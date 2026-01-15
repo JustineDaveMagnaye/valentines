@@ -565,29 +565,85 @@ export default function ValentineCat() {
   // --- Floating "No" position
   const [pos, setPos] = useState<XY>({ x: 24, y: 24 });
 
+  // Pick a position OUTSIDE the card but nearby - never overlapping
   const pickNearCard = () => {
     const card = cardRef.current?.getBoundingClientRect?.();
-    if (!card) return clampBtn(rand(16, vp.w - btnSize.w - 16), rand(16, vp.h - btnSize.h - 16));
-    const spots = [
-      { x: card.right - 40, y: card.top + 14 },
-      { x: card.left - btnSize.w + 28, y: card.top + rand(10, Math.max(12, card.height - 64)) },
-      { x: card.right - 28, y: card.top + rand(10, Math.max(12, card.height - 64)) },
-      { x: card.left + rand(10, Math.max(12, card.width - 160)), y: card.top - btnSize.h + 24 },
-      { x: card.left + rand(10, Math.max(12, card.width - 160)), y: card.bottom - 26 },
-    ];
+    if (!card) return clampBtn(rand(16, vp.w - btnSize.w - 16), rand(80, vp.h - btnSize.h - 80));
+
+    // Safe margin to ensure button is fully outside card
+    const margin = 20;
+
+    // Spots that are OUTSIDE the card with safe margins
+    const spots: XY[] = [];
+
+    // LEFT of card (if there's room)
+    if (card.left > btnSize.w + margin) {
+      spots.push({ x: card.left - btnSize.w - margin, y: card.top + rand(0, Math.max(0, card.height - btnSize.h)) });
+    }
+
+    // RIGHT of card (if there's room)
+    if (vp.w - card.right > btnSize.w + margin) {
+      spots.push({ x: card.right + margin, y: card.top + rand(0, Math.max(0, card.height - btnSize.h)) });
+    }
+
+    // ABOVE card (if there's room - accounting for HUD)
+    if (card.top > btnSize.h + 80) {
+      spots.push({ x: card.left + rand(0, Math.max(0, card.width - btnSize.w)), y: card.top - btnSize.h - margin });
+    }
+
+    // BELOW card (if there's room)
+    if (vp.h - card.bottom > btnSize.h + margin) {
+      spots.push({ x: card.left + rand(0, Math.max(0, card.width - btnSize.w)), y: card.bottom + margin });
+    }
+
+    // If no safe spots found, place in corners away from card center
+    if (spots.length === 0) {
+      const cardCenterX = card.left + card.width / 2;
+      const cardCenterY = card.top + card.height / 2;
+
+      // Pick corner furthest from card center
+      if (cardCenterX > vp.w / 2) {
+        // Card is on right, put button on left
+        spots.push({ x: 20, y: cardCenterY > vp.h / 2 ? 80 : vp.h - btnSize.h - 20 });
+      } else {
+        // Card is on left, put button on right
+        spots.push({ x: vp.w - btnSize.w - 20, y: cardCenterY > vp.h / 2 ? 80 : vp.h - btnSize.h - 20 });
+      }
+    }
+
     const s = spots[Math.floor(rand(0, spots.length))];
-    return clampBtn(s.x + rand(-12, 12), s.y + rand(-10, 10), true);
+    return clampBtn(s.x, s.y);
   };
 
   const moveNo = (reason?: string) => {
     const t = now();
     if (t < freezeUntil) return;
 
-    // On mobile (coarse pointer), keep button near the card for easier access
-    // On desktop, can move more freely but still stay visible
-    const next = coarse
-      ? pickNearCard()
-      : clampBtn(rand(40, vp.w - btnSize.w - 40), rand(100, vp.h - btnSize.h - 100));
+    // Always use pickNearCard to ensure button is outside the card
+    // This works for both mobile and desktop
+    let next = pickNearCard();
+
+    // On desktop, occasionally allow more varied positions but still avoid card
+    if (!coarse && Math.random() < 0.3) {
+      const card = cardRef.current?.getBoundingClientRect?.();
+      if (card) {
+        // Generate random position
+        let candidate = clampBtn(rand(40, vp.w - btnSize.w - 40), rand(100, vp.h - btnSize.h - 100));
+
+        // Check if it overlaps with card (with margin)
+        const margin = 30;
+        const overlapsCard =
+          candidate.x < card.right + margin &&
+          candidate.x + btnSize.w > card.left - margin &&
+          candidate.y < card.bottom + margin &&
+          candidate.y + btnSize.h > card.top - margin;
+
+        // Only use candidate if it doesn't overlap
+        if (!overlapsCard) {
+          next = candidate;
+        }
+      }
+    }
 
     setPos(next);
     // Stay in place longer (1.2s) so user can find and click it
