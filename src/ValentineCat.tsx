@@ -11,19 +11,23 @@ function cn(...xs: Array<string | undefined | false>) {
   return xs.filter(Boolean).join(" ");
 }
 
-function Card({ className, children, ...props }: React.HTMLAttributes<HTMLDivElement>) {
-  return (
-    <div
-      className={cn(
-        "rounded-2xl border border-slate-200 bg-white shadow-sm",
-        className
-      )}
-      {...props}
-    >
-      {children}
-    </div>
-  );
-}
+const Card = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
+  ({ className, children, ...props }, ref) => {
+    return (
+      <div
+        ref={ref}
+        className={cn(
+          "rounded-2xl border border-slate-200 bg-white shadow-sm",
+          className
+        )}
+        {...props}
+      >
+        {children}
+      </div>
+    );
+  }
+);
+Card.displayName = "Card";
 
 function CardContent({ className, children, ...props }: React.HTMLAttributes<HTMLDivElement>) {
   return (
@@ -130,15 +134,32 @@ const moveToward = (from: XY, to: XY, step: number): XY => {
 };
 
 function useViewport() {
-  const [vp, setVp] = useState(() =>
-    typeof window === "undefined" ? { w: 390, h: 844 } : { w: window.innerWidth, h: window.innerHeight }
-  );
+  // Start with safe defaults for SSR - hydration safe
+  const [vp, setVp] = useState({ w: 390, h: 844 });
+  const [mounted, setMounted] = useState(false);
+
   useEffect(() => {
-    const on = () => setVp({ w: window.innerWidth, h: window.innerHeight });
-    window.addEventListener("resize", on);
-    return () => window.removeEventListener("resize", on);
+    setMounted(true);
+    const update = () => {
+      // Use visualViewport for better mobile support (accounts for keyboard, etc.)
+      const w = window.visualViewport?.width ?? window.innerWidth;
+      const h = window.visualViewport?.height ?? window.innerHeight;
+      setVp({ w, h });
+    };
+    update();
+
+    window.addEventListener("resize", update);
+    window.visualViewport?.addEventListener("resize", update);
+    window.visualViewport?.addEventListener("scroll", update);
+
+    return () => {
+      window.removeEventListener("resize", update);
+      window.visualViewport?.removeEventListener("resize", update);
+      window.visualViewport?.removeEventListener("scroll", update);
+    };
   }, []);
-  return vp;
+
+  return { ...vp, mounted };
 }
 
 function usePointerCoarse() {
@@ -164,10 +185,16 @@ function useInterval(ms: number, enabled = true) {
 }
 
 export default function ValentineCat() {
-  const vp = useViewport();
+  const { w: vpW, h: vpH, mounted } = useViewport();
+  const vp = { w: vpW, h: vpH };
   const coarse = usePointerCoarse();
   const reduceMotion = useReducedMotion();
   const tick = useInterval(90);
+
+  // Responsive scaling factor based on viewport
+  const isMobile = vpW < 640;
+  const isSmall = vpW < 380;
+  const scaleFactor = isSmall ? 0.85 : isMobile ? 0.92 : 1;
 
   const cardRef = useRef<HTMLDivElement | null>(null);
 
@@ -238,7 +265,10 @@ export default function ValentineCat() {
     return { scale, holdMs, label, shieldChance };
   }, [noCount, calm]);
 
-  const btnSize = useMemo(() => ({ w: 132 * mode.scale, h: 56 * mode.scale }), [mode.scale]);
+  const btnSize = useMemo(() => ({
+    w: Math.round(132 * mode.scale * scaleFactor),
+    h: Math.round(56 * mode.scale * scaleFactor)
+  }), [mode.scale, scaleFactor]);
 
   const clampBtn = (x: number, y: number, allowOff = false) => {
     const off = allowOff ? 14 : 0;
@@ -289,9 +319,9 @@ export default function ValentineCat() {
     }
   }, [noCount]);
 
-  // --- Shield box + fish lure
-  const BOX_W = 136;
-  const BOX_H = 96;
+  // --- Shield box + fish lure (responsive)
+  const BOX_W = Math.round(136 * scaleFactor);
+  const BOX_H = Math.round(96 * scaleFactor);
 
   const [boxVisible, setBoxVisible] = useState(false);
   const [boxPos, setBoxPos] = useState<XY>({ x: 24, y: 24 });
@@ -572,12 +602,20 @@ export default function ValentineCat() {
     return "Tip: press & hold the No button";
   })();
 
-  // --- Accepted screen
+  // --- Accepted screen (responsive)
   if (accepted) {
     return (
-      <div className="min-h-screen min-h-dvh bg-gradient-to-br from-pink-100 to-rose-100 flex items-center justify-center p-4 sm:p-6">
+      <div
+        className="min-h-[100dvh] bg-gradient-to-br from-pink-100 to-rose-100 flex items-center justify-center p-4 sm:p-6"
+        style={{
+          paddingTop: "max(env(safe-area-inset-top, 16px), 16px)",
+          paddingBottom: "max(env(safe-area-inset-bottom, 16px), 16px)",
+          paddingLeft: "max(env(safe-area-inset-left, 16px), 16px)",
+          paddingRight: "max(env(safe-area-inset-right, 16px), 16px)",
+        }}
+      >
         <div className="fixed inset-0 pointer-events-none overflow-hidden">
-          {Array.from({ length: coarse ? 12 : 24 }).map((_, i) => (
+          {mounted && Array.from({ length: isMobile ? 16 : 24 }).map((_, i) => (
             <motion.div
               key={i}
               className="absolute text-xl sm:text-2xl opacity-40"
@@ -590,15 +628,15 @@ export default function ValentineCat() {
           ))}
         </div>
         <motion.div initial={{ scale: 0.88, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="w-full max-w-md mx-auto">
-          <Card className="rounded-3xl shadow-lg bg-white/85 backdrop-blur border border-white/60">
+          <Card className="rounded-2xl sm:rounded-3xl shadow-lg bg-white/85 backdrop-blur border border-white/60">
             <CardContent className="p-6 sm:p-10 text-center">
-              <Cat className="h-16 w-16 sm:h-20 sm:w-20 mx-auto text-pink-500" />
-              <h1 className="text-3xl sm:text-4xl font-bold mt-4">YAYYYYY 💖</h1>
-              <p className="mt-3 text-base sm:text-lg">You are now officially my Valentine 😽💘</p>
-              <p className="mt-2 text-xs sm:text-sm text-slate-500">The cat is pleased. The cat is loved.</p>
-              <div className="mt-6 flex items-center justify-center gap-2">
-                <Button variant="outline" onClick={resetAll} className="rounded-full min-h-[44px]">
-                  <RefreshCcw className="h-4 w-4" /> play again
+              <Cat className="h-14 w-14 sm:h-20 sm:w-20 mx-auto text-pink-500" />
+              <h1 className="text-2xl sm:text-4xl font-bold mt-3 sm:mt-4">YAYYYYY 💖</h1>
+              <p className="mt-2 sm:mt-3 text-base sm:text-lg">You are now officially my Valentine 😽💘</p>
+              <p className="mt-1.5 sm:mt-2 text-xs sm:text-sm text-slate-500">The cat is pleased. The cat is loved.</p>
+              <div className="mt-4 sm:mt-6 flex items-center justify-center gap-2">
+                <Button variant="outline" onClick={resetAll} className="rounded-full text-xs sm:text-sm px-3 sm:px-4 py-2 sm:py-3 touch-manipulation">
+                  <RefreshCcw className="h-3 w-3 sm:h-4 sm:w-4" /> play again
                 </Button>
               </div>
             </CardContent>
@@ -615,10 +653,12 @@ export default function ValentineCat() {
 
   return (
     <div
-      className="min-h-screen min-h-dvh bg-gradient-to-br from-pink-50 via-rose-50 to-rose-100 p-4 sm:p-6 overflow-hidden"
+      className="min-h-[100dvh] bg-gradient-to-br from-pink-50 via-rose-50 to-rose-100 p-2 sm:p-4 md:p-6 overflow-x-hidden"
       style={{
-        paddingBottom: "calc(env(safe-area-inset-bottom, 0px) + 18px)",
-        paddingTop: "calc(env(safe-area-inset-top, 0px) + 16px)"
+        paddingTop: "env(safe-area-inset-top, 0px)",
+        paddingBottom: "max(env(safe-area-inset-bottom, 0px), 16px)",
+        paddingLeft: "env(safe-area-inset-left, 0px)",
+        paddingRight: "env(safe-area-inset-right, 0px)",
       }}
     >
       {/* Background ambience */}
@@ -651,40 +691,45 @@ export default function ValentineCat() {
         ))}
       </div>
 
-      {/* HUD */}
-      <div className="fixed left-0 right-0 top-0 z-[90] px-2 sm:px-4 pt-2 sm:pt-4">
+      {/* HUD - responsive for all screen sizes */}
+      <div
+        className="fixed left-0 right-0 top-0 z-[90] px-2 sm:px-4 pt-2 sm:pt-4"
+        style={{ paddingTop: "max(env(safe-area-inset-top, 8px), 8px)" }}
+      >
         <div className="mx-auto max-w-md">
-          <div className="flex items-start justify-between gap-2 sm:gap-3">
-            <div className="flex items-center gap-1.5 sm:gap-2">
+          <div className="flex items-start justify-between gap-1.5 sm:gap-3">
+            <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
               <Button
                 variant="outline"
                 onClick={resetAll}
-                className="rounded-full bg-white/70 backdrop-blur border-white/60 shadow-sm min-h-[40px] text-xs sm:text-sm px-2.5 sm:px-4"
+                className="rounded-full bg-white/70 backdrop-blur border-white/60 shadow-sm text-xs sm:text-sm px-2 sm:px-4 py-2 sm:py-3"
                 aria-label="Reset"
               >
-                <RefreshCcw className="h-3.5 w-3.5 sm:h-4 sm:w-4" /> <span className="hidden sm:inline">reset</span>
+                <RefreshCcw className="h-3 w-3 sm:h-4 sm:w-4" />
+                <span className="hidden xs:inline sm:inline">reset</span>
               </Button>
               <Button
                 variant="outline"
                 onClick={() => setShowHelp(true)}
-                className="rounded-full bg-white/70 backdrop-blur border-white/60 shadow-sm min-h-[40px] text-xs sm:text-sm px-2.5 sm:px-4"
+                className="rounded-full bg-white/70 backdrop-blur border-white/60 shadow-sm text-xs sm:text-sm px-2 sm:px-4 py-2 sm:py-3"
                 aria-label="How to play"
               >
-                <Info className="h-3.5 w-3.5 sm:h-4 sm:w-4" /> <span className="hidden sm:inline">help</span>
+                <Info className="h-3 w-3 sm:h-4 sm:w-4" />
+                <span className="hidden xs:inline sm:inline">help</span>
               </Button>
             </div>
 
-            <div className="rounded-2xl bg-white/70 backdrop-blur border border-white/60 shadow-sm px-2.5 sm:px-3 py-1.5 sm:py-2 min-w-[140px] sm:min-w-[190px]">
+            <div className="rounded-xl sm:rounded-2xl bg-white/70 backdrop-blur border border-white/60 shadow-sm px-2 sm:px-3 py-1.5 sm:py-2 min-w-0 flex-1 max-w-[180px] sm:max-w-[190px]">
               <div className="flex items-center justify-between">
                 <span className="text-[10px] sm:text-[11px] text-slate-600">status</span>
                 <motion.div
                   animate={reduceMotion ? {} : { rotate: isShieldActive ? [0, 12, -12, 0] : 0 }}
                   transition={{ duration: 1.2, repeat: isShieldActive ? Infinity : 0, ease: "easeInOut" }}
                 >
-                  <Sparkles className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-rose-500" />
+                  <Sparkles className="h-3 w-3 sm:h-4 sm:w-4 text-rose-500" />
                 </motion.div>
               </div>
-              <div className="mt-0.5 sm:mt-1 text-[10px] sm:text-[11px] text-slate-700">
+              <div className="mt-0.5 sm:mt-1 text-[10px] sm:text-[11px] text-slate-700 truncate">
                 <span className="font-semibold">{moodBadge.t}</span>
                 <span className="text-slate-500"> • No {noCount}/20</span>
               </div>
@@ -694,13 +739,13 @@ export default function ValentineCat() {
         </div>
       </div>
 
-      {/* Help modal */}
+      {/* Help modal - responsive */}
       <AnimatePresence>
         {showHelp && (
           <motion.div className="fixed inset-0 z-[100]" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
             <div className="absolute inset-0 bg-black/30" onClick={() => setShowHelp(false)} />
             <motion.div
-              className="absolute left-1/2 top-1/2 w-[min(92vw,520px)] -translate-x-1/2 -translate-y-1/2"
+              className="absolute left-1/2 top-1/2 w-[min(94vw,520px)] -translate-x-1/2 -translate-y-1/2 max-h-[90vh] overflow-y-auto"
               initial={{ y: 18, scale: 0.98, opacity: 0 }}
               animate={{ y: 0, scale: 1, opacity: 1 }}
               exit={{ y: 12, scale: 0.98, opacity: 0 }}
@@ -708,40 +753,40 @@ export default function ValentineCat() {
               role="dialog"
               aria-modal="true"
             >
-              <Card className="rounded-3xl bg-white/90 backdrop-blur border border-white/70 shadow-xl">
-                <CardContent className="p-6">
-                  <div className="flex items-start justify-between gap-3">
+              <Card className="rounded-2xl sm:rounded-3xl bg-white/90 backdrop-blur border border-white/70 shadow-xl">
+                <CardContent className="p-4 sm:p-6">
+                  <div className="flex items-start justify-between gap-2 sm:gap-3">
                     <div>
-                      <div className="text-lg font-semibold">How to play</div>
-                      <div className="mt-1 text-sm text-slate-600">A tiny game of patience. The cat is dramatic.</div>
+                      <div className="text-base sm:text-lg font-semibold">How to play</div>
+                      <div className="mt-0.5 sm:mt-1 text-xs sm:text-sm text-slate-600">A tiny game of patience. The cat is dramatic.</div>
                     </div>
-                    <Button variant="outline" className="rounded-full" onClick={() => setShowHelp(false)} aria-label="Close help">
-                      <X className="h-4 w-4" />
+                    <Button variant="outline" className="rounded-full px-2 sm:px-3 py-1.5 sm:py-2 touch-manipulation flex-shrink-0" onClick={() => setShowHelp(false)} aria-label="Close help">
+                      <X className="h-3 w-3 sm:h-4 sm:w-4" />
                     </Button>
                   </div>
 
-                  <div className="mt-4 grid gap-3 text-sm text-slate-700">
-                    <div className="rounded-2xl bg-rose-50/70 border border-rose-100 p-3">
-                      <div className="font-semibold">Saying “No”</div>
-                      <div className="mt-1">
+                  <div className="mt-3 sm:mt-4 grid gap-2 sm:gap-3 text-xs sm:text-sm text-slate-700">
+                    <div className="rounded-xl sm:rounded-2xl bg-rose-50/70 border border-rose-100 p-2 sm:p-3">
+                      <div className="font-semibold text-sm sm:text-base">Saying "No"</div>
+                      <div className="mt-0.5 sm:mt-1">
                         Find the floating <span className="font-semibold">No</span> and <span className="font-semibold">press & hold</span> until it fills.
                       </div>
                     </div>
-                    <div className="rounded-2xl bg-amber-50/70 border border-amber-100 p-3">
-                      <div className="font-semibold">Shield box 📦</div>
-                      <div className="mt-1">After a successful No, the cat may summon a box and hide inside.</div>
+                    <div className="rounded-xl sm:rounded-2xl bg-amber-50/70 border border-amber-100 p-2 sm:p-3">
+                      <div className="font-semibold text-sm sm:text-base">Shield box 📦</div>
+                      <div className="mt-0.5 sm:mt-1">After a successful No, the cat may summon a box and hide inside.</div>
                     </div>
-                    <div className="rounded-2xl bg-indigo-50/70 border border-indigo-100 p-3">
-                      <div className="font-semibold">Lure with fish 🐟</div>
-                      <div className="mt-1">
+                    <div className="rounded-xl sm:rounded-2xl bg-indigo-50/70 border border-indigo-100 p-2 sm:p-3">
+                      <div className="font-semibold text-sm sm:text-base">Lure with fish 🐟</div>
+                      <div className="mt-0.5 sm:mt-1">
                         Spawn a fish, then <span className="font-semibold">drag it near the box</span>. The cat will approach and eat it.
                       </div>
-                      <div className="mt-1">If you tap the cat while it’s approaching/eating, it panics and dives back into the box.</div>
+                      <div className="mt-0.5 sm:mt-1">If you tap the cat while it's approaching/eating, it panics and dives back.</div>
                     </div>
                   </div>
 
-                  <div className="mt-5 flex items-center justify-end gap-2">
-                    <Button variant="outline" className="rounded-full" onClick={() => setShowHelp(false)}>
+                  <div className="mt-3 sm:mt-5 flex items-center justify-end gap-2">
+                    <Button variant="outline" className="rounded-full text-xs sm:text-sm px-3 sm:px-4 py-1.5 sm:py-2 touch-manipulation" onClick={() => setShowHelp(false)}>
                       got it
                     </Button>
                   </div>
@@ -752,20 +797,20 @@ export default function ValentineCat() {
         )}
       </AnimatePresence>
 
-      {/* Main card */}
-      <div className="min-h-[calc(100vh-2rem)] min-h-[calc(100dvh-2rem)] flex items-center justify-center px-2 sm:px-0 pt-16 sm:pt-20">
+      {/* Main card - responsive for all screen sizes */}
+      <div className="min-h-[calc(100dvh-2rem)] flex items-center justify-center pt-16 sm:pt-20 pb-4">
         <Card
-          ref={cardRef as any}
-          className="relative z-30 rounded-3xl shadow-lg bg-white/80 backdrop-blur-xl border border-white/60 max-w-md w-full mx-auto"
+          ref={cardRef}
+          className="relative z-30 rounded-2xl sm:rounded-3xl shadow-lg bg-white/80 backdrop-blur-xl border border-white/60 max-w-md w-full mx-2 sm:mx-4"
         >
           <CardContent className="p-4 sm:p-6 md:p-8 text-center">
-            <div className="flex flex-wrap items-center justify-center gap-1 sm:gap-2">
-              <Badge className={moodBadge.cls}>{moodBadge.t}</Badge>
-              <Badge variant="outline">No: {noCount}/20</Badge>
-              {calm && <Badge className="bg-emerald-50 text-emerald-700">Calm 😽</Badge>}
-              {isShieldActive && <Badge className="bg-amber-50 text-amber-700">Shield 📦</Badge>}
+            <div className="flex flex-wrap items-center justify-center gap-1.5 sm:gap-2">
+              <Badge className={cn(moodBadge.cls, "text-[10px] sm:text-[11px]")}>{moodBadge.t}</Badge>
+              <Badge variant="outline" className="text-[10px] sm:text-[11px]">No: {noCount}/20</Badge>
+              {calm && <Badge className="bg-emerald-50 text-emerald-700 text-[10px] sm:text-[11px]">Calm 😽</Badge>}
+              {isShieldActive && <Badge className="bg-amber-50 text-amber-700 text-[10px] sm:text-[11px]">Shield 📦</Badge>}
               {fishVisible && (
-                <Badge className={fishNearBox ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-700"}>
+                <Badge className={cn(fishNearBox ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-700", "text-[10px] sm:text-[11px]")}>
                   {fishNearBox ? "Lure!" : "Fish"}
                 </Badge>
               )}
@@ -773,7 +818,7 @@ export default function ValentineCat() {
 
             <motion.button
               type="button"
-              className="mt-3 sm:mt-4 mx-auto block rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-300 min-w-[56px] min-h-[56px]"
+              className="mt-3 sm:mt-4 mx-auto block rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-300 touch-manipulation"
               onClick={() => {
                 // any touch while approaching/eating scares it back into the box
                 if (approaching || eating) {
@@ -795,13 +840,13 @@ export default function ValentineCat() {
               title="Pet the cat"
             >
               {noCount < 5 ? (
-                <Cat className="h-14 w-14 sm:h-16 sm:w-16 md:h-20 md:w-20 mx-auto text-pink-400" />
+                <Cat className="h-14 w-14 sm:h-20 sm:w-20 mx-auto text-pink-400" />
               ) : (
-                <Angry className="h-14 w-14 sm:h-16 sm:w-16 md:h-20 md:w-20 mx-auto text-red-500" />
+                <Angry className="h-14 w-14 sm:h-20 sm:w-20 mx-auto text-red-500" />
               )}
             </motion.button>
 
-            <h1 className="text-2xl sm:text-3xl font-bold mt-3">Will you be my Valentine?</h1>
+            <h1 className="text-2xl sm:text-3xl font-bold mt-2 sm:mt-3">Will you be my Valentine?</h1>
 
             <AnimatePresence mode="wait">
               <motion.p
@@ -837,43 +882,43 @@ export default function ValentineCat() {
                   burst("💖", { x: vp.w * 0.5, y: vp.h * 0.35 }, 16, 92, 1.2);
                   setAccepted(true);
                 }}
-                className="bg-pink-500 hover:bg-pink-600 text-white w-full sm:w-auto sm:mx-auto rounded-2xl min-h-[44px] text-sm sm:text-base"
+                className="bg-pink-500 hover:bg-pink-600 text-white w-full sm:w-auto sm:mx-auto rounded-xl sm:rounded-2xl text-sm sm:text-base py-2.5 sm:py-3 touch-manipulation"
               >
-                <Heart className="h-4 w-4 flex-shrink-0" /> Yes 💖
+                <Heart className="h-4 w-4" /> Yes 💖
               </Button>
 
               <div className="flex flex-wrap items-center justify-center gap-1.5 sm:gap-2">
-                <Button variant="outline" onClick={giveTreat} disabled={calm} className="rounded-full min-h-[40px] text-sm">
-                  <Fish className="h-4 w-4 flex-shrink-0" /> give treat
+                <Button variant="outline" onClick={giveTreat} disabled={calm} className="rounded-full text-xs sm:text-sm px-3 sm:px-4 py-2 sm:py-3 touch-manipulation">
+                  <Fish className="h-3 w-3 sm:h-4 sm:w-4" /> give treat
                 </Button>
-                <span className="text-[10px] sm:text-xs text-slate-500">(calms 5s)</span>
+                <span className="text-[10px] sm:text-xs text-slate-500">(calms it for 5s)</span>
               </div>
 
               {(isShieldActive || noCount >= 2) && (
-                <div className="rounded-2xl bg-white/70 backdrop-blur border border-white/60 shadow-sm px-2.5 sm:px-3 py-2.5 sm:py-3">
+                <div className="rounded-xl sm:rounded-2xl bg-white/70 backdrop-blur border border-white/60 shadow-sm px-2 sm:px-3 py-2 sm:py-3">
                   {!fishVisible ? (
-                    <Button onClick={() => spawnFish(true)} className="bg-amber-500 hover:bg-amber-600 text-white w-full rounded-2xl min-h-[44px] text-sm sm:text-base">
-                      <Fish className="h-4 w-4 flex-shrink-0" /> spawn fish
+                    <Button onClick={() => spawnFish(true)} className="bg-amber-500 hover:bg-amber-600 text-white w-full rounded-xl sm:rounded-2xl text-xs sm:text-sm py-2 sm:py-3 touch-manipulation">
+                      <Fish className="h-3 w-3 sm:h-4 sm:w-4" /> spawn fish
                     </Button>
                   ) : (
-                    <p className="text-[10px] sm:text-xs text-slate-600 leading-relaxed">
-                      Drag fish near box. Don't tap while it eats!
+                    <p className="text-[10px] sm:text-xs text-slate-600">
+                      Drag the fish near the box. If the cat comes out, don't tap it—touching scares it back.
                     </p>
                   )}
                 </div>
               )}
 
-              <p className="mt-1 text-[10px] sm:text-xs text-slate-500 leading-relaxed">
-                Press & hold the floating <span className="font-semibold">No</span> button. ({Math.round(mode.holdMs / 100) / 10}s)
+              <p className="mt-0.5 sm:mt-1 text-[10px] sm:text-xs text-slate-500 px-2">
+                To say <span className="font-semibold">No</span>, press & hold the floating button. ({Math.round(mode.holdMs / 100) / 10}s)
               </p>
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* FLOATING NO BUTTON */}
+      {/* FLOATING NO BUTTON - responsive */}
       <AnimatePresence>
-        {showNo && (
+        {showNo && mounted && (
           <motion.div
             className="fixed left-0 top-0 z-[25]"
             style={{ x: pos.x, y: pos.y }}
@@ -884,7 +929,8 @@ export default function ValentineCat() {
           >
             <motion.button
               type="button"
-              className="relative select-none rounded-2xl px-4 py-3 shadow-lg bg-white/80 backdrop-blur border border-white/60"
+              className="relative select-none rounded-xl sm:rounded-2xl px-3 sm:px-4 py-2 sm:py-3 shadow-lg bg-white/80 backdrop-blur border border-white/60 touch-manipulation"
+              style={{ minWidth: btnSize.w, minHeight: btnSize.h }}
               onPointerDown={beginHold}
               onPointerUp={endHold}
               onPointerCancel={endHold}
@@ -896,23 +942,23 @@ export default function ValentineCat() {
               transition={{ duration: 1.1, repeat: reduceMotion || holding ? 0 : Infinity, ease: "easeInOut" }}
             >
               {/* ring */}
-              <div className="absolute -inset-[6px] rounded-[22px] p-[2px]" style={ringStyle} aria-hidden="true">
-                <div className="h-full w-full rounded-[20px] bg-white/75" />
+              <div className="absolute -inset-[5px] sm:-inset-[6px] rounded-[18px] sm:rounded-[22px] p-[2px]" style={ringStyle} aria-hidden="true">
+                <div className="h-full w-full rounded-[16px] sm:rounded-[20px] bg-white/75" />
               </div>
 
-              <div className="relative flex items-center gap-2">
-                <div className="text-sm font-semibold text-slate-800">{mode.label}</div>
-                <span className="text-[11px] text-slate-500">hold</span>
+              <div className="relative flex items-center gap-1.5 sm:gap-2">
+                <div className="text-xs sm:text-sm font-semibold text-slate-800">{mode.label}</div>
+                <span className="text-[10px] sm:text-[11px] text-slate-500">hold</span>
               </div>
-              <div className="relative mt-1 text-[11px] text-slate-600">{holding ? `${Math.round(holdP * 100)}%` : "tap & hold"}</div>
+              <div className="relative mt-0.5 sm:mt-1 text-[10px] sm:text-[11px] text-slate-600">{holding ? `${Math.round(holdP * 100)}%` : "tap & hold"}</div>
             </motion.button>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* ENTERING BOX (jump animation) */}
+      {/* ENTERING BOX (jump animation) - responsive */}
       <AnimatePresence>
-        {enteringBox && (
+        {enteringBox && mounted && (
           <motion.div
             className="fixed left-0 top-0 z-[75]"
             initial={{ x: enteringBox.from.x, y: enteringBox.from.y, opacity: 1, scale: 1 }}
@@ -920,16 +966,16 @@ export default function ValentineCat() {
             exit={{ opacity: 0, scale: 0.8 }}
             transition={{ type: "spring", stiffness: 360, damping: 24 }}
           >
-            <div className="rounded-2xl bg-white/80 backdrop-blur border border-white/60 shadow-lg px-4 py-3">
-              <div className="text-sm font-semibold text-slate-800">*hop* 📦</div>
+            <div className="rounded-xl sm:rounded-2xl bg-white/80 backdrop-blur border border-white/60 shadow-lg px-3 sm:px-4 py-2 sm:py-3">
+              <div className="text-xs sm:text-sm font-semibold text-slate-800">*hop* 📦</div>
             </div>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* CHASING / EATING CAT (touch scares it back) */}
+      {/* CHASING / EATING CAT (touch scares it back) - responsive */}
       <AnimatePresence>
-        {(approaching || eating) && (
+        {(approaching || eating) && mounted && (
           <motion.div
             className="fixed left-0 top-0 z-[75]"
             style={{ x: catChasePos.x, y: catChasePos.y }}
@@ -940,19 +986,19 @@ export default function ValentineCat() {
           >
             <motion.button
               type="button"
-              className="rounded-2xl bg-white/80 backdrop-blur border border-white/60 shadow-lg px-4 py-3"
-              onPointerDown={() => scareBackToBox(eating ? "HEY 😾📦 (let me eat!)" : "DON’T 😾📦")}
+              className="rounded-xl sm:rounded-2xl bg-white/80 backdrop-blur border border-white/60 shadow-lg px-3 sm:px-4 py-2 sm:py-3 touch-manipulation"
+              onPointerDown={() => scareBackToBox(eating ? "HEY 😾📦 (let me eat!)" : "DON'T 😾📦")}
               aria-label="Cat"
-              title="Don’t touch while it eats"
+              title="Don't touch while it eats"
               animate={reduceMotion ? {} : eating ? { rotate: [0, -2, 2, 0] } : { y: [0, -1.5, 0] }}
               transition={{ duration: 0.9, repeat: reduceMotion ? 0 : Infinity, ease: "easeInOut" }}
             >
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-semibold text-slate-800">{eating ? "munch…" : "sniff…"}</span>
-                <span className="text-xs text-slate-500">😼</span>
+              <div className="flex items-center gap-1.5 sm:gap-2">
+                <span className="text-xs sm:text-sm font-semibold text-slate-800">{eating ? "munch…" : "sniff…"}</span>
+                <span className="text-[10px] sm:text-xs text-slate-500">😼</span>
               </div>
               {eating && (
-                <div className="mt-2 h-2 w-[132px] rounded-full bg-slate-200 overflow-hidden">
+                <div className="mt-1.5 sm:mt-2 h-1.5 sm:h-2 w-[100px] sm:w-[132px] rounded-full bg-slate-200 overflow-hidden">
                   <motion.div
                     className="h-full rounded-full bg-rose-400"
                     animate={{ width: `${Math.round(fishEatenP * 100)}%` }}
@@ -965,9 +1011,9 @@ export default function ValentineCat() {
         )}
       </AnimatePresence>
 
-      {/* DRAG FISH */}
+      {/* DRAG FISH - responsive */}
       <AnimatePresence>
-        {fishVisible && (
+        {fishVisible && mounted && (
           <motion.div
             className="fixed left-0 top-0 z-[80]"
             style={{ x: fishPos.x, y: fishPos.y }}
@@ -980,9 +1026,9 @@ export default function ValentineCat() {
               <motion.button
                 type="button"
                 className={cn(
-                  "relative select-none",
-                  "rounded-3xl border border-white/60 bg-white/80 backdrop-blur shadow-lg",
-                  "px-4 py-3",
+                  "relative select-none touch-manipulation",
+                  "rounded-2xl sm:rounded-3xl border border-white/60 bg-white/80 backdrop-blur shadow-lg",
+                  "px-3 sm:px-4 py-2 sm:py-3",
                   eating ? "cursor-not-allowed opacity-70" : "cursor-grab active:cursor-grabbing"
                 )}
                 aria-label="Drag the fish"
@@ -1006,16 +1052,16 @@ export default function ValentineCat() {
                 transition={{ duration: 1.1, repeat: reduceMotion || eating ? 0 : Infinity, ease: "easeInOut" }}
               >
                 <motion.div
-                  className="text-4xl"
+                  className="text-3xl sm:text-4xl"
                   animate={eating ? { scale: fishScale } : { scale: 1 }}
                   transition={{ type: "spring", stiffness: 420, damping: 26 }}
                 >
                   🐟
                 </motion.div>
 
-                <div className="mt-1 flex items-center justify-between gap-2">
-                  <div className="text-[11px] text-slate-600">fish</div>
-                  <div className={cn("text-[11px]", fishNearBox ? "text-emerald-700" : "text-slate-500")}>
+                <div className="mt-0.5 sm:mt-1 flex items-center justify-between gap-1.5 sm:gap-2">
+                  <div className="text-[10px] sm:text-[11px] text-slate-600">fish</div>
+                  <div className={cn("text-[10px] sm:text-[11px]", fishNearBox ? "text-emerald-700" : "text-slate-500")}>
                     {fishNearBox ? "near box" : "drag"}
                   </div>
                 </div>
@@ -1026,7 +1072,7 @@ export default function ValentineCat() {
                       initial={{ opacity: 0, y: 6 }}
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, y: 6 }}
-                      className="mt-2 h-2 w-full rounded-full bg-slate-200 overflow-hidden"
+                      className="mt-1.5 sm:mt-2 h-1.5 sm:h-2 w-full rounded-full bg-slate-200 overflow-hidden"
                     >
                       <motion.div
                         className="h-full rounded-full bg-rose-400"
@@ -1044,10 +1090,10 @@ export default function ValentineCat() {
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: 10 }}
-                    className="mt-2 text-center"
+                    className="mt-1.5 sm:mt-2 text-center"
                   >
-                    <span className="inline-flex items-center gap-2 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-100 px-3 py-1 text-[11px]">
-                      <Sparkles className="h-3 w-3" /> lure active
+                    <span className="inline-flex items-center gap-1.5 sm:gap-2 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-100 px-2 sm:px-3 py-0.5 sm:py-1 text-[10px] sm:text-[11px]">
+                      <Sparkles className="h-2.5 w-2.5 sm:h-3 sm:w-3" /> lure active
                     </span>
                   </motion.div>
                 )}
@@ -1057,9 +1103,9 @@ export default function ValentineCat() {
         )}
       </AnimatePresence>
 
-      {/* SHIELD BOX — keep face + wobble vibe */}
+      {/* SHIELD BOX — responsive + keep face + wobble vibe */}
       <AnimatePresence>
-        {boxVisible && (
+        {boxVisible && mounted && (
           <motion.div
             className="fixed left-0 top-0 z-[60]"
             style={{ x: boxPos.x, y: boxPos.y, width: BOX_W, height: BOX_H }}
@@ -1069,7 +1115,7 @@ export default function ValentineCat() {
             transition={{ type: "spring", stiffness: 360, damping: 24 }}
           >
             <div
-              className="relative w-full h-full"
+              className="relative w-full h-full touch-manipulation"
               onPointerDown={(e) => {
                 e.preventDefault();
                 if (approaching || eating) return;
@@ -1100,7 +1146,7 @@ export default function ValentineCat() {
 
               {/* glow */}
               <motion.div
-                className="absolute -inset-2 rounded-[24px] blur-xl"
+                className="absolute -inset-1.5 sm:-inset-2 rounded-[20px] sm:rounded-[24px] blur-xl"
                 animate={
                   reduceMotion
                     ? { opacity: fishNearBox ? 0.6 : catInBox ? 0.45 : 0.18 }
@@ -1112,28 +1158,28 @@ export default function ValentineCat() {
                 }
                 transition={{ duration: 1.25, repeat: reduceMotion ? 0 : Infinity, ease: "easeInOut" }}
               >
-                <div className={cn("absolute inset-0 rounded-[24px]", fishNearBox ? "bg-emerald-300/30" : "bg-amber-300/20")} />
+                <div className={cn("absolute inset-0 rounded-[20px] sm:rounded-[24px]", fishNearBox ? "bg-emerald-300/30" : "bg-amber-300/20")} />
               </motion.div>
 
               {/* box body */}
               <motion.div
-                className="absolute inset-0 rounded-3xl border border-white/60 bg-white/75 backdrop-blur shadow-lg"
+                className="absolute inset-0 rounded-2xl sm:rounded-3xl border border-white/60 bg-white/75 backdrop-blur shadow-lg"
                 animate={reduceMotion ? {} : { rotate: fishNearBox ? [0, 0.6, -0.6, 0] : [0, 0.35, -0.35, 0] }}
                 transition={{ duration: 1.1, repeat: reduceMotion ? 0 : Infinity, ease: "easeInOut" }}
               />
 
               {/* face */}
               <div className="absolute inset-0 flex items-center justify-center">
-                <div className="w-full px-3">
-                  <div className="mx-auto w-full rounded-2xl bg-amber-50/70 border border-amber-100 p-2">
-                    <div className="flex items-center justify-center gap-4">
-                      <span className="inline-block h-2.5 w-2.5 rounded-full bg-slate-700" />
-                      <span className="inline-block h-2.5 w-2.5 rounded-full bg-slate-700" />
+                <div className="w-full px-2 sm:px-3">
+                  <div className="mx-auto w-full rounded-xl sm:rounded-2xl bg-amber-50/70 border border-amber-100 p-1.5 sm:p-2">
+                    <div className="flex items-center justify-center gap-3 sm:gap-4">
+                      <span className="inline-block h-2 w-2 sm:h-2.5 sm:w-2.5 rounded-full bg-slate-700" />
+                      <span className="inline-block h-2 w-2 sm:h-2.5 sm:w-2.5 rounded-full bg-slate-700" />
                     </div>
-                    <div className="mt-2 flex items-center justify-center">
-                      <span className="text-[12px] text-slate-700">{catInBox ? "mrrp…" : "peek…"}</span>
+                    <div className="mt-1 sm:mt-2 flex items-center justify-center">
+                      <span className="text-[10px] sm:text-[12px] text-slate-700">{catInBox ? "mrrp…" : "peek…"}</span>
                     </div>
-                    <div className="mt-1 text-center text-[10px] text-slate-500">
+                    <div className="mt-0.5 sm:mt-1 text-center text-[9px] sm:text-[10px] text-slate-500">
                       {fishNearBox ? "lure active" : "drag fish nearby"}
                     </div>
                   </div>
@@ -1141,7 +1187,7 @@ export default function ValentineCat() {
               </div>
 
               {/* tiny cat icon */}
-              <div className="absolute -top-2 -right-2 rounded-full bg-white/80 border border-white/60 shadow px-2 py-1 text-[11px]">
+              <div className="absolute -top-1.5 -right-1.5 sm:-top-2 sm:-right-2 rounded-full bg-white/80 border border-white/60 shadow px-1.5 sm:px-2 py-0.5 sm:py-1 text-[10px] sm:text-[11px]">
                 {catInBox ? "😼📦" : "📦"}
               </div>
             </div>
