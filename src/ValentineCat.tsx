@@ -400,9 +400,15 @@ export default function ValentineCat() {
   // Mess and cleaning system
   const [messes, setMesses] = useState<Mess[]>([]);
   const [cleaningTools, setCleaningTools] = useState<CleaningTool[]>([]);
-  const [heldTool, setHeldTool] = useState<string | null>(null);
   const [cleanedCount, setCleanedCount] = useState(0);
   const [lastMessTime, setLastMessTime] = useState(now());
+
+  // Dragging tool state
+  const [draggedTool, setDraggedTool] = useState<string | null>(null);
+  const [draggedToolPos, setDraggedToolPos] = useState<XY>({ x: 0, y: 0 });
+  const [cleaningMess, setCleaningMess] = useState<string | null>(null);
+  const [cleaningProgress, setCleaningProgress] = useState(0);
+  const [cleaningBubbles, setCleaningBubbles] = useState<Array<{ id: string; x: number; y: number; t: number }>>([]);
 
   // Check if behavior is active
   const isBehaviorActive = tNow < behaviorUntil;
@@ -524,31 +530,90 @@ export default function ValentineCat() {
     setCleaningTools((prev) => [...prev.slice(-8), newTool]);
   };
 
-  const cleanMess = (messId: string, toolId: string) => {
-    const mess = messes.find((m) => m.id === messId);
+  // Check if dragged tool is over a mess
+  const getMessUnderTool = (toolPos: XY, toolId: string): Mess | null => {
     const tool = cleaningTools.find((t) => t.id === toolId);
+    if (!tool) return null;
 
-    if (!mess || !tool) return;
-
-    // Check if this tool can clean this mess
-    const validTools = messToolMap[mess.type];
-    if (!validTools.includes(tool.type)) {
-      setAside("wrong tool! 😾 try another");
-      return;
+    for (const mess of messes) {
+      const distance = dist(toolPos, { x: mess.x, y: mess.y });
+      if (distance < 50) {
+        // Check if this tool can clean this mess
+        const validTools = messToolMap[mess.type];
+        if (validTools.includes(tool.type)) {
+          return mess;
+        }
+      }
     }
+    return null;
+  };
 
-    // Clean the mess!
-    burst("✨", { x: mess.x, y: mess.y }, 6, 50, 1);
-    burst(toolEmojis[tool.type], { x: mess.x, y: mess.y }, 3, 30, 0.7);
+  // Spawn cleaning bubbles while scrubbing
+  const spawnCleaningBubble = (x: number, y: number) => {
+    setCleaningBubbles((prev) => [
+      ...prev.slice(-15),
+      {
+        id: `bubble-${now()}-${Math.random()}`,
+        x: x + rand(-30, 30),
+        y: y + rand(-30, 30),
+        t: now(),
+      },
+    ]);
+  };
+
+  // Complete the cleaning
+  const finishCleaning = (messId: string, toolId: string) => {
+    const mess = messes.find((m) => m.id === messId);
+    if (!mess) return;
+
+    // Big celebration burst!
+    burst("✨", { x: mess.x, y: mess.y }, 10, 60, 1.2);
+    burst("🫧", { x: mess.x, y: mess.y }, 8, 50, 1);
+    burst("💫", { x: mess.x, y: mess.y }, 5, 40, 0.8);
 
     setMesses((prev) => prev.filter((m) => m.id !== messId));
     setCleaningTools((prev) => prev.filter((t) => t.id !== toolId));
     setCleanedCount((c) => c + 1);
-    setHeldTool(null);
+    setDraggedTool(null);
+    setCleaningMess(null);
+    setCleaningProgress(0);
 
-    const cleanMessages = ["all clean! ✨", "good human! 😽", "sparkling~", "nice job! 🧹", "*approves* 😼"];
+    const cleanMessages = ["all clean! ✨", "good human! 😽", "sparkling~", "nice job! 🧹", "*approves* 😼", "squeaky clean! 🫧"];
     setAside(cleanMessages[Math.floor(rand(0, cleanMessages.length))]);
   };
+
+  // Cleaning progress effect - when tool is over mess, progress increases
+  useEffect(() => {
+    if (!draggedTool || !cleaningMess) {
+      setCleaningProgress(0);
+      return;
+    }
+
+    const mess = messes.find((m) => m.id === cleaningMess);
+    if (!mess) return;
+
+    // Spawn bubbles while cleaning
+    if (Math.random() < 0.4) {
+      spawnCleaningBubble(mess.x, mess.y);
+    }
+
+    // Increase progress
+    setCleaningProgress((p) => {
+      const newP = p + 0.08; // Takes about 1.2 seconds to clean
+      if (newP >= 1) {
+        finishCleaning(cleaningMess, draggedTool);
+        return 0;
+      }
+      return newP;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tick, draggedTool, cleaningMess]);
+
+  // Clean up bubbles
+  useEffect(() => {
+    setCleaningBubbles((prev) => prev.filter((b) => tNow - b.t < 1500));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tick]);
 
   // Random behavior trigger (when idle)
   useEffect(() => {
@@ -1190,9 +1255,13 @@ export default function ValentineCat() {
     // Reset mess system
     setMesses([]);
     setCleaningTools([]);
-    setHeldTool(null);
     setCleanedCount(0);
     setLastMessTime(now());
+    setDraggedTool(null);
+    setDraggedToolPos({ x: 0, y: 0 });
+    setCleaningMess(null);
+    setCleaningProgress(0);
+    setCleaningBubbles([]);
 
     setFx([]);
     window.setTimeout(() => moveNo(), 0);
@@ -1359,113 +1428,264 @@ export default function ValentineCat() {
         ))}
       </div>
 
-      {/* MESSES - Cat makes these automatically! */}
-      <div className="fixed inset-0 z-[18]">
-        {messes.map((mess) => (
+      {/* CLEANING BUBBLES - Float up while scrubbing */}
+      <div className="pointer-events-none fixed inset-0 z-[20]">
+        {cleaningBubbles.map((bubble) => (
           <motion.div
-            key={mess.id}
-            className="absolute"
-            style={{ left: mess.x - 25, top: mess.y - 25 }}
-            initial={{ opacity: 0, scale: 0, rotate: rand(-20, 20) }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0 }}
-            transition={{ type: "spring", stiffness: 400, damping: 20 }}
+            key={bubble.id}
+            className="absolute text-lg sm:text-xl"
+            style={{ left: bubble.x, top: bubble.y }}
+            initial={{ opacity: 0.9, scale: 0.5, y: 0 }}
+            animate={{ opacity: 0, scale: 1.2, y: -60 }}
+            transition={{ duration: 1.5, ease: "easeOut" }}
           >
-            <motion.button
-              type="button"
-              className={cn(
-                "relative w-14 h-14 sm:w-16 sm:h-16 rounded-full flex items-center justify-center",
-                "cursor-pointer touch-manipulation select-none",
-                "border-2 border-dashed shadow-lg backdrop-blur-sm",
-                heldTool ? "border-emerald-400 bg-emerald-50/80" : "border-amber-300 bg-amber-50/80"
-              )}
-              onClick={() => {
-                if (heldTool) {
-                  cleanMess(mess.id, heldTool);
-                } else {
-                  setAside("grab a cleaning tool first! 🧹");
-                  burst("❓", { x: mess.x, y: mess.y }, 2, 20, 0.6);
-                }
-              }}
-              animate={reduceMotion ? {} : { scale: [1, 1.05, 1] }}
-              transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
-              aria-label={`Clean ${mess.type}`}
-              title={heldTool ? "Click to clean!" : "Grab a tool first"}
-            >
-              <span className="text-2xl sm:text-3xl">{messEmojis[mess.type]}</span>
-              {heldTool && (
-                <motion.div
-                  className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-emerald-500 flex items-center justify-center text-white text-xs"
-                  initial={{ scale: 0 }}
-                  animate={{ scale: [1, 1.2, 1] }}
-                  transition={{ duration: 0.5, repeat: Infinity }}
-                >
-                  ✓
-                </motion.div>
-              )}
-            </motion.button>
-            <motion.div
-              className="absolute -bottom-5 left-1/2 -translate-x-1/2 whitespace-nowrap"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 0.8 }}
-            >
-              <span className="text-[9px] sm:text-[10px] bg-white/80 px-1.5 py-0.5 rounded-full text-slate-600 shadow-sm">
-                {mess.type.replace("_", " ")}
-              </span>
-            </motion.div>
+            {Math.random() > 0.5 ? "🫧" : "✨"}
           </motion.div>
         ))}
       </div>
 
-      {/* CLEANING TOOLS - Spawn when messes appear */}
-      <div className="fixed inset-0 z-[19]">
-        {cleaningTools.map((tool) => (
-          <motion.div
-            key={tool.id}
-            className="absolute"
-            style={{ left: tool.x - 22, top: tool.y - 22 }}
-            initial={{ opacity: 0, scale: 0, y: -20 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0 }}
-            transition={{ type: "spring", stiffness: 400, damping: 20 }}
-          >
-            <motion.button
-              type="button"
-              className={cn(
-                "w-12 h-12 sm:w-14 sm:h-14 rounded-xl flex items-center justify-center",
-                "cursor-grab active:cursor-grabbing touch-manipulation select-none",
-                "border-2 shadow-lg backdrop-blur-sm",
-                heldTool === tool.id
-                  ? "border-emerald-500 bg-emerald-100 ring-2 ring-emerald-300"
-                  : "border-slate-300 bg-white/90 hover:bg-slate-50 hover:border-emerald-300"
-              )}
-              onClick={() => {
-                if (heldTool === tool.id) {
-                  setHeldTool(null);
-                  setAside("tool dropped");
-                } else {
-                  setHeldTool(tool.id);
-                  setAside(`grabbed ${tool.type.replace("_", " ")}! now tap a mess 🎯`);
-                }
-              }}
-              animate={reduceMotion ? {} : heldTool === tool.id ? { scale: [1, 1.1, 1] } : { y: [0, -3, 0] }}
-              transition={{ duration: heldTool === tool.id ? 0.3 : 1.5, repeat: Infinity, ease: "easeInOut" }}
-              aria-label={`Pick up ${tool.type}`}
-              title={heldTool === tool.id ? "Click mess to clean, or click here to drop" : "Click to pick up"}
-            >
-              <span className="text-xl sm:text-2xl">{toolEmojis[tool.type]}</span>
-            </motion.button>
+      {/* MESSES - Cat makes these automatically! */}
+      <div className="fixed inset-0 z-[18]">
+        {messes.map((mess) => {
+          const isBeingCleaned = cleaningMess === mess.id;
+          return (
             <motion.div
-              className="absolute -bottom-4 left-1/2 -translate-x-1/2 whitespace-nowrap"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 0.7 }}
+              key={mess.id}
+              className="absolute"
+              style={{ left: mess.x - 30, top: mess.y - 30 }}
+              initial={{ opacity: 0, scale: 0, rotate: rand(-20, 20) }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0 }}
+              transition={{ type: "spring", stiffness: 400, damping: 20 }}
             >
-              <span className="text-[8px] sm:text-[9px] bg-white/80 px-1 py-0.5 rounded text-slate-500">
-                {tool.type.replace("_", " ")}
-              </span>
+              <motion.div
+                className={cn(
+                  "relative w-16 h-16 sm:w-18 sm:h-18 rounded-full flex items-center justify-center",
+                  "border-2 border-dashed shadow-lg backdrop-blur-sm",
+                  isBeingCleaned
+                    ? "border-emerald-400 bg-emerald-50/90 ring-4 ring-emerald-300/50"
+                    : "border-amber-300 bg-amber-50/80"
+                )}
+                animate={
+                  reduceMotion
+                    ? {}
+                    : isBeingCleaned
+                    ? { scale: [1, 0.95, 1], rotate: [-3, 3, -3] }
+                    : { scale: [1, 1.05, 1] }
+                }
+                transition={{
+                  duration: isBeingCleaned ? 0.2 : 2,
+                  repeat: Infinity,
+                  ease: "easeInOut",
+                }}
+              >
+                <motion.span
+                  className="text-2xl sm:text-3xl"
+                  animate={isBeingCleaned ? { opacity: [1, 0.5, 1] } : {}}
+                  transition={{ duration: 0.3, repeat: Infinity }}
+                >
+                  {messEmojis[mess.type]}
+                </motion.span>
+
+                {/* Cleaning progress ring */}
+                {isBeingCleaned && (
+                  <div
+                    className="absolute -inset-1 rounded-full"
+                    style={{
+                      background: `conic-gradient(rgba(16,185,129,0.9) ${Math.round(cleaningProgress * 360)}deg, rgba(226,232,240,0.3) 0deg)`,
+                      padding: "3px",
+                    }}
+                  >
+                    <div className="h-full w-full rounded-full bg-emerald-50/80" />
+                  </div>
+                )}
+
+                {/* Scrubbing sparkles when being cleaned */}
+                {isBeingCleaned && (
+                  <>
+                    <motion.div
+                      className="absolute -top-2 -right-2 text-sm"
+                      animate={{ scale: [0.8, 1.2, 0.8], rotate: [0, 180, 360] }}
+                      transition={{ duration: 0.5, repeat: Infinity }}
+                    >
+                      ✨
+                    </motion.div>
+                    <motion.div
+                      className="absolute -bottom-2 -left-2 text-sm"
+                      animate={{ scale: [1, 0.8, 1], rotate: [360, 180, 0] }}
+                      transition={{ duration: 0.4, repeat: Infinity }}
+                    >
+                      🫧
+                    </motion.div>
+                  </>
+                )}
+              </motion.div>
+
+              {/* Mess label */}
+              <motion.div
+                className="absolute -bottom-5 left-1/2 -translate-x-1/2 whitespace-nowrap"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 0.8 }}
+              >
+                <span className="text-[9px] sm:text-[10px] bg-white/80 px-1.5 py-0.5 rounded-full text-slate-600 shadow-sm">
+                  {isBeingCleaned ? `${Math.round(cleaningProgress * 100)}%` : mess.type.replace("_", " ")}
+                </span>
+              </motion.div>
             </motion.div>
-          </motion.div>
-        ))}
+          );
+        })}
+      </div>
+
+      {/* CLEANING TOOLS - Drag them to messes! */}
+      <div className="fixed inset-0 z-[19]">
+        {cleaningTools.map((tool) => {
+          const isDragging = draggedTool === tool.id;
+          const toolPos = isDragging ? draggedToolPos : { x: tool.x, y: tool.y };
+
+          return (
+            <motion.div
+              key={tool.id}
+              className="absolute"
+              style={{
+                left: toolPos.x - 25,
+                top: toolPos.y - 25,
+                zIndex: isDragging ? 100 : 19,
+              }}
+              initial={{ opacity: 0, scale: 0, y: -20 }}
+              animate={{ opacity: 1, scale: isDragging ? 1.2 : 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0 }}
+              transition={{ type: "spring", stiffness: 400, damping: 20 }}
+            >
+              <motion.div
+                className={cn(
+                  "w-14 h-14 sm:w-16 sm:h-16 rounded-xl flex items-center justify-center",
+                  "cursor-grab active:cursor-grabbing touch-manipulation select-none",
+                  "border-2 shadow-lg backdrop-blur-sm",
+                  isDragging
+                    ? "border-emerald-500 bg-emerald-100 ring-4 ring-emerald-300/50 shadow-2xl"
+                    : "border-slate-300 bg-white/90 hover:bg-slate-50 hover:border-emerald-300"
+                )}
+                animate={
+                  reduceMotion
+                    ? {}
+                    : isDragging
+                    ? { rotate: [-5, 5, -5] }
+                    : { y: [0, -4, 0] }
+                }
+                transition={{
+                  duration: isDragging ? 0.2 : 1.5,
+                  repeat: Infinity,
+                  ease: "easeInOut",
+                }}
+                onPointerDown={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setDraggedTool(tool.id);
+                  setDraggedToolPos({ x: e.clientX, y: e.clientY });
+                  try {
+                    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+                  } catch {}
+                }}
+                onPointerMove={(e) => {
+                  if (draggedTool !== tool.id) return;
+                  const newPos = { x: e.clientX, y: e.clientY };
+                  setDraggedToolPos(newPos);
+
+                  // Check if over a mess
+                  const messUnder = getMessUnderTool(newPos, tool.id);
+                  if (messUnder) {
+                    if (cleaningMess !== messUnder.id) {
+                      setCleaningMess(messUnder.id);
+                      setCleaningProgress(0);
+                      setAside("scrub scrub! 🧹");
+                    }
+                  } else {
+                    if (cleaningMess) {
+                      setCleaningMess(null);
+                      setCleaningProgress(0);
+                    }
+                  }
+                }}
+                onPointerUp={(e) => {
+                  if (draggedTool !== tool.id) return;
+                  setDraggedTool(null);
+                  setCleaningMess(null);
+                  setCleaningProgress(0);
+                  try {
+                    (e.target as HTMLElement).releasePointerCapture(e.pointerId);
+                  } catch {}
+                }}
+                onPointerCancel={() => {
+                  setDraggedTool(null);
+                  setCleaningMess(null);
+                  setCleaningProgress(0);
+                }}
+                // Touch fallbacks
+                onTouchStart={(e) => {
+                  const touch = e.touches[0];
+                  if (touch) {
+                    setDraggedTool(tool.id);
+                    setDraggedToolPos({ x: touch.clientX, y: touch.clientY });
+                  }
+                }}
+                onTouchMove={(e) => {
+                  if (draggedTool !== tool.id) return;
+                  const touch = e.touches[0];
+                  if (touch) {
+                    const newPos = { x: touch.clientX, y: touch.clientY };
+                    setDraggedToolPos(newPos);
+
+                    const messUnder = getMessUnderTool(newPos, tool.id);
+                    if (messUnder) {
+                      if (cleaningMess !== messUnder.id) {
+                        setCleaningMess(messUnder.id);
+                        setCleaningProgress(0);
+                      }
+                    } else {
+                      if (cleaningMess) {
+                        setCleaningMess(null);
+                        setCleaningProgress(0);
+                      }
+                    }
+                  }
+                }}
+                onTouchEnd={() => {
+                  setDraggedTool(null);
+                  setCleaningMess(null);
+                  setCleaningProgress(0);
+                }}
+              >
+                <span className="text-2xl sm:text-3xl">{toolEmojis[tool.type]}</span>
+              </motion.div>
+
+              {/* Tool label */}
+              {!isDragging && (
+                <motion.div
+                  className="absolute -bottom-5 left-1/2 -translate-x-1/2 whitespace-nowrap"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 0.7 }}
+                >
+                  <span className="text-[8px] sm:text-[9px] bg-white/80 px-1.5 py-0.5 rounded text-slate-500">
+                    drag me! 👆
+                  </span>
+                </motion.div>
+              )}
+
+              {/* Dragging indicator */}
+              {isDragging && (
+                <motion.div
+                  className="absolute -bottom-6 left-1/2 -translate-x-1/2 whitespace-nowrap"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                >
+                  <span className="text-[9px] sm:text-[10px] bg-emerald-500 text-white px-2 py-0.5 rounded-full font-medium shadow-lg">
+                    {cleaningMess ? "cleaning! 🫧" : "drag to mess!"}
+                  </span>
+                </motion.div>
+              )}
+            </motion.div>
+          );
+        })}
       </div>
 
       {/* Mess counter badge */}
@@ -1477,23 +1697,25 @@ export default function ValentineCat() {
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: 20 }}
           >
-            <div className={cn(
-              "px-3 py-2 rounded-xl shadow-lg backdrop-blur border",
-              messes.length >= 4 ? "bg-red-100/90 border-red-300 text-red-800" :
-              messes.length >= 2 ? "bg-amber-100/90 border-amber-300 text-amber-800" :
-              "bg-slate-100/90 border-slate-300 text-slate-700"
-            )}>
+            <div
+              className={cn(
+                "px-3 py-2 rounded-xl shadow-lg backdrop-blur border",
+                messes.length >= 4
+                  ? "bg-red-100/90 border-red-300 text-red-800"
+                  : messes.length >= 2
+                  ? "bg-amber-100/90 border-amber-300 text-amber-800"
+                  : "bg-slate-100/90 border-slate-300 text-slate-700"
+              )}
+            >
               <div className="text-[10px] sm:text-xs font-medium">
                 {messes.length >= 4 ? "🚨 Too messy!" : messes.length >= 2 ? "⚠️ Getting messy" : "🧹 Clean up!"}
               </div>
               <div className="text-[9px] sm:text-[10px] mt-0.5 opacity-80">
                 {messes.length} mess{messes.length !== 1 ? "es" : ""} • {cleanedCount} cleaned
               </div>
-              {heldTool && (
-                <div className="text-[9px] sm:text-[10px] mt-1 text-emerald-700 font-medium">
-                  🧹 Tool ready! Tap a mess
-                </div>
-              )}
+              <div className="text-[9px] sm:text-[10px] mt-1 text-slate-600">
+                👆 Drag tool onto mess to clean
+              </div>
             </div>
           </motion.div>
         )}
@@ -1754,9 +1976,9 @@ export default function ValentineCat() {
                         The cat makes messes automatically (💩 poop, 🤮 hairballs, 🟤 dirt, etc). Cleaning tools spawn nearby!
                       </div>
                       <div className="mt-0.5 sm:mt-1">
-                        <span className="font-semibold">Tap a tool</span> to pick it up, then <span className="font-semibold">tap a mess</span> to clean it.
+                        <span className="font-semibold">Drag a tool</span> onto a mess and <span className="font-semibold">scrub</span> to clean it! Watch the bubbles! 🫧
                       </div>
-                      <div className="mt-0.5 sm:mt-1 text-[10px] sm:text-xs text-slate-500">Different tools work on different messes!</div>
+                      <div className="mt-0.5 sm:mt-1 text-[10px] sm:text-xs text-slate-500">Different tools work on different messes - keep scrubbing until clean!</div>
                     </div>
                   </div>
 
