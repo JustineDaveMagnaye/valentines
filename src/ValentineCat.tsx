@@ -232,7 +232,7 @@ export default function ValentineCat() {
   const vp = { w: vpW, h: vpH };
   const coarse = usePointerCoarse();
   const reduceMotion = useReducedMotion();
-  const tick = useInterval(90);
+  const tick = useInterval(100); // Slightly slower for better performance
 
   // Responsive scaling factor based on viewport - supports all device sizes
   // Small phones: < 360px (iPhone SE, Galaxy S series mini)
@@ -308,9 +308,10 @@ export default function ValentineCat() {
   const [behaviorUntil, setBehaviorUntil] = useState(0);
   const [lastInteraction, setLastInteraction] = useState(now());
 
-  // Laser pointer state
+  // Laser pointer state - use ref for position to avoid re-renders on every mouse move
   const [laserActive, setLaserActive] = useState(false);
   const [laserPos, setLaserPos] = useState<XY>({ x: 0, y: 0 });
+  const laserPosRef = useRef<XY>({ x: 0, y: 0 });
   const [catChasingLaser, setCatChasingLaser] = useState(false);
 
   // Yarn ball state
@@ -336,12 +337,14 @@ export default function ValentineCat() {
   const isBehaviorActive = tNow < behaviorUntil;
   const isCatnipActive = tNow < catnipUntil;
 
-  // --- FX
+  // --- FX (optimized - reduced max particles)
   const [fx, setFx] = useState<FX[]>([]);
-  const burst = (emoji: string, at: XY, count = 8, spread = 56, dur = 1.05) => {
+  const burst = (emoji: string, at: XY, count = 6, spread = 50, dur = 0.9) => {
     const t = now();
+    // Cap burst count for performance
+    const actualCount = Math.min(count, 8);
     setFx((arr) => {
-      const next = Array.from({ length: count }).map((_, i) => ({
+      const next = Array.from({ length: actualCount }).map((_, i) => ({
         id: `${t}-${i}-${Math.random().toString(16).slice(2)}`,
         t,
         x: at.x,
@@ -349,11 +352,12 @@ export default function ValentineCat() {
         dx: rand(-spread, spread),
         dy: rand(-spread, spread) - spread * 0.35,
         r: rand(-45, 45),
-        s: rand(0.9, 1.25),
+        s: rand(0.9, 1.2),
         emoji,
-        dur: dur + rand(-0.18, 0.22),
+        dur: dur + rand(-0.1, 0.15),
       }));
-      return [...arr, ...next].slice(-140);
+      // Reduced max particles from 140 to 60
+      return [...arr, ...next].slice(-60);
     });
   };
 
@@ -372,7 +376,7 @@ export default function ValentineCat() {
 
   const addPawPrint = (x: number, y: number) => {
     setPawPrints((prev) => [
-      ...prev.slice(-20),
+      ...prev.slice(-12), // Reduced from 20 to 12
       { id: `paw-${now()}-${Math.random()}`, x, y, r: rand(-30, 30), t: now() }
     ]);
   };
@@ -381,10 +385,10 @@ export default function ValentineCat() {
     const items = ["📱", "🖊️", "☕", "🥛", "📚", "🎮", "💄", "🔑", "🪴", "🧸"];
     const emoji = items[Math.floor(rand(0, items.length))];
     setKnockedItems((prev) => [
-      ...prev.slice(-5),
+      ...prev.slice(-3), // Reduced from 5 to 3
       { id: `knock-${now()}`, emoji, x: rand(50, vp.w - 50), y: rand(100, vp.h * 0.4), t: now() }
     ]);
-    burst(emoji, { x: vp.w * 0.5, y: vp.h * 0.3 }, 6, 80, 1.5);
+    burst(emoji, { x: vp.w * 0.5, y: vp.h * 0.3 }, 4, 60, 1); // Reduced particles
   };
 
   const bringGift = () => {
@@ -392,7 +396,7 @@ export default function ValentineCat() {
     setCurrentGift(gift);
     setGiftPos({ x: pos.x + btnSize.w / 2, y: pos.y + btnSize.h / 2 });
     triggerBehavior("gifting", 3000);
-    burst(gift, { x: pos.x + btnSize.w / 2, y: pos.y }, 8, 60, 1.2);
+    burst(gift, { x: pos.x + btnSize.w / 2, y: pos.y }, 5, 50, 1); // Reduced particles
   };
 
   // Random behavior trigger (when idle)
@@ -472,35 +476,39 @@ export default function ValentineCat() {
 
   // --- LASER POINTER LOGIC ---
   const activateLaser = () => {
+    const startPos = { x: vp.w * 0.5, y: vp.h * 0.5 };
     setLaserActive(true);
-    setLaserPos({ x: vp.w * 0.5, y: vp.h * 0.5 });
+    setLaserPos(startPos);
+    laserPosRef.current = startPos;
     setAside("🔴 Move the laser! Cat can't resist!");
     setCatChasingLaser(true);
     setLastInteraction(now());
   };
 
-  // Cat chases laser
+  // Cat chases laser - uses ref for position to avoid re-renders
   useEffect(() => {
     if (!laserActive || !catChasingLaser) return;
 
-    const target = clampBtn(laserPos.x - btnSize.w / 2, laserPos.y - btnSize.h / 2);
+    // Use ref for smoother tracking without triggering re-renders
+    const lp = laserPosRef.current;
+    const target = clampBtn(lp.x - btnSize.w / 2, lp.y - btnSize.h / 2);
     const speed = isCatnipActive ? 28 : 18;
 
     setPos((p) => {
       const next = moveToward(p, target, speed);
-      if (dist(next, target) < 20) {
-        burst("✨", laserPos, 6, 40, 0.8);
+      if (dist(next, target) < 20 && Math.random() < 0.3) {
+        burst("✨", lp, 4, 30, 0.6); // Reduced particles
         const laserReactions = ["*pounce!* 🐾", "almost got it! 😼", "WHERE'D IT GO?!", "*confused chirp*", "MUST. CATCH. DOT.", "*intense stare*"];
         setAside(laserReactions[Math.floor(rand(0, laserReactions.length))]);
       }
-      // Add paw prints occasionally
-      if (Math.random() < 0.12) {
+      // Reduced paw print frequency
+      if (Math.random() < 0.06) {
         addPawPrint(next.x + btnSize.w / 2, next.y + btnSize.h / 2);
       }
       return next;
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tick, laserActive, catChasingLaser, laserPos.x, laserPos.y]);
+  }, [tick, laserActive, catChasingLaser]);
 
   // --- YARN BALL LOGIC (simplified to prevent crashes) ---
   const yarnRef = useRef({ vel: { x: 0, y: 0 }, dragging: false });
@@ -583,7 +591,7 @@ export default function ValentineCat() {
   const giveCatnip = () => {
     setCatnipUntil(now() + 8000);
     triggerBehavior("catnip", 8000);
-    burst("🌿", { x: vp.w * 0.5, y: vp.h * 0.4 }, 20, 100, 1.5);
+    burst("🌿", { x: vp.w * 0.5, y: vp.h * 0.4 }, 8, 70, 1);
     setLastInteraction(now());
   };
 
@@ -739,13 +747,13 @@ export default function ValentineCat() {
     setFishEatenP(0);
     setFishPos(start);
     if (hint) setAside("drag fish near the box 🐟");
-    burst("🐟", start, 12, 62, 1.0);
+    burst("🐟", start, 6, 50, 0.8);
   };
 
-  const scareBackToBox = (msg = "DON’T TOUCH 😾📦") => {
+  const scareBackToBox = (msg = "DON'T TOUCH 😾📦") => {
     if (!boxVisible) return;
     setAside(msg);
-    burst("💨", boxCenter, 12, 76, 1.05);
+    burst("💨", boxCenter, 6, 60, 0.9);
     setApproaching(false);
     setEating(false);
     setEatUntil(0);
@@ -760,7 +768,7 @@ export default function ValentineCat() {
     setFishHeld(false);
     setFishEatenP(0);
     setAside("all gone 😼✨");
-    burst("✨", fishPos, 16, 92, 1.15);
+    burst("✨", fishPos, 8, 70, 1);
 
     // resolve shield
     setCatInBox(false);
@@ -788,7 +796,7 @@ export default function ValentineCat() {
     setCatChasePos(
       clampBtn(boxPos.x + BOX_W * 0.56 - btnSize.w / 2, boxPos.y + BOX_H * 0.14 - btnSize.h / 2, true)
     );
-    burst("👀", { x: boxCenter.x + 18, y: boxCenter.y - 22 }, 8, 50, 0.95);
+    burst("👀", { x: boxCenter.x + 18, y: boxCenter.y - 22 }, 4, 40, 0.8);
 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tick, fishNearBox, catInBox, fishVisible, fishHeld, eating, enteringBox]);
@@ -812,7 +820,7 @@ export default function ValentineCat() {
         setFishHeld(false);
         setEatUntil(now() + 1750);
         setAside("munch munch… 😼");
-        burst("💗", fishPos, 10, 56, 1.0);
+        burst("💗", fishPos, 5, 45, 0.8);
       }
       return next;
     });
@@ -847,7 +855,7 @@ export default function ValentineCat() {
     setEnteringBox({ from: pos, to: mouth });
 
     setAside(Math.random() < 0.5 ? "SHIELD! 📦" : "*hops into the box* 📦");
-    burst("💨", { x: bp.x + BOX_W / 2, y: bp.y + BOX_H / 2 }, 14, 82, 1.1);
+    burst("💨", { x: bp.x + BOX_W / 2, y: bp.y + BOX_H / 2 }, 6, 60, 0.9);
     setFreezeUntil(t + 600);
     setBoxCooldownUntil(t + 9000);
 
@@ -890,7 +898,7 @@ export default function ValentineCat() {
 
     // Different reactions based on how many times they've said no
     const emojis = noCount < 3 ? "😿" : noCount < 6 ? "😾" : noCount < 10 ? "💔" : "🐾";
-    burst(emojis, { x: pos.x + btnSize.w / 2, y: pos.y + btnSize.h / 2 }, 10, 70, 1.05);
+    burst(emojis, { x: pos.x + btnSize.w / 2, y: pos.y + btnSize.h / 2 }, 5, 50, 0.9);
 
     setNoCount((n) => Math.min(n + 1, beats.length - 1));
 
@@ -1004,7 +1012,7 @@ export default function ValentineCat() {
     setCalmUntil(now() + 5000);
     setAside("treat accepted 😽 (calm mode)");
     stopHold();
-    burst("💗", { x: vp.w * 0.5, y: vp.h * 0.35 }, 14, 92, 1.2);
+    burst("💗", { x: vp.w * 0.5, y: vp.h * 0.35 }, 6, 60, 0.9);
     if (isShieldActive && !fishVisible) spawnFish(false);
   };
 
@@ -1179,35 +1187,30 @@ export default function ValentineCat() {
                 e.preventDefault();
                 setLastInteraction(now());
               }}
-              onPointerMove={(e) => {
-                if (laserActive) {
-                  setLaserPos({ x: e.clientX, y: e.clientY });
-                  setLastInteraction(now());
-                }
-              }}
-              onTouchMove={(e) => {
-                const touch = e.touches[0];
-                if (touch && laserActive) {
-                  setLaserPos({ x: touch.clientX, y: touch.clientY });
-                }
-              }}
             />
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* Full screen laser move area */}
+      {/* Full screen laser move area - optimized with ref for smooth tracking */}
       {laserActive && (
         <div
           className="fixed inset-0 z-[81] cursor-crosshair"
           onPointerMove={(e) => {
-            setLaserPos({ x: e.clientX, y: e.clientY });
-            setLastInteraction(now());
+            // Update ref immediately for chase logic (no re-render)
+            laserPosRef.current = { x: e.clientX, y: e.clientY };
+            // Throttled state update for visual only
+            if (Math.random() < 0.3) {
+              setLaserPos({ x: e.clientX, y: e.clientY });
+            }
           }}
           onTouchMove={(e) => {
             const touch = e.touches[0];
             if (touch) {
-              setLaserPos({ x: touch.clientX, y: touch.clientY });
+              laserPosRef.current = { x: touch.clientX, y: touch.clientY };
+              if (Math.random() < 0.3) {
+                setLaserPos({ x: touch.clientX, y: touch.clientY });
+              }
             }
           }}
           onClick={() => {
@@ -1476,12 +1479,12 @@ export default function ValentineCat() {
                 }
                 if (catInBox) {
                   setAside("…mrrp (i'm in the box) 📦");
-                  burst("📦", { x: boxCenter.x, y: boxCenter.y }, 8, 56, 1.0);
+                  burst("📦", { x: boxCenter.x, y: boxCenter.y }, 4, 45, 0.8);
                   return;
                 }
                 setCalmUntil((c) => Math.max(c, now() + 1800));
                 setAside(petReactions[Math.floor(rand(0, petReactions.length))]);
-                burst("💗", { x: vp.w * 0.5, y: vp.h * 0.35 }, 10, 64, 1.05);
+                burst("💗", { x: vp.w * 0.5, y: vp.h * 0.35 }, 5, 50, 0.9);
               }}
               animate={reduceMotion ? {} : { rotate: noCount >= 5 ? [0, -6, 6, -6, 0] : 0 }}
               transition={{ duration: 0.8, ease: "easeInOut" }}
@@ -1528,7 +1531,7 @@ export default function ValentineCat() {
             <div className="mt-4 sm:mt-6 grid gap-2 sm:gap-3">
               <Button
                 onClick={() => {
-                  burst("💖", { x: vp.w * 0.5, y: vp.h * 0.35 }, 16, 92, 1.2);
+                  burst("💖", { x: vp.w * 0.5, y: vp.h * 0.35 }, 8, 70, 1);
                   setAccepted(true);
                 }}
                 className="bg-pink-500 hover:bg-pink-600 text-white w-full sm:w-auto sm:mx-auto rounded-xl sm:rounded-2xl text-sm sm:text-base py-2.5 sm:py-3 touch-manipulation"
