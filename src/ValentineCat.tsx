@@ -106,6 +106,27 @@ const beats = [
 
 const noLabels = ["No 🙀", "No 😼", "Nope 🐾", "Nah 😾", "NO 😡", "Still no? 🥲"];
 
+// Cat behavior states - makes the game more dynamic and unpredictable
+type CatBehavior = "normal" | "zoomies" | "napping" | "grooming" | "hunting" | "knocking" | "gifting" | "loaf" | "catnip";
+
+const catBehaviorMessages: Record<CatBehavior, string[]> = {
+  normal: ["meow", "mrrp", "*stares*", "*blinks slowly*"],
+  zoomies: ["ZOOM!! 💨", "*NYOOM*", "GOTTA GO FAST", "*chaos mode*", "WHEEEEE"],
+  napping: ["zzz… 💤", "*snore*", "5 more minutes…", "*dreaming of fish*", "so sleepy…"],
+  grooming: ["*lick lick*", "*cleaning paws*", "must stay pretty", "*wash wash*"],
+  hunting: ["*wiggles butt*", "TARGET ACQUIRED", "*stalking*", "*pounce mode*", "👀"],
+  knocking: ["*pushes thing*", "oops 😼", "*CRASH*", "gravity test!", "it had to go"],
+  gifting: ["I brought you something! 🎁", "*proud*", "look what I found!", "for you! 💝"],
+  loaf: ["*becomes loaf* 🍞", "loaf mode activated", "*tucks paws*", "am bread now"],
+  catnip: ["WHEEEE 🌿", "*rolls around*", "*pure bliss*", "THIS IS AMAZING", "*zooms AND purrs*"],
+};
+
+// Cat gifts the cat can bring you
+const catGifts = ["🐭", "🪶", "🧦", "🎀", "🍂", "🦗", "🪲", "💝", "🌸", "⭐"];
+
+// Yarn colors for the yarn ball
+const yarnColors = ["#f472b6", "#fb923c", "#a78bfa", "#34d399", "#60a5fa", "#f87171"];
+
 type XY = { x: number; y: number };
 
 type FX = {
@@ -142,18 +163,30 @@ function useViewport() {
     setMounted(true);
     const update = () => {
       // Use visualViewport for better mobile support (accounts for keyboard, etc.)
-      const w = window.visualViewport?.width ?? window.innerWidth;
-      const h = window.visualViewport?.height ?? window.innerHeight;
+      // Fallback chain for maximum browser compatibility
+      const w = window.visualViewport?.width ?? window.innerWidth ?? document.documentElement.clientWidth ?? 390;
+      const h = window.visualViewport?.height ?? window.innerHeight ?? document.documentElement.clientHeight ?? 844;
       setVp({ w, h });
     };
     update();
 
+    // Multiple event listeners for cross-browser compatibility
     window.addEventListener("resize", update);
+    window.addEventListener("orientationchange", update);
     window.visualViewport?.addEventListener("resize", update);
     window.visualViewport?.addEventListener("scroll", update);
 
+    // Delayed update for Safari orientation change quirks
+    const handleOrientation = () => {
+      setTimeout(update, 100);
+      setTimeout(update, 300);
+    };
+    window.addEventListener("orientationchange", handleOrientation);
+
     return () => {
       window.removeEventListener("resize", update);
+      window.removeEventListener("orientationchange", update);
+      window.removeEventListener("orientationchange", handleOrientation);
       window.visualViewport?.removeEventListener("resize", update);
       window.visualViewport?.removeEventListener("scroll", update);
     };
@@ -191,10 +224,26 @@ export default function ValentineCat() {
   const reduceMotion = useReducedMotion();
   const tick = useInterval(90);
 
-  // Responsive scaling factor based on viewport
-  const isMobile = vpW < 640;
-  const isSmall = vpW < 380;
-  const scaleFactor = isSmall ? 0.85 : isMobile ? 0.92 : 1;
+  // Responsive scaling factor based on viewport - supports all device sizes
+  // Small phones: < 360px (iPhone SE, Galaxy S series mini)
+  // Medium phones: 360-414px (most Android phones, iPhone 6-8)
+  // Large phones: 414-640px (iPhone Plus/Max, large Android)
+  // Tablets: 640-1024px (iPad Mini, small tablets)
+  // Large tablets: 1024-1280px (iPad Pro, Android tablets)
+  // Desktop: > 1280px
+  const isVerySmall = vpW < 320; // Very small phones
+  const isSmall = vpW < 380;     // Small phones
+  const isMobile = vpW < 640;    // Mobile phones
+  const isTablet = vpW >= 640 && vpW < 1024; // Tablets
+  const isLargeTablet = vpW >= 1024 && vpW < 1280; // Large tablets/iPad Pro
+  const isDesktop = vpW >= 1280; // Desktop
+
+  // Also consider height for landscape orientation
+  const isLandscape = vpW > vpH;
+  const isShortScreen = vpH < 600;
+
+  // Scale factor for different device sizes
+  const scaleFactor = isVerySmall ? 0.75 : isSmall ? 0.85 : isMobile ? 0.92 : isTablet ? 1 : 1;
 
   const cardRef = useRef<HTMLDivElement | null>(null);
 
@@ -229,6 +278,40 @@ export default function ValentineCat() {
   const frozen = tNow < freezeUntil;
   const calm = tNow < calmUntil;
 
+  // --- CAT BEHAVIOR SYSTEM ---
+  const [catBehavior, setCatBehavior] = useState<CatBehavior>("normal");
+  const [behaviorUntil, setBehaviorUntil] = useState(0);
+  const [lastInteraction, setLastInteraction] = useState(now());
+
+  // Laser pointer state
+  const [laserActive, setLaserActive] = useState(false);
+  const [laserPos, setLaserPos] = useState<XY>({ x: 0, y: 0 });
+  const [catChasingLaser, setCatChasingLaser] = useState(false);
+
+  // Yarn ball state
+  const [yarnActive, setYarnActive] = useState(false);
+  const [yarnPos, setYarnPos] = useState<XY>({ x: 100, y: 100 });
+  const [yarnVelocity, setYarnVelocity] = useState<XY>({ x: 0, y: 0 });
+  const [yarnColor, setYarnColor] = useState(yarnColors[0]);
+  const [catChasingYarn, setCatChasingYarn] = useState(false);
+
+  // Catnip state
+  const [catnipUntil, setCatnipUntil] = useState(0);
+
+  // Cat gifts
+  const [currentGift, setCurrentGift] = useState<string | null>(null);
+  const [giftPos, setGiftPos] = useState<XY>({ x: 0, y: 0 });
+
+  // Paw prints trail
+  const [pawPrints, setPawPrints] = useState<Array<{ id: string; x: number; y: number; r: number; t: number }>>([]);
+
+  // Knocked items
+  const [knockedItems, setKnockedItems] = useState<Array<{ id: string; emoji: string; x: number; y: number; t: number }>>([]);
+
+  // Check if behavior is active
+  const isBehaviorActive = tNow < behaviorUntil;
+  const isCatnipActive = tNow < catnipUntil;
+
   // --- FX
   const [fx, setFx] = useState<FX[]>([]);
   const burst = (emoji: string, at: XY, count = 8, spread = 56, dur = 1.05) => {
@@ -255,19 +338,220 @@ export default function ValentineCat() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tick]);
 
-  // --- Mode
+  // --- BEHAVIOR HELPERS ---
+  const triggerBehavior = (behavior: CatBehavior, durationMs: number) => {
+    setCatBehavior(behavior);
+    setBehaviorUntil(now() + durationMs);
+    const msg = catBehaviorMessages[behavior][Math.floor(rand(0, catBehaviorMessages[behavior].length))];
+    setAside(msg);
+  };
+
+  const addPawPrint = (x: number, y: number) => {
+    setPawPrints((prev) => [
+      ...prev.slice(-20),
+      { id: `paw-${now()}-${Math.random()}`, x, y, r: rand(-30, 30), t: now() }
+    ]);
+  };
+
+  const knockSomethingOff = () => {
+    const items = ["📱", "🖊️", "☕", "🥛", "📚", "🎮", "💄", "🔑", "🪴", "🧸"];
+    const emoji = items[Math.floor(rand(0, items.length))];
+    setKnockedItems((prev) => [
+      ...prev.slice(-5),
+      { id: `knock-${now()}`, emoji, x: rand(50, vp.w - 50), y: rand(100, vp.h * 0.4), t: now() }
+    ]);
+    burst(emoji, { x: vp.w * 0.5, y: vp.h * 0.3 }, 6, 80, 1.5);
+  };
+
+  const bringGift = () => {
+    const gift = catGifts[Math.floor(rand(0, catGifts.length))];
+    setCurrentGift(gift);
+    setGiftPos({ x: pos.x + btnSize.w / 2, y: pos.y + btnSize.h / 2 });
+    triggerBehavior("gifting", 3000);
+    burst(gift, { x: pos.x + btnSize.w / 2, y: pos.y }, 8, 60, 1.2);
+  };
+
+  // Random behavior trigger (when idle)
+  useEffect(() => {
+    if (accepted || catInBox || approaching || eating || catChasingLaser || catChasingYarn) return;
+    if (isBehaviorActive) return;
+
+    const timeSinceInteraction = tNow - lastInteraction;
+
+    // After 8 seconds of no interaction, cat might do something
+    if (timeSinceInteraction > 8000 && Math.random() < 0.02) {
+      const behaviors: CatBehavior[] = ["zoomies", "napping", "grooming", "knocking", "loaf"];
+      const randomBehavior = behaviors[Math.floor(rand(0, behaviors.length))];
+
+      if (randomBehavior === "knocking") {
+        knockSomethingOff();
+      }
+
+      triggerBehavior(randomBehavior, rand(3000, 6000));
+
+      // Zoomies makes the cat move erratically
+      if (randomBehavior === "zoomies") {
+        const zoomInterval = setInterval(() => {
+          if (now() > behaviorUntil) {
+            clearInterval(zoomInterval);
+            return;
+          }
+          const newPos = clampBtn(rand(20, vp.w - 60), rand(80, vp.h - 100));
+          setPos(newPos);
+          addPawPrint(newPos.x + btnSize.w / 2, newPos.y + btnSize.h / 2);
+          burst("💨", newPos, 4, 30, 0.6);
+        }, 400);
+      }
+    }
+
+    // Small chance to bring a gift
+    if (timeSinceInteraction > 12000 && Math.random() < 0.008 && !currentGift) {
+      bringGift();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tick]);
+
+  // Clean up paw prints and knocked items
+  useEffect(() => {
+    setPawPrints((prev) => prev.filter((p) => tNow - p.t < 4000));
+    setKnockedItems((prev) => prev.filter((p) => tNow - p.t < 3000));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tick]);
+
+  // Clear gift after some time
+  useEffect(() => {
+    if (currentGift) {
+      const t = setTimeout(() => setCurrentGift(null), 5000);
+      return () => clearTimeout(t);
+    }
+  }, [currentGift]);
+
+  // --- LASER POINTER LOGIC ---
+  const activateLaser = () => {
+    setLaserActive(true);
+    setLaserPos({ x: vp.w * 0.5, y: vp.h * 0.5 });
+    setAside("🔴 Move the laser! Cat can't resist!");
+    setCatChasingLaser(true);
+    setLastInteraction(now());
+  };
+
+  // Cat chases laser
+  useEffect(() => {
+    if (!laserActive || !catChasingLaser) return;
+
+    const target = clampBtn(laserPos.x - btnSize.w / 2, laserPos.y - btnSize.h / 2);
+    const speed = isCatnipActive ? 28 : 18;
+
+    setPos((p) => {
+      const next = moveToward(p, target, speed);
+      if (dist(next, target) < 20) {
+        burst("✨", laserPos, 6, 40, 0.8);
+        setAside(Math.random() < 0.5 ? "*pounce!* 🐾" : "almost got it! 😼");
+      }
+      // Add paw prints occasionally
+      if (Math.random() < 0.15) {
+        addPawPrint(next.x + btnSize.w / 2, next.y + btnSize.h / 2);
+      }
+      return next;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tick, laserActive, catChasingLaser, laserPos.x, laserPos.y]);
+
+  // --- YARN BALL LOGIC ---
+  const spawnYarn = () => {
+    setYarnActive(true);
+    setYarnColor(yarnColors[Math.floor(rand(0, yarnColors.length))]);
+    setYarnPos({ x: vp.w * 0.5, y: vp.h * 0.6 });
+    setYarnVelocity({ x: 0, y: 0 });
+    setCatChasingYarn(true);
+    setAside("🧶 Flick the yarn ball!");
+    setLastInteraction(now());
+  };
+
+  // Yarn physics
+  useEffect(() => {
+    if (!yarnActive) return;
+
+    setYarnPos((p) => {
+      let newX = p.x + yarnVelocity.x;
+      let newY = p.y + yarnVelocity.y;
+
+      // Bounce off walls
+      if (newX < 30 || newX > vp.w - 30) {
+        setYarnVelocity((v) => ({ ...v, x: -v.x * 0.7 }));
+        newX = clamp(newX, 30, vp.w - 30);
+      }
+      if (newY < 80 || newY > vp.h - 80) {
+        setYarnVelocity((v) => ({ ...v, y: -v.y * 0.7 }));
+        newY = clamp(newY, 80, vp.h - 80);
+      }
+
+      return { x: newX, y: newY };
+    });
+
+    // Apply friction
+    setYarnVelocity((v) => ({
+      x: v.x * 0.96,
+      y: v.y * 0.96
+    }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tick, yarnActive]);
+
+  // Cat chases yarn
+  useEffect(() => {
+    if (!yarnActive || !catChasingYarn) return;
+
+    const target = clampBtn(yarnPos.x - btnSize.w / 2, yarnPos.y - btnSize.h / 2);
+    const speed = isCatnipActive ? 22 : 14;
+
+    setPos((p) => {
+      const next = moveToward(p, target, speed);
+      const d = dist(next, target);
+
+      if (d < 30) {
+        // Cat caught the yarn!
+        burst("🧶", yarnPos, 8, 50, 1.0);
+        setAside(Math.random() < 0.5 ? "*caught it!* 😺" : "*plays with yarn* 🧶");
+
+        // Knock the yarn away
+        setYarnVelocity({
+          x: rand(-15, 15),
+          y: rand(-15, 15)
+        });
+      }
+
+      if (Math.random() < 0.1) {
+        addPawPrint(next.x + btnSize.w / 2, next.y + btnSize.h / 2);
+      }
+      return next;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tick, yarnActive, catChasingYarn, yarnPos.x, yarnPos.y]);
+
+  // --- CATNIP LOGIC ---
+  const giveCatnip = () => {
+    setCatnipUntil(now() + 8000);
+    triggerBehavior("catnip", 8000);
+    burst("🌿", { x: vp.w * 0.5, y: vp.h * 0.4 }, 20, 100, 1.5);
+    setLastInteraction(now());
+  };
+
+  // --- Mode (BALANCED for playability)
   const mode = useMemo(() => {
-    const scale = clamp(1.04 - noCount * 0.018, 0.82, 1.18);
-    const holdMs = clamp(360 + noCount * 28, 360, calm ? 620 : 920);
+    // Scale stays closer to 1 for better visibility
+    const scale = clamp(1.08 - noCount * 0.012, 0.92, 1.15);
+    // Hold time: starts easy (300ms), max 700ms - much more forgiving
+    const holdMs = clamp(300 + noCount * 20, 300, calm ? 500 : 700);
     const label = noLabels[noCount % noLabels.length];
-    // shield chance grows slightly, but capped
-    const shieldChance = clamp(0.12 + noCount * 0.007, 0.12, 0.26);
+    // Shield chance - moderate so it's not too frustrating
+    const shieldChance = clamp(0.08 + noCount * 0.005, 0.08, 0.18);
     return { scale, holdMs, label, shieldChance };
   }, [noCount, calm]);
 
+  // Button size - made bigger for easier tapping
   const btnSize = useMemo(() => ({
-    w: Math.round(132 * mode.scale * scaleFactor),
-    h: Math.round(56 * mode.scale * scaleFactor)
+    w: Math.round(150 * mode.scale * scaleFactor), // Wider
+    h: Math.round(64 * mode.scale * scaleFactor)   // Taller
   }), [mode.scale, scaleFactor]);
 
   const clampBtn = (x: number, y: number, allowOff = false) => {
@@ -298,11 +582,16 @@ export default function ValentineCat() {
   const moveNo = (reason?: string) => {
     const t = now();
     if (t < freezeUntil) return;
+
+    // On mobile (coarse pointer), keep button near the card for easier access
+    // On desktop, can move more freely but still stay visible
     const next = coarse
       ? pickNearCard()
-      : clampBtn(rand(16, vp.w - btnSize.w - 16), rand(16, vp.h - btnSize.h - 16));
+      : clampBtn(rand(40, vp.w - btnSize.w - 40), rand(100, vp.h - btnSize.h - 100));
+
     setPos(next);
-    setFreezeUntil(t + 850);
+    // Stay in place longer (1.2s) so user can find and click it
+    setFreezeUntil(t + 1200);
     if (reason) setAside(reason);
   };
 
@@ -347,7 +636,8 @@ export default function ValentineCat() {
   const [fishEatenP, setFishEatenP] = useState(0);
 
   const isShieldActive = boxVisible || catInBox || !!enteringBox || approaching || eating;
-  const showNo = !catInBox && !enteringBox && !approaching && !eating;
+  // Show the floating No button when cat isn't in special states
+  const showNo = !catInBox && !enteringBox && !approaching && !eating && catBehavior !== "napping";
 
   // Larger lure radius (requested)
   const lureR = coarse ? 210 : 180;
@@ -522,13 +812,24 @@ export default function ValentineCat() {
     window.setTimeout(() => moveNo(), 70);
   };
 
-  const beginHold = (e: any) => {
+  const beginHold = (e: React.PointerEvent | React.TouchEvent) => {
     if (holding || frozen || !showNo) return;
+
+    // Prevent default to stop text selection and other browser behaviors
+    e.preventDefault?.();
+    e.stopPropagation?.();
+
     setHolding(true);
     startRef.current = now();
+
+    // Cross-browser pointer capture
     try {
-      e?.currentTarget?.setPointerCapture?.(e.pointerId);
-    } catch {}
+      if ('pointerId' in e && e.currentTarget) {
+        (e.currentTarget as HTMLElement).setPointerCapture?.((e as React.PointerEvent).pointerId);
+      }
+    } catch {
+      // Fallback for browsers that don't support pointer capture
+    }
 
     const loop = () => {
       const p = clamp((now() - startRef.current) / mode.holdMs, 0, 1);
@@ -542,9 +843,19 @@ export default function ValentineCat() {
 
   const endHold = () => {
     if (holdP > 0 && holdP < 1) {
-      if (holdP >= 0.75) setAside("SO CLOSE 😼 (just a bit longer)");
-      else if (holdP >= 0.35) setAside("mmm… keep holding 😾");
-      else if (!frozen && !calm && noCount >= 3) moveNo("*skitters away* 🐾");
+      // Give encouraging feedback instead of running away
+      if (holdP >= 0.75) {
+        setAside("SO CLOSE! 😼 Try again!");
+        // Don't move - let them try again easily
+      } else if (holdP >= 0.5) {
+        setAside("Almost! Keep holding 😾");
+        // Don't move - they were doing well
+      } else if (holdP >= 0.25) {
+        setAside("Hold longer! 🐾");
+      } else if (!frozen && !calm && noCount >= 5) {
+        // Only run away if very low progress AND high no count
+        moveNo("*skitters away* 🐾");
+      }
     }
     stopHold();
   };
@@ -572,6 +883,19 @@ export default function ValentineCat() {
     setFishVisible(false);
     setFishHeld(false);
     setFishEatenP(0);
+
+    // Reset new behavior states
+    setCatBehavior("normal");
+    setBehaviorUntil(0);
+    setLastInteraction(now());
+    setLaserActive(false);
+    setCatChasingLaser(false);
+    setYarnActive(false);
+    setCatChasingYarn(false);
+    setCatnipUntil(0);
+    setCurrentGift(null);
+    setPawPrints([]);
+    setKnockedItems([]);
 
     setFx([]);
     window.setTimeout(() => moveNo(), 0);
@@ -602,16 +926,22 @@ export default function ValentineCat() {
     return "Tip: press & hold the No button";
   })();
 
-  // --- Accepted screen (responsive)
+  // --- Accepted screen (responsive for all browsers and devices)
   if (accepted) {
     return (
       <div
-        className="min-h-[100dvh] bg-gradient-to-br from-pink-100 to-rose-100 flex items-center justify-center p-4 sm:p-6"
+        className={cn(
+          "bg-gradient-to-br from-pink-100 to-rose-100 flex items-center justify-center",
+          "p-4 sm:p-6 md:p-8 lg:p-10",
+          // Height fallback: min-h-screen for old browsers, then dvh for modern
+          "min-h-screen min-h-[100dvh]"
+        )}
         style={{
           paddingTop: "max(env(safe-area-inset-top, 16px), 16px)",
           paddingBottom: "max(env(safe-area-inset-bottom, 16px), 16px)",
           paddingLeft: "max(env(safe-area-inset-left, 16px), 16px)",
           paddingRight: "max(env(safe-area-inset-right, 16px), 16px)",
+          touchAction: "manipulation",
         }}
       >
         <div className="fixed inset-0 pointer-events-none overflow-hidden">
@@ -646,19 +976,29 @@ export default function ValentineCat() {
     );
   }
 
-  // Hold ring style
-  const ringStyle = {
-    background: `conic-gradient(rgba(244,63,94,0.95) ${Math.round(holdP * 360)}deg, rgba(148,163,184,0.25) 0deg)`,
-  } as React.CSSProperties;
-
   return (
     <div
-      className="min-h-[100dvh] bg-gradient-to-br from-pink-50 via-rose-50 to-rose-100 p-2 sm:p-4 md:p-6 overflow-x-hidden"
+      className={cn(
+        "bg-gradient-to-br from-pink-50 via-rose-50 to-rose-100",
+        "p-2 sm:p-4 md:p-6 lg:p-8",
+        // Height: min-h-screen as fallback, then dvh for modern browsers
+        "min-h-screen min-h-[100dvh]",
+        "overflow-x-hidden overflow-y-auto",
+        // Prevent text selection on interactive elements (cross-browser)
+        "select-none sm:select-auto",
+        // Smooth scrolling for iOS Safari
+        "[&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
+      )}
       style={{
+        // Safe area insets with fallbacks
         paddingTop: "env(safe-area-inset-top, 0px)",
         paddingBottom: "max(env(safe-area-inset-bottom, 0px), 16px)",
         paddingLeft: "env(safe-area-inset-left, 0px)",
         paddingRight: "env(safe-area-inset-right, 0px)",
+        // Prevent iOS Safari bounce/rubber-band effect
+        WebkitOverflowScrolling: "touch",
+        // Prevent accidental zooming on double-tap (Safari)
+        touchAction: "manipulation",
       }}
     >
       {/* Background ambience */}
@@ -690,6 +1030,188 @@ export default function ValentineCat() {
           </motion.div>
         ))}
       </div>
+
+      {/* PAW PRINTS TRAIL */}
+      <div className="pointer-events-none fixed inset-0 z-[15]">
+        {pawPrints.map((p) => (
+          <motion.div
+            key={p.id}
+            className="absolute text-lg sm:text-xl"
+            style={{ left: p.x, top: p.y }}
+            initial={{ opacity: 0.6, scale: 1, rotate: p.r }}
+            animate={{ opacity: 0, scale: 0.5 }}
+            transition={{ duration: 4, ease: "easeOut" }}
+          >
+            🐾
+          </motion.div>
+        ))}
+      </div>
+
+      {/* KNOCKED ITEMS (falling) */}
+      <div className="pointer-events-none fixed inset-0 z-[83]">
+        {knockedItems.map((item) => (
+          <motion.div
+            key={item.id}
+            className="absolute text-2xl sm:text-3xl"
+            initial={{ x: item.x, y: item.y, rotate: 0, opacity: 1 }}
+            animate={{ y: vp.h + 50, rotate: rand(-180, 180), opacity: 0 }}
+            transition={{ duration: 2.5, ease: "easeIn" }}
+          >
+            {item.emoji}
+          </motion.div>
+        ))}
+      </div>
+
+      {/* LASER POINTER */}
+      <AnimatePresence>
+        {laserActive && mounted && (
+          <motion.div
+            className="fixed z-[82]"
+            style={{ left: laserPos.x - 12, top: laserPos.y - 12 }}
+            initial={{ opacity: 0, scale: 0 }}
+            animate={{ opacity: 1, scale: [1, 1.2, 1] }}
+            exit={{ opacity: 0, scale: 0 }}
+            transition={{ scale: { duration: 0.3, repeat: Infinity } }}
+          >
+            <div
+              className="w-6 h-6 rounded-full bg-red-500 shadow-lg cursor-pointer touch-manipulation"
+              style={{ boxShadow: "0 0 20px 8px rgba(239, 68, 68, 0.6)" }}
+              onPointerDown={(e) => {
+                e.preventDefault();
+                setLastInteraction(now());
+              }}
+              onPointerMove={(e) => {
+                if (laserActive) {
+                  setLaserPos({ x: e.clientX, y: e.clientY });
+                  setLastInteraction(now());
+                }
+              }}
+              onTouchMove={(e) => {
+                const touch = e.touches[0];
+                if (touch && laserActive) {
+                  setLaserPos({ x: touch.clientX, y: touch.clientY });
+                }
+              }}
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Full screen laser move area */}
+      {laserActive && (
+        <div
+          className="fixed inset-0 z-[81] cursor-crosshair"
+          onPointerMove={(e) => {
+            setLaserPos({ x: e.clientX, y: e.clientY });
+            setLastInteraction(now());
+          }}
+          onTouchMove={(e) => {
+            const touch = e.touches[0];
+            if (touch) {
+              setLaserPos({ x: touch.clientX, y: touch.clientY });
+            }
+          }}
+          onClick={() => {
+            setLaserActive(false);
+            setCatChasingLaser(false);
+            setAside("laser off 😿");
+          }}
+        />
+      )}
+
+      {/* YARN BALL */}
+      <AnimatePresence>
+        {yarnActive && mounted && (
+          <motion.div
+            className="fixed z-[82] touch-manipulation cursor-grab active:cursor-grabbing"
+            style={{ left: yarnPos.x - 24, top: yarnPos.y - 24 }}
+            initial={{ opacity: 0, scale: 0 }}
+            animate={{ opacity: 1, scale: 1, rotate: [0, 360] }}
+            exit={{ opacity: 0, scale: 0 }}
+            transition={{ rotate: { duration: 2, repeat: Infinity, ease: "linear" } }}
+            drag
+            dragMomentum={false}
+            onDrag={(_, info) => {
+              setYarnPos({ x: yarnPos.x + info.delta.x, y: yarnPos.y + info.delta.y });
+              setLastInteraction(now());
+            }}
+            onDragEnd={(_, info) => {
+              // Flick the yarn
+              setYarnVelocity({
+                x: clamp(info.velocity.x / 50, -20, 20),
+                y: clamp(info.velocity.y / 50, -20, 20)
+              });
+            }}
+            whileDrag={{ scale: 1.1 }}
+          >
+            <div
+              className="w-12 h-12 rounded-full flex items-center justify-center text-3xl"
+              style={{
+                background: `radial-gradient(circle at 30% 30%, ${yarnColor}, ${yarnColor}99)`,
+                boxShadow: `0 4px 12px ${yarnColor}66`
+              }}
+            >
+              🧶
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* CAT GIFT */}
+      <AnimatePresence>
+        {currentGift && mounted && (
+          <motion.div
+            className="fixed z-[84] pointer-events-none"
+            style={{ left: giftPos.x - 20, top: giftPos.y - 40 }}
+            initial={{ opacity: 0, y: 20, scale: 0 }}
+            animate={{ opacity: 1, y: 0, scale: [1, 1.2, 1] }}
+            exit={{ opacity: 0, y: -20, scale: 0 }}
+            transition={{ scale: { duration: 0.5, repeat: 3 } }}
+          >
+            <div className="text-4xl">{currentGift}</div>
+            <motion.div
+              className="absolute -bottom-6 left-1/2 -translate-x-1/2 text-[10px] text-slate-600 whitespace-nowrap bg-white/80 px-2 py-1 rounded-full"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+            >
+              for you! 💝
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* CAT BEHAVIOR INDICATOR */}
+      <AnimatePresence>
+        {isBehaviorActive && catBehavior !== "normal" && mounted && (
+          <motion.div
+            className="fixed left-1/2 -translate-x-1/2 bottom-20 z-[86]"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 20 }}
+          >
+            <div className={cn(
+              "px-4 py-2 rounded-full text-sm font-medium shadow-lg backdrop-blur",
+              catBehavior === "zoomies" && "bg-amber-100/90 text-amber-800",
+              catBehavior === "napping" && "bg-indigo-100/90 text-indigo-800",
+              catBehavior === "grooming" && "bg-pink-100/90 text-pink-800",
+              catBehavior === "hunting" && "bg-red-100/90 text-red-800",
+              catBehavior === "knocking" && "bg-orange-100/90 text-orange-800",
+              catBehavior === "gifting" && "bg-rose-100/90 text-rose-800",
+              catBehavior === "loaf" && "bg-amber-50/90 text-amber-700",
+              catBehavior === "catnip" && "bg-emerald-100/90 text-emerald-800",
+            )}>
+              {catBehavior === "zoomies" && "⚡ ZOOMIES MODE"}
+              {catBehavior === "napping" && "💤 Napping..."}
+              {catBehavior === "grooming" && "✨ Grooming"}
+              {catBehavior === "hunting" && "🎯 Hunting Mode"}
+              {catBehavior === "knocking" && "😼 Being Mischievous"}
+              {catBehavior === "gifting" && "🎁 Brought You Something!"}
+              {catBehavior === "loaf" && "🍞 Loaf Mode"}
+              {catBehavior === "catnip" && "🌿 CATNIP ACTIVATED"}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* HUD - responsive for all screen sizes */}
       <div
@@ -797,11 +1319,28 @@ export default function ValentineCat() {
         )}
       </AnimatePresence>
 
-      {/* Main card - responsive for all screen sizes */}
-      <div className="min-h-[calc(100dvh-2rem)] flex items-center justify-center pt-16 sm:pt-20 pb-4">
+      {/* Main card - responsive for all screen sizes including tablets */}
+      <div
+        className={cn(
+          "flex items-center justify-center pb-4",
+          // Use vh as fallback, dvh for modern browsers
+          isShortScreen && isLandscape
+            ? "min-h-screen min-h-[100dvh] pt-12"
+            : "min-h-[calc(100vh-2rem)] min-h-[calc(100dvh-2rem)] pt-16 sm:pt-20"
+        )}
+      >
         <Card
           ref={cardRef}
-          className="relative z-30 rounded-2xl sm:rounded-3xl shadow-lg bg-white/80 backdrop-blur-xl border border-white/60 max-w-md w-full mx-2 sm:mx-4"
+          className={cn(
+            "relative z-30 shadow-lg bg-white/80 border border-white/60",
+            "rounded-2xl sm:rounded-3xl",
+            // Width adjustments for different devices
+            "w-full mx-2 sm:mx-4 md:mx-6",
+            // Max width for different screen sizes
+            isTablet || isLargeTablet || isDesktop ? "max-w-lg" : "max-w-md",
+            // Safari backdrop-blur fallback
+            "backdrop-blur-xl supports-[backdrop-filter]:bg-white/80"
+          )}
         >
           <CardContent className="p-4 sm:p-6 md:p-8 text-center">
             <div className="flex flex-wrap items-center justify-center gap-1.5 sm:gap-2">
@@ -908,49 +1447,213 @@ export default function ValentineCat() {
                 </div>
               )}
 
-              <p className="mt-0.5 sm:mt-1 text-[10px] sm:text-xs text-slate-500 px-2">
-                To say <span className="font-semibold">No</span>, press & hold the floating button. ({Math.round(mode.holdMs / 100) / 10}s)
+              {/* TOY BOX - Compact and clean */}
+              <div className="flex flex-wrap items-center justify-center gap-2">
+                <Button
+                  variant="outline"
+                  onClick={activateLaser}
+                  disabled={laserActive || yarnActive}
+                  className={cn(
+                    "rounded-full text-xs px-3 py-2 touch-manipulation",
+                    laserActive && "bg-red-100 border-red-300"
+                  )}
+                >
+                  🔴 Laser
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={spawnYarn}
+                  disabled={yarnActive || laserActive}
+                  className={cn(
+                    "rounded-full text-xs px-3 py-2 touch-manipulation",
+                    yarnActive && "bg-pink-100 border-pink-300"
+                  )}
+                >
+                  🧶 Yarn
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={giveCatnip}
+                  disabled={isCatnipActive}
+                  className={cn(
+                    "rounded-full text-xs px-3 py-2 touch-manipulation",
+                    isCatnipActive && "bg-emerald-100 border-emerald-300"
+                  )}
+                >
+                  🌿 Catnip
+                </Button>
+                {(laserActive || yarnActive) && (
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setLaserActive(false);
+                      setCatChasingLaser(false);
+                      setYarnActive(false);
+                      setCatChasingYarn(false);
+                      setAside("toys away 📦");
+                    }}
+                    className="rounded-full text-xs px-3 py-2 touch-manipulation bg-slate-100"
+                  >
+                    ✖️
+                  </Button>
+                )}
+              </div>
+
+              {/* Simple instruction */}
+              <p className="mt-2 text-xs text-slate-500 text-center">
+                Find the floating <span className="font-semibold text-rose-500">No</span> button and hold it for {Math.round(mode.holdMs / 100) / 10}s
               </p>
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* FLOATING NO BUTTON - responsive */}
+      {/* FLOATING NO BUTTON - improved visibility and easier to click */}
       <AnimatePresence>
         {showNo && mounted && (
           <motion.div
             className="fixed left-0 top-0 z-[25]"
             style={{ x: pos.x, y: pos.y }}
             initial={{ opacity: 0, scale: 0.92 }}
-            animate={{ opacity: 1, scale: 1 }}
+            animate={{
+              opacity: 1,
+              scale: isCatnipActive ? [1, 1.05, 1] : 1,
+              rotate: catBehavior === "zoomies" ? [0, -2, 2, 0] : 0
+            }}
             exit={{ opacity: 0, scale: 0.92 }}
-            transition={{ type: "spring", stiffness: 420, damping: 26 }}
+            transition={{
+              type: "spring",
+              stiffness: 420,
+              damping: 26,
+              scale: { duration: 0.5, repeat: isCatnipActive ? Infinity : 0 },
+              rotate: { duration: 0.4, repeat: catBehavior === "zoomies" ? Infinity : 0 }
+            }}
           >
+            {/* Attention-grabbing glow behind button */}
+            {!holding && !catChasingLaser && !catChasingYarn && (
+              <motion.div
+                className="absolute inset-0 rounded-2xl sm:rounded-3xl bg-rose-400/30 blur-xl"
+                animate={{ scale: [1, 1.15, 1], opacity: [0.4, 0.7, 0.4] }}
+                transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+              />
+            )}
+
             <motion.button
               type="button"
-              className="relative select-none rounded-xl sm:rounded-2xl px-3 sm:px-4 py-2 sm:py-3 shadow-lg bg-white/80 backdrop-blur border border-white/60 touch-manipulation"
+              className={cn(
+                "relative select-none rounded-2xl sm:rounded-3xl px-4 sm:px-5 py-3 sm:py-4",
+                "shadow-xl backdrop-blur-md border-2 touch-manipulation",
+                // Better contrast - white/solid backgrounds
+                catBehavior === "grooming" && "bg-pink-100 border-pink-300",
+                catBehavior === "loaf" && "bg-amber-100 border-amber-300",
+                catBehavior === "hunting" && "bg-red-100 border-red-300",
+                isCatnipActive && "bg-emerald-100 border-emerald-400",
+                catChasingLaser && "bg-red-100 border-red-300",
+                catChasingYarn && "bg-purple-100 border-purple-300",
+                !isCatnipActive && !catChasingLaser && !catChasingYarn && catBehavior === "normal" && "bg-white border-rose-200",
+                // Holding state - darker to show it's being pressed
+                holding && "bg-rose-50 border-rose-400"
+              )}
               style={{ minWidth: btnSize.w, minHeight: btnSize.h }}
               onPointerDown={beginHold}
               onPointerUp={endHold}
               onPointerCancel={endHold}
               onPointerLeave={() => (coarse ? undefined : endHold())}
-              disabled={frozen}
+              // Touch event fallbacks for older Safari/browsers
+              onTouchStart={beginHold}
+              onTouchEnd={endHold}
+              onTouchCancel={endHold}
+              disabled={frozen || catChasingLaser || catChasingYarn}
               aria-label="No button"
               title="Press & hold"
-              animate={reduceMotion || holding ? {} : { y: [0, -2, 0] }}
-              transition={{ duration: 1.1, repeat: reduceMotion || holding ? 0 : Infinity, ease: "easeInOut" }}
+              animate={
+                reduceMotion
+                  ? {}
+                  : holding
+                  ? { scale: 0.98 } // Pressed effect
+                  : catBehavior === "zoomies" || isCatnipActive
+                  ? { y: [0, -3, 0] }
+                  : { y: [0, -4, 0], scale: [1, 1.02, 1] } // Gentle bounce to attract attention
+              }
+              transition={{
+                duration: holding ? 0.1 : catBehavior === "zoomies" || isCatnipActive ? 0.4 : 1.5,
+                repeat: reduceMotion || holding ? 0 : Infinity,
+                ease: "easeInOut"
+              }}
             >
-              {/* ring */}
-              <div className="absolute -inset-[5px] sm:-inset-[6px] rounded-[18px] sm:rounded-[22px] p-[2px]" style={ringStyle} aria-hidden="true">
-                <div className="h-full w-full rounded-[16px] sm:rounded-[20px] bg-white/75" />
+              {/* Progress ring - more visible */}
+              <div
+                className="absolute -inset-[4px] sm:-inset-[5px] rounded-[20px] sm:rounded-[26px] p-[3px]"
+                style={{
+                  background: holding
+                    ? `conic-gradient(rgba(244,63,94,1) ${Math.round(holdP * 360)}deg, rgba(226,232,240,0.5) 0deg)`
+                    : isCatnipActive
+                    ? `conic-gradient(rgba(16,185,129,0.95) ${Math.round(holdP * 360)}deg, rgba(148,163,184,0.25) 0deg)`
+                    : `conic-gradient(rgba(244,63,94,0.3) 360deg, rgba(226,232,240,0.3) 0deg)`
+                }}
+                aria-hidden="true"
+              >
+                <div className="h-full w-full rounded-[17px] sm:rounded-[23px] bg-white/90" />
               </div>
 
-              <div className="relative flex items-center gap-1.5 sm:gap-2">
-                <div className="text-xs sm:text-sm font-semibold text-slate-800">{mode.label}</div>
-                <span className="text-[10px] sm:text-[11px] text-slate-500">hold</span>
+              {/* Button content */}
+              <div className="relative flex flex-col items-center justify-center">
+                <div className="flex items-center gap-2">
+                  <div className="text-sm sm:text-base font-bold text-slate-800">
+                    {catChasingLaser ? "🔴 Chasing!" : catChasingYarn ? "🧶 Playing!" : mode.label}
+                  </div>
+                </div>
+
+                {/* Clear instruction or progress */}
+                <div className="mt-1 text-[11px] sm:text-xs font-medium">
+                  {holding ? (
+                    <span className="text-rose-600">
+                      {holdP < 0.5 ? "Keep holding..." : holdP < 0.8 ? "Almost there!" : "Almost done!"}
+                    </span>
+                  ) : catChasingLaser ? (
+                    <span className="text-red-600">Move the laser!</span>
+                  ) : catChasingYarn ? (
+                    <span className="text-purple-600">Flick the yarn!</span>
+                  ) : (
+                    <span className="text-slate-500">👆 Tap & hold</span>
+                  )}
+                </div>
+
+                {/* Visual progress bar when holding */}
+                {holding && (
+                  <div className="mt-2 w-full h-2 rounded-full bg-slate-200 overflow-hidden">
+                    <motion.div
+                      className="h-full rounded-full bg-gradient-to-r from-rose-400 to-rose-500"
+                      initial={{ width: 0 }}
+                      animate={{ width: `${holdP * 100}%` }}
+                      transition={{ duration: 0.05 }}
+                    />
+                  </div>
+                )}
               </div>
-              <div className="relative mt-0.5 sm:mt-1 text-[10px] sm:text-[11px] text-slate-600">{holding ? `${Math.round(holdP * 100)}%` : "tap & hold"}</div>
+
+              {/* Behavior emoji indicator */}
+              {isBehaviorActive && catBehavior !== "normal" && !holding && (
+                <motion.div
+                  className="absolute -top-2 -right-2 text-base bg-white rounded-full p-1 shadow-md"
+                  animate={{ scale: [1, 1.2, 1] }}
+                  transition={{ duration: 0.5, repeat: Infinity }}
+                >
+                  {catBehavior === "zoomies" && "⚡"}
+                  {catBehavior === "grooming" && "✨"}
+                  {catBehavior === "loaf" && "🍞"}
+                  {catBehavior === "hunting" && "🎯"}
+                </motion.div>
+              )}
+              {isCatnipActive && !holding && (
+                <motion.div
+                  className="absolute -top-2 -left-2 text-base bg-white rounded-full p-1 shadow-md"
+                  animate={{ rotate: [0, 360] }}
+                  transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                >
+                  🌿
+                </motion.div>
+              )}
             </motion.button>
           </motion.div>
         )}
@@ -1035,18 +1738,53 @@ export default function ValentineCat() {
                 onPointerDown={(e) => {
                   if (eating) return;
                   e.preventDefault();
+                  e.stopPropagation();
                   setFishHeld(true);
+                  // Cross-browser pointer capture
                   try {
-                    (e.currentTarget as any).setPointerCapture?.(e.pointerId);
-                  } catch {}
-                  setFishPos({ x: e.clientX, y: e.clientY });
+                    (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
+                  } catch {
+                    // Safari fallback - some versions don't support pointer capture
+                  }
+                  // Use clientX/Y with fallbacks for older browsers
+                  const x = e.clientX ?? (e as any).pageX ?? vp.w * 0.5;
+                  const y = e.clientY ?? (e as any).pageY ?? vp.h - 110;
+                  setFishPos({ x, y });
                 }}
                 onPointerMove={(e) => {
                   if (!fishHeld || eating) return;
-                  setFishPos({ x: e.clientX, y: e.clientY });
+                  e.preventDefault();
+                  const x = e.clientX ?? (e as any).pageX ?? fishPos.x;
+                  const y = e.clientY ?? (e as any).pageY ?? fishPos.y;
+                  setFishPos({ x, y });
                 }}
-                onPointerUp={() => setFishHeld(false)}
+                onPointerUp={(e) => {
+                  e.preventDefault();
+                  setFishHeld(false);
+                  // Release pointer capture
+                  try {
+                    (e.currentTarget as HTMLElement).releasePointerCapture?.(e.pointerId);
+                  } catch {}
+                }}
                 onPointerCancel={() => setFishHeld(false)}
+                // Touch event fallbacks for older Safari
+                onTouchStart={(e) => {
+                  if (eating) return;
+                  const touch = e.touches[0];
+                  if (touch) {
+                    setFishHeld(true);
+                    setFishPos({ x: touch.clientX, y: touch.clientY });
+                  }
+                }}
+                onTouchMove={(e) => {
+                  if (!fishHeld || eating) return;
+                  const touch = e.touches[0];
+                  if (touch) {
+                    setFishPos({ x: touch.clientX, y: touch.clientY });
+                  }
+                }}
+                onTouchEnd={() => setFishHeld(false)}
+                onTouchCancel={() => setFishHeld(false)}
                 title={eating ? "Eating…" : "Drag me near the box"}
                 animate={reduceMotion || eating ? {} : { y: [0, -3, 0] }}
                 transition={{ duration: 1.1, repeat: reduceMotion || eating ? 0 : Infinity, ease: "easeInOut" }}
