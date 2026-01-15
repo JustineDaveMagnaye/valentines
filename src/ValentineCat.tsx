@@ -137,6 +137,70 @@ const catGifts = ["🐭", "🪶", "🧦", "🎀", "🍂", "🦗", "🪲", "💝"
 // Yarn colors for the yarn ball
 const yarnColors = ["#f472b6", "#fb923c", "#a78bfa", "#34d399", "#60a5fa", "#f87171"];
 
+// Mess types the cat can make
+type MessType = "poop" | "hairball" | "dirt" | "muddy_paws" | "knocked_plant" | "water_spill" | "scratch_marks" | "yarn_tangle";
+
+type Mess = {
+  id: string;
+  type: MessType;
+  x: number;
+  y: number;
+  t: number;
+  cleaned: boolean;
+};
+
+type CleaningTool = {
+  id: string;
+  type: "broom" | "paper_towel" | "spray" | "sponge" | "dustpan" | "lint_roller";
+  x: number;
+  y: number;
+  t: number;
+  forMess: string; // Links to mess id
+};
+
+const messEmojis: Record<MessType, string> = {
+  poop: "💩",
+  hairball: "🤮",
+  dirt: "🟤",
+  muddy_paws: "🐾",
+  knocked_plant: "🪴",
+  water_spill: "💧",
+  scratch_marks: "〰️",
+  yarn_tangle: "🧶",
+};
+
+const messMessages: Record<MessType, string[]> = {
+  poop: ["oops… 💩", "*innocent look*", "wasn't me 😼", "nature calls!", "gift for you! 💩"],
+  hairball: ["*hack hack* 🤮", "*cough*", "uh oh…", "BLEH", "*hurk*"],
+  dirt: ["*digs*", "exploring! 🟤", "what's under here?", "*scratch scratch*"],
+  muddy_paws: ["*stomp stomp* 🐾", "paw art! 🎨", "everywhere I go~", "*prances*"],
+  knocked_plant: ["oops 🪴", "it was in my way", "*pushes*", "gravity test!"],
+  water_spill: ["*splash* 💧", "the bowl attacked me", "water go brrr", "*wet*"],
+  scratch_marks: ["*scratch* 💅", "sharpening claws!", "mine now", "*kneads aggressively*"],
+  yarn_tangle: ["got tangled 🧶", "art project!", "*spins*", "help?"],
+};
+
+const toolEmojis: Record<CleaningTool["type"], string> = {
+  broom: "🧹",
+  paper_towel: "🧻",
+  spray: "🧴",
+  sponge: "🧽",
+  dustpan: "🪣",
+  lint_roller: "🧼",
+};
+
+// Which tools clean which messes
+const messToolMap: Record<MessType, CleaningTool["type"][]> = {
+  poop: ["paper_towel", "dustpan"],
+  hairball: ["paper_towel", "spray"],
+  dirt: ["broom", "dustpan"],
+  muddy_paws: ["sponge", "spray"],
+  knocked_plant: ["broom", "dustpan"],
+  water_spill: ["paper_towel", "sponge"],
+  scratch_marks: ["spray", "lint_roller"],
+  yarn_tangle: ["lint_roller", "broom"],
+};
+
 type XY = { x: number; y: number };
 
 type FX = {
@@ -333,6 +397,13 @@ export default function ValentineCat() {
   // Knocked items
   const [knockedItems, setKnockedItems] = useState<Array<{ id: string; emoji: string; x: number; y: number; t: number }>>([]);
 
+  // Mess and cleaning system
+  const [messes, setMesses] = useState<Mess[]>([]);
+  const [cleaningTools, setCleaningTools] = useState<CleaningTool[]>([]);
+  const [heldTool, setHeldTool] = useState<string | null>(null);
+  const [cleanedCount, setCleanedCount] = useState(0);
+  const [lastMessTime, setLastMessTime] = useState(now());
+
   // Check if behavior is active
   const isBehaviorActive = tNow < behaviorUntil;
   const isCatnipActive = tNow < catnipUntil;
@@ -399,6 +470,86 @@ export default function ValentineCat() {
     burst(gift, { x: pos.x + btnSize.w / 2, y: pos.y }, 5, 50, 1); // Reduced particles
   };
 
+  // --- MESS SYSTEM ---
+  const createMess = (type?: MessType) => {
+    const messTypes: MessType[] = ["poop", "hairball", "dirt", "muddy_paws", "knocked_plant", "water_spill", "scratch_marks", "yarn_tangle"];
+    const messType = type || messTypes[Math.floor(rand(0, messTypes.length))];
+
+    // Position mess near the cat's current position
+    const messX = clamp(pos.x + btnSize.w / 2 + rand(-60, 60), 50, vp.w - 50);
+    const messY = clamp(pos.y + btnSize.h + rand(20, 80), 150, vp.h - 100);
+
+    const messId = `mess-${now()}-${Math.random().toString(16).slice(2)}`;
+
+    const newMess: Mess = {
+      id: messId,
+      type: messType,
+      x: messX,
+      y: messY,
+      t: now(),
+      cleaned: false,
+    };
+
+    setMesses((prev) => [...prev.slice(-8), newMess]); // Max 8 messes on screen
+    setLastMessTime(now());
+
+    // Show message
+    const msgs = messMessages[messType];
+    setAside(msgs[Math.floor(rand(0, msgs.length))]);
+
+    // Burst effect at mess location
+    burst(messEmojis[messType], { x: messX, y: messY }, 4, 35, 0.8);
+
+    // Spawn appropriate cleaning tool
+    spawnCleaningTool(messId, messType, messX, messY);
+  };
+
+  const spawnCleaningTool = (messId: string, messType: MessType, messX: number, messY: number) => {
+    const availableTools = messToolMap[messType];
+    const toolType = availableTools[Math.floor(rand(0, availableTools.length))];
+
+    // Spawn tool near the mess but offset
+    const toolX = clamp(messX + rand(-100, 100), 30, vp.w - 60);
+    const toolY = clamp(messY + rand(40, 100), 200, vp.h - 80);
+
+    const newTool: CleaningTool = {
+      id: `tool-${now()}-${Math.random().toString(16).slice(2)}`,
+      type: toolType,
+      x: toolX,
+      y: toolY,
+      t: now(),
+      forMess: messId,
+    };
+
+    setCleaningTools((prev) => [...prev.slice(-8), newTool]);
+  };
+
+  const cleanMess = (messId: string, toolId: string) => {
+    const mess = messes.find((m) => m.id === messId);
+    const tool = cleaningTools.find((t) => t.id === toolId);
+
+    if (!mess || !tool) return;
+
+    // Check if this tool can clean this mess
+    const validTools = messToolMap[mess.type];
+    if (!validTools.includes(tool.type)) {
+      setAside("wrong tool! 😾 try another");
+      return;
+    }
+
+    // Clean the mess!
+    burst("✨", { x: mess.x, y: mess.y }, 6, 50, 1);
+    burst(toolEmojis[tool.type], { x: mess.x, y: mess.y }, 3, 30, 0.7);
+
+    setMesses((prev) => prev.filter((m) => m.id !== messId));
+    setCleaningTools((prev) => prev.filter((t) => t.id !== toolId));
+    setCleanedCount((c) => c + 1);
+    setHeldTool(null);
+
+    const cleanMessages = ["all clean! ✨", "good human! 😽", "sparkling~", "nice job! 🧹", "*approves* 😼"];
+    setAside(cleanMessages[Math.floor(rand(0, cleanMessages.length))]);
+  };
+
   // Random behavior trigger (when idle)
   useEffect(() => {
     if (accepted || catInBox || approaching || eating || catChasingLaser || catChasingYarn) return;
@@ -455,6 +606,38 @@ export default function ValentineCat() {
     // Small chance to bring a gift
     if (timeSinceInteraction > 12000 && Math.random() < 0.008 && !currentGift) {
       bringGift();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tick]);
+
+  // Auto-mess creation (cat makes messes automatically!)
+  useEffect(() => {
+    if (accepted) return;
+
+    const timeSinceMess = tNow - lastMessTime;
+    const messCount = messes.length;
+
+    // Cat makes mess every 8-15 seconds if not too many messes already
+    // More frequent if cat is in zoomies or catnip mode
+    const baseInterval = isCatnipActive || catBehavior === "zoomies" ? 5000 : 10000;
+    const messChance = isCatnipActive ? 0.04 : catBehavior === "zoomies" ? 0.03 : 0.015;
+
+    if (timeSinceMess > baseInterval && messCount < 6 && Math.random() < messChance) {
+      // Weight certain mess types based on behavior
+      let messType: MessType | undefined;
+
+      if (catBehavior === "grooming") {
+        messType = Math.random() < 0.7 ? "hairball" : undefined;
+      } else if (catBehavior === "scratching") {
+        messType = Math.random() < 0.8 ? "scratch_marks" : undefined;
+      } else if (catBehavior === "zoomies") {
+        messType = Math.random() < 0.5 ? "muddy_paws" : Math.random() < 0.5 ? "knocked_plant" : undefined;
+      } else if (isCatnipActive) {
+        const chaosTypes: MessType[] = ["yarn_tangle", "knocked_plant", "water_spill", "dirt"];
+        messType = chaosTypes[Math.floor(rand(0, chaosTypes.length))];
+      }
+
+      createMess(messType);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tick]);
@@ -1004,6 +1187,13 @@ export default function ValentineCat() {
     setPawPrints([]);
     setKnockedItems([]);
 
+    // Reset mess system
+    setMesses([]);
+    setCleaningTools([]);
+    setHeldTool(null);
+    setCleanedCount(0);
+    setLastMessTime(now());
+
     setFx([]);
     window.setTimeout(() => moveNo(), 0);
   };
@@ -1168,6 +1358,146 @@ export default function ValentineCat() {
           </motion.div>
         ))}
       </div>
+
+      {/* MESSES - Cat makes these automatically! */}
+      <div className="fixed inset-0 z-[18]">
+        {messes.map((mess) => (
+          <motion.div
+            key={mess.id}
+            className="absolute"
+            style={{ left: mess.x - 25, top: mess.y - 25 }}
+            initial={{ opacity: 0, scale: 0, rotate: rand(-20, 20) }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0 }}
+            transition={{ type: "spring", stiffness: 400, damping: 20 }}
+          >
+            <motion.button
+              type="button"
+              className={cn(
+                "relative w-14 h-14 sm:w-16 sm:h-16 rounded-full flex items-center justify-center",
+                "cursor-pointer touch-manipulation select-none",
+                "border-2 border-dashed shadow-lg backdrop-blur-sm",
+                heldTool ? "border-emerald-400 bg-emerald-50/80" : "border-amber-300 bg-amber-50/80"
+              )}
+              onClick={() => {
+                if (heldTool) {
+                  cleanMess(mess.id, heldTool);
+                } else {
+                  setAside("grab a cleaning tool first! 🧹");
+                  burst("❓", { x: mess.x, y: mess.y }, 2, 20, 0.6);
+                }
+              }}
+              animate={reduceMotion ? {} : { scale: [1, 1.05, 1] }}
+              transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+              aria-label={`Clean ${mess.type}`}
+              title={heldTool ? "Click to clean!" : "Grab a tool first"}
+            >
+              <span className="text-2xl sm:text-3xl">{messEmojis[mess.type]}</span>
+              {heldTool && (
+                <motion.div
+                  className="absolute -top-1 -right-1 w-5 h-5 rounded-full bg-emerald-500 flex items-center justify-center text-white text-xs"
+                  initial={{ scale: 0 }}
+                  animate={{ scale: [1, 1.2, 1] }}
+                  transition={{ duration: 0.5, repeat: Infinity }}
+                >
+                  ✓
+                </motion.div>
+              )}
+            </motion.button>
+            <motion.div
+              className="absolute -bottom-5 left-1/2 -translate-x-1/2 whitespace-nowrap"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 0.8 }}
+            >
+              <span className="text-[9px] sm:text-[10px] bg-white/80 px-1.5 py-0.5 rounded-full text-slate-600 shadow-sm">
+                {mess.type.replace("_", " ")}
+              </span>
+            </motion.div>
+          </motion.div>
+        ))}
+      </div>
+
+      {/* CLEANING TOOLS - Spawn when messes appear */}
+      <div className="fixed inset-0 z-[19]">
+        {cleaningTools.map((tool) => (
+          <motion.div
+            key={tool.id}
+            className="absolute"
+            style={{ left: tool.x - 22, top: tool.y - 22 }}
+            initial={{ opacity: 0, scale: 0, y: -20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0 }}
+            transition={{ type: "spring", stiffness: 400, damping: 20 }}
+          >
+            <motion.button
+              type="button"
+              className={cn(
+                "w-12 h-12 sm:w-14 sm:h-14 rounded-xl flex items-center justify-center",
+                "cursor-grab active:cursor-grabbing touch-manipulation select-none",
+                "border-2 shadow-lg backdrop-blur-sm",
+                heldTool === tool.id
+                  ? "border-emerald-500 bg-emerald-100 ring-2 ring-emerald-300"
+                  : "border-slate-300 bg-white/90 hover:bg-slate-50 hover:border-emerald-300"
+              )}
+              onClick={() => {
+                if (heldTool === tool.id) {
+                  setHeldTool(null);
+                  setAside("tool dropped");
+                } else {
+                  setHeldTool(tool.id);
+                  setAside(`grabbed ${tool.type.replace("_", " ")}! now tap a mess 🎯`);
+                }
+              }}
+              animate={reduceMotion ? {} : heldTool === tool.id ? { scale: [1, 1.1, 1] } : { y: [0, -3, 0] }}
+              transition={{ duration: heldTool === tool.id ? 0.3 : 1.5, repeat: Infinity, ease: "easeInOut" }}
+              aria-label={`Pick up ${tool.type}`}
+              title={heldTool === tool.id ? "Click mess to clean, or click here to drop" : "Click to pick up"}
+            >
+              <span className="text-xl sm:text-2xl">{toolEmojis[tool.type]}</span>
+            </motion.button>
+            <motion.div
+              className="absolute -bottom-4 left-1/2 -translate-x-1/2 whitespace-nowrap"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 0.7 }}
+            >
+              <span className="text-[8px] sm:text-[9px] bg-white/80 px-1 py-0.5 rounded text-slate-500">
+                {tool.type.replace("_", " ")}
+              </span>
+            </motion.div>
+          </motion.div>
+        ))}
+      </div>
+
+      {/* Mess counter badge */}
+      <AnimatePresence>
+        {messes.length > 0 && mounted && (
+          <motion.div
+            className="fixed right-2 sm:right-4 bottom-20 sm:bottom-24 z-[88]"
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: 20 }}
+          >
+            <div className={cn(
+              "px-3 py-2 rounded-xl shadow-lg backdrop-blur border",
+              messes.length >= 4 ? "bg-red-100/90 border-red-300 text-red-800" :
+              messes.length >= 2 ? "bg-amber-100/90 border-amber-300 text-amber-800" :
+              "bg-slate-100/90 border-slate-300 text-slate-700"
+            )}>
+              <div className="text-[10px] sm:text-xs font-medium">
+                {messes.length >= 4 ? "🚨 Too messy!" : messes.length >= 2 ? "⚠️ Getting messy" : "🧹 Clean up!"}
+              </div>
+              <div className="text-[9px] sm:text-[10px] mt-0.5 opacity-80">
+                {messes.length} mess{messes.length !== 1 ? "es" : ""} • {cleanedCount} cleaned
+              </div>
+              {heldTool && (
+                <div className="text-[9px] sm:text-[10px] mt-1 text-emerald-700 font-medium">
+                  🧹 Tool ready! Tap a mess
+                </div>
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* LASER POINTER */}
       <AnimatePresence>
@@ -1418,6 +1748,16 @@ export default function ValentineCat() {
                       </div>
                       <div className="mt-0.5 sm:mt-1">If you tap the cat while it's approaching/eating, it panics and dives back.</div>
                     </div>
+                    <div className="rounded-xl sm:rounded-2xl bg-emerald-50/70 border border-emerald-100 p-2 sm:p-3">
+                      <div className="font-semibold text-sm sm:text-base">Clean up messes! 🧹</div>
+                      <div className="mt-0.5 sm:mt-1">
+                        The cat makes messes automatically (💩 poop, 🤮 hairballs, 🟤 dirt, etc). Cleaning tools spawn nearby!
+                      </div>
+                      <div className="mt-0.5 sm:mt-1">
+                        <span className="font-semibold">Tap a tool</span> to pick it up, then <span className="font-semibold">tap a mess</span> to clean it.
+                      </div>
+                      <div className="mt-0.5 sm:mt-1 text-[10px] sm:text-xs text-slate-500">Different tools work on different messes!</div>
+                    </div>
                   </div>
 
                   <div className="mt-3 sm:mt-5 flex items-center justify-end gap-2">
@@ -1464,6 +1804,16 @@ export default function ValentineCat() {
               {fishVisible && (
                 <Badge className={cn(fishNearBox ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-700", "text-[10px] sm:text-[11px]")}>
                   {fishNearBox ? "Lure!" : "Fish"}
+                </Badge>
+              )}
+              {messes.length > 0 && (
+                <Badge className={cn(
+                  messes.length >= 4 ? "bg-red-100 text-red-700" :
+                  messes.length >= 2 ? "bg-amber-100 text-amber-700" :
+                  "bg-emerald-50 text-emerald-700",
+                  "text-[10px] sm:text-[11px]"
+                )}>
+                  {messes.length >= 4 ? "🚨" : "🧹"} {messes.length} mess{messes.length !== 1 ? "es" : ""}
                 </Badge>
               )}
             </div>
