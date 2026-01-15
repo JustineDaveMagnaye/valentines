@@ -560,13 +560,76 @@ export default function ValentineCat() {
   };
 
   // --- MESS SYSTEM ---
+
+  // Helper to check if position overlaps with card
+  const isOverlappingCard = (x: number, y: number, margin = 20): boolean => {
+    const card = cardRef.current?.getBoundingClientRect?.();
+    if (!card) return false;
+    return (
+      x > card.left - margin &&
+      x < card.right + margin &&
+      y > card.top - margin &&
+      y < card.bottom + margin
+    );
+  };
+
+  // Find a position that doesn't overlap with the card
+  const findSafePosition = (preferredX: number, preferredY: number, margin = 30): XY => {
+    const card = cardRef.current?.getBoundingClientRect?.();
+    if (!card) return { x: preferredX, y: preferredY };
+
+    // If preferred position is safe, use it
+    if (!isOverlappingCard(preferredX, preferredY, margin)) {
+      return { x: preferredX, y: preferredY };
+    }
+
+    // Try positions around the card (left, right, above, below)
+    const safeSpots: XY[] = [];
+
+    // Left of card
+    if (card.left > 100) {
+      safeSpots.push({ x: rand(50, card.left - margin), y: rand(120, vp.h - 100) });
+    }
+    // Right of card
+    if (vp.w - card.right > 100) {
+      safeSpots.push({ x: rand(card.right + margin, vp.w - 50), y: rand(120, vp.h - 100) });
+    }
+    // Above card
+    if (card.top > 150) {
+      safeSpots.push({ x: rand(50, vp.w - 50), y: rand(100, card.top - margin) });
+    }
+    // Below card
+    if (vp.h - card.bottom > 120) {
+      safeSpots.push({ x: rand(50, vp.w - 50), y: rand(card.bottom + margin, vp.h - 80) });
+    }
+
+    // Pick a random safe spot, or fall back to corners
+    if (safeSpots.length > 0) {
+      return safeSpots[Math.floor(rand(0, safeSpots.length))];
+    }
+
+    // Fallback to corners
+    const corners: XY[] = [
+      { x: 60, y: 100 },
+      { x: vp.w - 60, y: 100 },
+      { x: 60, y: vp.h - 100 },
+      { x: vp.w - 60, y: vp.h - 100 },
+    ];
+    return corners[Math.floor(rand(0, corners.length))];
+  };
+
   const createMess = (type?: MessType) => {
     const messTypes: MessType[] = ["poop", "hairball", "dirt", "muddy_paws", "knocked_plant", "water_spill", "vomit", "fur_clump"];
     const messType = type || messTypes[Math.floor(rand(0, messTypes.length))];
 
-    // Position mess near the cat's current position
-    const messX = clamp(pos.x + btnSize.w / 2 + rand(-60, 60), 50, vp.w - 50);
-    const messY = clamp(pos.y + btnSize.h + rand(20, 80), 150, vp.h - 100);
+    // Try to position near the cat, but ensure it's not behind the card
+    const preferredX = clamp(pos.x + btnSize.w / 2 + rand(-60, 60), 60, vp.w - 60);
+    const preferredY = clamp(pos.y + btnSize.h + rand(20, 80), 120, vp.h - 100);
+
+    // Find a safe position that doesn't overlap with the card
+    const safePos = findSafePosition(preferredX, preferredY, 40);
+    const messX = safePos.x;
+    const messY = safePos.y;
 
     const messId = `mess-${now()}-${Math.random().toString(16).slice(2)}`;
 
@@ -601,17 +664,20 @@ export default function ValentineCat() {
 
     const toolType = step.tool;
 
-    // Spawn tool near the mess but offset
+    // Try to spawn tool near the mess but not behind card
     const angle = rand(0, Math.PI * 2);
-    const distance = rand(80, 120);
-    const toolX = clamp(messX + Math.cos(angle) * distance, 40, vp.w - 60);
-    const toolY = clamp(messY + Math.sin(angle) * distance, 180, vp.h - 80);
+    const distance = rand(70, 110);
+    const preferredX = clamp(messX + Math.cos(angle) * distance, 50, vp.w - 50);
+    const preferredY = clamp(messY + Math.sin(angle) * distance, 120, vp.h - 80);
+
+    // Find safe position for tool
+    const safePos = findSafePosition(preferredX, preferredY, 30);
 
     const newTool: CleaningTool = {
       id: `tool-${now()}-${Math.random().toString(16).slice(2)}`,
       type: toolType,
-      x: toolX,
-      y: toolY,
+      x: safePos.x,
+      y: safePos.y,
       t: now(),
       forMess: messId,
     };
