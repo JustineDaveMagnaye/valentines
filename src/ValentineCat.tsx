@@ -107,19 +107,29 @@ const beats = [
 const noLabels = ["No 🙀", "No 😼", "Nope 🐾", "Nah 😾", "NO 😡", "Still no? 🥲"];
 
 // Cat behavior states - makes the game more dynamic and unpredictable
-type CatBehavior = "normal" | "zoomies" | "napping" | "grooming" | "hunting" | "knocking" | "gifting" | "loaf" | "catnip";
+type CatBehavior = "normal" | "zoomies" | "napping" | "grooming" | "hunting" | "knocking" | "gifting" | "loaf" | "catnip" | "stretching" | "yawning" | "scratching" | "judging";
 
 const catBehaviorMessages: Record<CatBehavior, string[]> = {
-  normal: ["meow", "mrrp", "*stares*", "*blinks slowly*"],
-  zoomies: ["ZOOM!! 💨", "*NYOOM*", "GOTTA GO FAST", "*chaos mode*", "WHEEEEE"],
-  napping: ["zzz… 💤", "*snore*", "5 more minutes…", "*dreaming of fish*", "so sleepy…"],
-  grooming: ["*lick lick*", "*cleaning paws*", "must stay pretty", "*wash wash*"],
-  hunting: ["*wiggles butt*", "TARGET ACQUIRED", "*stalking*", "*pounce mode*", "👀"],
-  knocking: ["*pushes thing*", "oops 😼", "*CRASH*", "gravity test!", "it had to go"],
-  gifting: ["I brought you something! 🎁", "*proud*", "look what I found!", "for you! 💝"],
-  loaf: ["*becomes loaf* 🍞", "loaf mode activated", "*tucks paws*", "am bread now"],
-  catnip: ["WHEEEE 🌿", "*rolls around*", "*pure bliss*", "THIS IS AMAZING", "*zooms AND purrs*"],
+  normal: ["meow", "mrrp", "*stares*", "*blinks slowly*", "prrt?", "*ear twitch*", "*tail swish*"],
+  zoomies: ["ZOOM!! 💨", "*NYOOM*", "GOTTA GO FAST", "*chaos mode*", "WHEEEEE", "CAN'T STOP WON'T STOP", "*parkour*", "3AM ENERGY"],
+  napping: ["zzz… 💤", "*snore*", "5 more minutes…", "*dreaming of fish*", "so sleepy…", "*twitches whiskers*", "don't wake me…"],
+  grooming: ["*lick lick*", "*cleaning paws*", "must stay pretty", "*wash wash*", "gotta look good 💅", "*fixes fur*"],
+  hunting: ["*wiggles butt*", "TARGET ACQUIRED", "*stalking*", "*pounce mode*", "👀", "*intense focus*", "don't move…"],
+  knocking: ["*pushes thing*", "oops 😼", "*CRASH*", "gravity test!", "it had to go", "science experiment!", "*innocent look*"],
+  gifting: ["I brought you something! 🎁", "*proud*", "look what I found!", "for you! 💝", "accept my offering!", "you're welcome 😼"],
+  loaf: ["*becomes loaf* 🍞", "loaf mode activated", "*tucks paws*", "am bread now", "maximum cozy", "no thoughts only loaf"],
+  catnip: ["WHEEEE 🌿", "*rolls around*", "*pure bliss*", "THIS IS AMAZING", "*zooms AND purrs*", "EVERYTHING IS BEAUTIFUL", "*vibrating*"],
+  stretching: ["*biiiiig stretch* 🐱", "*yoga pose*", "ah, that's better", "*extends beans*", "streeeetch~", "*elongates*"],
+  yawning: ["*yaaaawn* 😴", "*shows teefies*", "sleepy boi hours", "*big yawn*", "am tired", "*dramatic yawn*"],
+  scratching: ["*scratch scratch* 💅", "*sharpens claws*", "must maintain weapons", "*kneads aggressively*", "scrtch scrtch"],
+  judging: ["*judges silently* 😐", "*disappointed look*", "really?", "*stares judgmentally*", "I expected better", "*visible disapproval*"],
 };
+
+// More varied reactions for different situations
+const petReactions = ["purr… 😽", "*headbutt* 💗", "*kneads happily*", "mrrrrow~ 💕", "*happy chirp*", "*slow blink* 💗"];
+const annoyedReactions = ["hiss… 😾", "*swats paw*", "excuse me?!", "*flattens ears*", "*tail puff*", "how DARE"];
+const curiousReactions = ["*head tilt*", "mrrp? 👀", "*sniff sniff*", "what's this?", "*perks ears*", "interesting…"];
+const playfulReactions = ["*pounce!* 🐾", "*wiggles*", "play with me!", "*chatters*", "*bunny kicks*", "gotcha!"];
 
 // Cat gifts the cat can bring you
 const catGifts = ["🐭", "🪶", "🧦", "🎀", "🍂", "🦗", "🪲", "💝", "🌸", "⭐"];
@@ -278,6 +288,21 @@ export default function ValentineCat() {
   const frozen = tNow < freezeUntil;
   const calm = tNow < calmUntil;
 
+  // --- Mode (BALANCED for playability) - moved before yarn chase effect
+  const mode = useMemo(() => {
+    const scale = clamp(1.08 - noCount * 0.012, 0.92, 1.15);
+    const holdMs = clamp(300 + noCount * 20, 300, calm ? 500 : 700);
+    const label = noLabels[noCount % noLabels.length];
+    const shieldChance = clamp(0.08 + noCount * 0.005, 0.08, 0.18);
+    return { scale, holdMs, label, shieldChance };
+  }, [noCount, calm]);
+
+  // Button size - made bigger for easier tapping
+  const btnSize = useMemo(() => ({
+    w: Math.round(150 * mode.scale * scaleFactor),
+    h: Math.round(64 * mode.scale * scaleFactor)
+  }), [mode.scale, scaleFactor]);
+
   // --- CAT BEHAVIOR SYSTEM ---
   const [catBehavior, setCatBehavior] = useState<CatBehavior>("normal");
   const [behaviorUntil, setBehaviorUntil] = useState(0);
@@ -291,7 +316,6 @@ export default function ValentineCat() {
   // Yarn ball state
   const [yarnActive, setYarnActive] = useState(false);
   const [yarnPos, setYarnPos] = useState<XY>({ x: 100, y: 100 });
-  const [yarnVelocity, setYarnVelocity] = useState<XY>({ x: 0, y: 0 });
   const [yarnColor, setYarnColor] = useState(yarnColors[0]);
   const [catChasingYarn, setCatChasingYarn] = useState(false);
 
@@ -380,7 +404,7 @@ export default function ValentineCat() {
 
     // After 8 seconds of no interaction, cat might do something
     if (timeSinceInteraction > 8000 && Math.random() < 0.02) {
-      const behaviors: CatBehavior[] = ["zoomies", "napping", "grooming", "knocking", "loaf"];
+      const behaviors: CatBehavior[] = ["zoomies", "napping", "grooming", "knocking", "loaf", "stretching", "yawning", "scratching", "judging"];
       const randomBehavior = behaviors[Math.floor(rand(0, behaviors.length))];
 
       if (randomBehavior === "knocking") {
@@ -401,6 +425,26 @@ export default function ValentineCat() {
           addPawPrint(newPos.x + btnSize.w / 2, newPos.y + btnSize.h / 2);
           burst("💨", newPos, 4, 30, 0.6);
         }, 400);
+      }
+
+      // Stretching shows stretch emoji
+      if (randomBehavior === "stretching") {
+        burst("🙆", { x: pos.x + btnSize.w / 2, y: pos.y }, 3, 40, 1);
+      }
+
+      // Yawning shows sleepy effects
+      if (randomBehavior === "yawning") {
+        burst("💤", { x: pos.x + btnSize.w / 2, y: pos.y - 20 }, 4, 30, 1.5);
+      }
+
+      // Scratching leaves marks
+      if (randomBehavior === "scratching") {
+        burst("✨", { x: pos.x + btnSize.w / 2, y: pos.y + btnSize.h / 2 }, 5, 25, 0.8);
+      }
+
+      // Judging stares at you intensely
+      if (randomBehavior === "judging") {
+        burst("👁️", { x: pos.x + btnSize.w / 2, y: pos.y }, 2, 20, 1.2);
       }
     }
 
@@ -446,10 +490,11 @@ export default function ValentineCat() {
       const next = moveToward(p, target, speed);
       if (dist(next, target) < 20) {
         burst("✨", laserPos, 6, 40, 0.8);
-        setAside(Math.random() < 0.5 ? "*pounce!* 🐾" : "almost got it! 😼");
+        const laserReactions = ["*pounce!* 🐾", "almost got it! 😼", "WHERE'D IT GO?!", "*confused chirp*", "MUST. CATCH. DOT.", "*intense stare*"];
+        setAside(laserReactions[Math.floor(rand(0, laserReactions.length))]);
       }
       // Add paw prints occasionally
-      if (Math.random() < 0.15) {
+      if (Math.random() < 0.12) {
         addPawPrint(next.x + btnSize.w / 2, next.y + btnSize.h / 2);
       }
       return next;
@@ -457,76 +502,82 @@ export default function ValentineCat() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tick, laserActive, catChasingLaser, laserPos.x, laserPos.y]);
 
-  // --- YARN BALL LOGIC ---
+  // --- YARN BALL LOGIC (simplified to prevent crashes) ---
+  const yarnRef = useRef({ vel: { x: 0, y: 0 }, dragging: false });
+
   const spawnYarn = () => {
     setYarnActive(true);
     setYarnColor(yarnColors[Math.floor(rand(0, yarnColors.length))]);
     setYarnPos({ x: vp.w * 0.5, y: vp.h * 0.6 });
-    setYarnVelocity({ x: 0, y: 0 });
+    yarnRef.current.vel = { x: 0, y: 0 };
+    yarnRef.current.dragging = false;
     setCatChasingYarn(true);
-    setAside("🧶 Flick the yarn ball!");
+    setAside("🧶 Drag the yarn ball!");
     setLastInteraction(now());
   };
 
-  // Yarn physics
+  const flickYarn = (vx: number, vy: number) => {
+    yarnRef.current.vel = {
+      x: clamp(vx / 60, -12, 12),
+      y: clamp(vy / 60, -12, 12)
+    };
+  };
+
+  // Yarn physics - using ref to avoid state update loops
   useEffect(() => {
-    if (!yarnActive) return;
+    if (!yarnActive || yarnRef.current.dragging) return;
+
+    const vel = yarnRef.current.vel;
+    if (Math.abs(vel.x) < 0.1 && Math.abs(vel.y) < 0.1) return;
 
     setYarnPos((p) => {
-      let newX = p.x + yarnVelocity.x;
-      let newY = p.y + yarnVelocity.y;
+      let newX = p.x + vel.x;
+      let newY = p.y + vel.y;
 
       // Bounce off walls
       if (newX < 30 || newX > vp.w - 30) {
-        setYarnVelocity((v) => ({ ...v, x: -v.x * 0.7 }));
+        vel.x *= -0.6;
         newX = clamp(newX, 30, vp.w - 30);
       }
-      if (newY < 80 || newY > vp.h - 80) {
-        setYarnVelocity((v) => ({ ...v, y: -v.y * 0.7 }));
-        newY = clamp(newY, 80, vp.h - 80);
+      if (newY < 100 || newY > vp.h - 60) {
+        vel.y *= -0.6;
+        newY = clamp(newY, 100, vp.h - 60);
       }
+
+      // Apply friction
+      vel.x *= 0.95;
+      vel.y *= 0.95;
 
       return { x: newX, y: newY };
     });
-
-    // Apply friction
-    setYarnVelocity((v) => ({
-      x: v.x * 0.96,
-      y: v.y * 0.96
-    }));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tick, yarnActive]);
+  }, [tick, yarnActive, vp.w, vp.h]);
 
   // Cat chases yarn
   useEffect(() => {
     if (!yarnActive || !catChasingYarn) return;
 
     const target = clampBtn(yarnPos.x - btnSize.w / 2, yarnPos.y - btnSize.h / 2);
-    const speed = isCatnipActive ? 22 : 14;
+    const speed = isCatnipActive ? 18 : 12;
 
     setPos((p) => {
       const next = moveToward(p, target, speed);
       const d = dist(next, target);
 
-      if (d < 30) {
+      if (d < 40 && !yarnRef.current.dragging) {
         // Cat caught the yarn!
-        burst("🧶", yarnPos, 8, 50, 1.0);
-        setAside(Math.random() < 0.5 ? "*caught it!* 😺" : "*plays with yarn* 🧶");
+        burst("🧶", yarnPos, 6, 40, 0.8);
+        setAside(playfulReactions[Math.floor(rand(0, playfulReactions.length))]);
 
         // Knock the yarn away
-        setYarnVelocity({
-          x: rand(-15, 15),
-          y: rand(-15, 15)
-        });
+        yarnRef.current.vel = { x: rand(-8, 8), y: rand(-8, 8) };
       }
 
-      if (Math.random() < 0.1) {
+      if (Math.random() < 0.08) {
         addPawPrint(next.x + btnSize.w / 2, next.y + btnSize.h / 2);
       }
       return next;
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tick, yarnActive, catChasingYarn, yarnPos.x, yarnPos.y]);
+  }, [tick, yarnActive, catChasingYarn, yarnPos.x, yarnPos.y, isCatnipActive, btnSize.w, btnSize.h]);
 
   // --- CATNIP LOGIC ---
   const giveCatnip = () => {
@@ -535,24 +586,6 @@ export default function ValentineCat() {
     burst("🌿", { x: vp.w * 0.5, y: vp.h * 0.4 }, 20, 100, 1.5);
     setLastInteraction(now());
   };
-
-  // --- Mode (BALANCED for playability)
-  const mode = useMemo(() => {
-    // Scale stays closer to 1 for better visibility
-    const scale = clamp(1.08 - noCount * 0.012, 0.92, 1.15);
-    // Hold time: starts easy (300ms), max 700ms - much more forgiving
-    const holdMs = clamp(300 + noCount * 20, 300, calm ? 500 : 700);
-    const label = noLabels[noCount % noLabels.length];
-    // Shield chance - moderate so it's not too frustrating
-    const shieldChance = clamp(0.08 + noCount * 0.005, 0.08, 0.18);
-    return { scale, holdMs, label, shieldChance };
-  }, [noCount, calm]);
-
-  // Button size - made bigger for easier tapping
-  const btnSize = useMemo(() => ({
-    w: Math.round(150 * mode.scale * scaleFactor), // Wider
-    h: Math.round(64 * mode.scale * scaleFactor)   // Taller
-  }), [mode.scale, scaleFactor]);
 
   const clampBtn = (x: number, y: number, allowOff = false) => {
     const off = allowOff ? 14 : 0;
@@ -854,7 +887,10 @@ export default function ValentineCat() {
 
   const confirmNo = () => {
     stopHold();
-    burst("🐾", { x: pos.x + btnSize.w / 2, y: pos.y + btnSize.h / 2 }, 10, 70, 1.05);
+
+    // Different reactions based on how many times they've said no
+    const emojis = noCount < 3 ? "😿" : noCount < 6 ? "😾" : noCount < 10 ? "💔" : "🐾";
+    burst(emojis, { x: pos.x + btnSize.w / 2, y: pos.y + btnSize.h / 2 }, 10, 70, 1.05);
 
     setNoCount((n) => Math.min(n + 1, beats.length - 1));
 
@@ -864,7 +900,14 @@ export default function ValentineCat() {
       return;
     }
 
-    setAside(Math.random() < 0.25 ? "hiss… 🐾" : "noted 😾");
+    // More varied reactions
+    const reaction = noCount < 3
+      ? curiousReactions[Math.floor(rand(0, curiousReactions.length))]
+      : noCount < 7
+      ? annoyedReactions[Math.floor(rand(0, annoyedReactions.length))]
+      : ["fine. 😿", "I see how it is 💔", "*dramatic sigh*", "okay then… 😢"][Math.floor(rand(0, 4))];
+
+    setAside(reaction);
     window.setTimeout(() => moveNo(), 70);
   };
 
@@ -1175,40 +1218,51 @@ export default function ValentineCat() {
         />
       )}
 
-      {/* YARN BALL */}
+      {/* YARN BALL - simplified drag */}
       <AnimatePresence>
         {yarnActive && mounted && (
           <motion.div
-            className="fixed z-[82] touch-manipulation cursor-grab active:cursor-grabbing"
-            style={{ left: yarnPos.x - 24, top: yarnPos.y - 24 }}
+            className="fixed z-[82]"
+            style={{ left: yarnPos.x - 28, top: yarnPos.y - 28 }}
             initial={{ opacity: 0, scale: 0 }}
-            animate={{ opacity: 1, scale: 1, rotate: [0, 360] }}
+            animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0 }}
-            transition={{ rotate: { duration: 2, repeat: Infinity, ease: "linear" } }}
-            drag
-            dragMomentum={false}
-            onDrag={(_, info) => {
-              setYarnPos({ x: yarnPos.x + info.delta.x, y: yarnPos.y + info.delta.y });
-              setLastInteraction(now());
-            }}
-            onDragEnd={(_, info) => {
-              // Flick the yarn
-              setYarnVelocity({
-                x: clamp(info.velocity.x / 50, -20, 20),
-                y: clamp(info.velocity.y / 50, -20, 20)
-              });
-            }}
-            whileDrag={{ scale: 1.1 }}
           >
-            <div
-              className="w-12 h-12 rounded-full flex items-center justify-center text-3xl"
+            <motion.div
+              className="w-14 h-14 rounded-full flex items-center justify-center text-3xl cursor-grab active:cursor-grabbing touch-manipulation select-none"
               style={{
                 background: `radial-gradient(circle at 30% 30%, ${yarnColor}, ${yarnColor}99)`,
-                boxShadow: `0 4px 12px ${yarnColor}66`
+                boxShadow: `0 4px 16px ${yarnColor}66`
+              }}
+              animate={{ rotate: [0, 360] }}
+              transition={{ rotate: { duration: 3, repeat: Infinity, ease: "linear" } }}
+              onPointerDown={(e) => {
+                e.preventDefault();
+                yarnRef.current.dragging = true;
+                yarnRef.current.vel = { x: 0, y: 0 };
+                try { (e.target as HTMLElement).setPointerCapture(e.pointerId); } catch {}
+              }}
+              onPointerMove={(e) => {
+                if (!yarnRef.current.dragging) return;
+                setYarnPos(p => ({
+                  x: clamp(p.x + e.movementX, 30, vp.w - 30),
+                  y: clamp(p.y + e.movementY, 100, vp.h - 60)
+                }));
+                setLastInteraction(now());
+              }}
+              onPointerUp={(e) => {
+                if (!yarnRef.current.dragging) return;
+                yarnRef.current.dragging = false;
+                // Simple flick based on last movement
+                flickYarn(e.movementX * 8, e.movementY * 8);
+                try { (e.target as HTMLElement).releasePointerCapture(e.pointerId); } catch {}
+              }}
+              onPointerCancel={() => {
+                yarnRef.current.dragging = false;
               }}
             >
               🧶
-            </div>
+            </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
@@ -1426,7 +1480,7 @@ export default function ValentineCat() {
                   return;
                 }
                 setCalmUntil((c) => Math.max(c, now() + 1800));
-                setAside(Math.random() < 0.5 ? "purr… 😽" : "*headbutt* 💗");
+                setAside(petReactions[Math.floor(rand(0, petReactions.length))]);
                 burst("💗", { x: vp.w * 0.5, y: vp.h * 0.35 }, 10, 64, 1.05);
               }}
               animate={reduceMotion ? {} : { rotate: noCount >= 5 ? [0, -6, 6, -6, 0] : 0 }}
@@ -1615,6 +1669,13 @@ export default function ValentineCat() {
               onPointerUp={endHold}
               onPointerCancel={endHold}
               onPointerLeave={() => (coarse ? undefined : endHold())}
+              onPointerEnter={() => {
+                // Occasional pet reaction when hovering
+                if (!holding && Math.random() < 0.3 && !catChasingLaser && !catChasingYarn) {
+                  setAside(petReactions[Math.floor(rand(0, petReactions.length))]);
+                  setLastInteraction(now());
+                }
+              }}
               // Touch event fallbacks for older Safari/browsers
               onTouchStart={beginHold}
               onTouchEnd={endHold}
