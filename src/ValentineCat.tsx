@@ -22,10 +22,10 @@ type GameScene =
   | "title"
   | "intro_cutscene"
   | "chapter1_chase"
-  | "chapter1_boss"
-  | "chapter2_love_potion"
-  | "chapter2_fortune"
-  | "chapter2_maze"
+  | "chapter1_catch_no"
+  | "chapter2_smash_hearts"
+  | "chapter2_escape"
+  | "chapter2_reject_letters"
   | "chapter3_boss_battle"
   | "chapter3_final"
   | "ending_good"
@@ -73,11 +73,11 @@ const INTRO_DIALOG: DialogLine[] = [
 ];
 
 const CHAPTER_TITLES = {
-  chapter1_boss: { num: 1, title: "Bubble Pop Blitz", subtitle: "Pop the love bubbles!" },
-  chapter2_love_potion: { num: 2, title: "Love Potion Lab", subtitle: "Mix the perfect potion!" },
-  chapter2_fortune: { num: 2, title: "Wheel of Love", subtitle: "Spin for your destiny!" },
-  chapter2_maze: { num: 2, title: "Heart's Journey", subtitle: "Find your way to love!" },
-  chapter3_boss_battle: { num: "👑", title: "DRAMA KING", subtitle: "The Ultimate Showdown!" },
+  chapter1_catch_no: { num: 1, title: "Catch the NO!", subtitle: "Spell out your rejection!" },
+  chapter2_smash_hearts: { num: 2, title: "Smash the Hearts!", subtitle: "Destroy the decorations!" },
+  chapter2_escape: { num: 2, title: "Escape the Cat!", subtitle: "Run for the exits!" },
+  chapter2_reject_letters: { num: 2, title: "Reject the Letters!", subtitle: "Tear them all up!" },
+  chapter3_boss_battle: { num: "👑", title: "FINAL BOSS", subtitle: "The cat won't give up!" },
   chapter3_final: { num: 3, title: "Final Decision", subtitle: "The moment of truth" },
 };
 
@@ -388,18 +388,261 @@ function CatSprite({ emotion = "happy", size = "md", className, animate = false 
 }
 
 // ============================================================================
-// MINI-GAMES - Creative and fun with unique mechanics!
+// MINI-GAMES - The user tries to say NO, but the cat won't let them!
 // ============================================================================
 
-// Game 1: Bubble Pop Blitz - Pop love bubbles, avoid broken hearts!
-function BubblePopGame({ onComplete }: { onComplete: (score: number) => void }) {
+// Game 1: CATCH THE NO - Falling "NO" letters, but cat blocks them with hearts!
+function CatchTheNoGame({ onComplete }: { onComplete: (score: number) => void }) {
+  const [phase, setPhase] = useState<"tutorial" | "playing" | "done">("tutorial");
+  const [noLetters, setNoLetters] = useState(0);
+  const [timeLeft, setTimeLeft] = useState(15);
+  const [items, setItems] = useState<Array<{ id: number; x: number; y: number; type: "N" | "O" | "heart"; speed: number }>>([]);
+  const [catMessage, setCatMessage] = useState("");
+  const [basketX, setBasketX] = useState(50);
+
+  const onCompleteRef = useRef(onComplete);
+  const gameEndedRef = useRef(false);
+  const noRef = useRef(0);
+
+  useEffect(() => { onCompleteRef.current = onComplete; }, [onComplete]);
+  useEffect(() => { noRef.current = noLetters; }, [noLetters]);
+
+  const catTaunts = [
+    "Nice try! 😼",
+    "You can't spell NO! 😹",
+    "BLOCKED! 💕",
+    "Too slow! 😸",
+    "Love conquers all! 😻",
+  ];
+
+  const startGame = () => {
+    gameEndedRef.current = false;
+    setNoLetters(0);
+    noRef.current = 0;
+    setTimeLeft(15);
+    setItems([]);
+    setCatMessage("");
+    setPhase("playing");
+  };
+
+  // Timer
+  useEffect(() => {
+    if (phase !== "playing") return;
+    const timer = setInterval(() => {
+      setTimeLeft(t => {
+        if (t <= 1) {
+          clearInterval(timer);
+          if (!gameEndedRef.current) {
+            gameEndedRef.current = true;
+            setPhase("done");
+            setTimeout(() => onCompleteRef.current(noRef.current), 1500);
+          }
+          return 0;
+        }
+        return t - 1;
+      });
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [phase]);
+
+  // Spawn items
+  useEffect(() => {
+    if (phase !== "playing") return;
+    const spawn = () => {
+      if (gameEndedRef.current) return;
+      const rand = Math.random();
+      // 30% N, 30% O, 40% hearts (blocking)
+      const type = rand < 0.3 ? "N" : rand < 0.6 ? "O" : "heart";
+      setItems(prev => [...prev.slice(-8), {
+        id: Date.now() + Math.random(),
+        x: 10 + Math.random() * 80,
+        y: -10,
+        type,
+        speed: 2 + Math.random() * 2,
+      }]);
+    };
+    const interval = setInterval(spawn, 600);
+    return () => clearInterval(interval);
+  }, [phase]);
+
+  // Move items down
+  useEffect(() => {
+    if (phase !== "playing") return;
+    const move = setInterval(() => {
+      setItems(prev => {
+        const updated = prev.map(item => ({ ...item, y: item.y + item.speed }));
+        // Check catches
+        updated.forEach(item => {
+          if (item.y >= 75 && item.y <= 85) {
+            const dist = Math.abs(item.x - basketX);
+            if (dist < 15) {
+              if (item.type === "heart") {
+                setCatMessage(catTaunts[Math.floor(Math.random() * catTaunts.length)]);
+                setTimeout(() => setCatMessage(""), 1000);
+              } else {
+                setNoLetters(n => n + 1);
+              }
+              item.y = 200; // Remove
+            }
+          }
+        });
+        return updated.filter(item => item.y < 100);
+      });
+    }, 50);
+    return () => clearInterval(move);
+  }, [phase, basketX]);
+
+  // Handle touch/mouse for basket
+  const handleMove = (clientX: number, rect: DOMRect) => {
+    const x = ((clientX - rect.left) / rect.width) * 100;
+    setBasketX(Math.max(10, Math.min(90, x)));
+  };
+
+  if (phase === "tutorial") {
+    return (
+      <div className="fixed inset-0 bg-gradient-to-b from-indigo-500 to-purple-700 flex flex-col items-center justify-center p-6">
+        <div className="bg-white/95 rounded-3xl p-8 max-w-sm text-center shadow-2xl">
+          <div className="text-6xl mb-4">🚫</div>
+          <h2 className="text-2xl font-bold text-indigo-800 mb-3">Catch the NO!</h2>
+          <p className="text-indigo-600 mb-4">
+            Catch falling <span className="font-bold text-red-500">N</span> and <span className="font-bold text-red-500">O</span> letters!<br/>
+            The cat throws 💕 to block you!
+          </p>
+          <div className="flex justify-center gap-4 my-4">
+            <div className="text-center">
+              <div className="text-3xl font-bold text-red-500">N O</div>
+              <div className="text-xs text-green-600 font-bold">Catch these!</div>
+            </div>
+            <div className="text-center">
+              <div className="text-3xl">💕</div>
+              <div className="text-xs text-red-600 font-bold">Avoid!</div>
+            </div>
+          </div>
+          <p className="text-indigo-500 text-sm mb-6">
+            Slide to move your basket! 🧺
+          </p>
+          <button
+            onClick={startGame}
+            className="w-full py-4 bg-gradient-to-r from-indigo-500 to-purple-500 text-white rounded-2xl font-bold text-xl shadow-lg active:scale-95 transition-transform"
+          >
+            Try to say NO! 🚫
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (phase === "done") {
+    const won = noLetters >= 5;
+    return (
+      <div className="fixed inset-0 bg-gradient-to-b from-indigo-500 to-purple-700 flex flex-col items-center justify-center p-6">
+        <div className="bg-white/95 rounded-3xl p-8 max-w-sm text-center shadow-2xl">
+          <div className="text-6xl mb-4">{won ? "😾" : "😹"}</div>
+          <h2 className="text-3xl font-bold text-indigo-800 mb-2">
+            {won ? "You spelled NO!" : "Cat blocked you!"}
+          </h2>
+          <p className="text-2xl font-bold text-indigo-600 mb-2">{noLetters} letters caught</p>
+          <p className="text-indigo-500 italic mb-4">
+            {won ? '"Fine, but I\'m not giving up!" 😾' : '"You can\'t reject ME!" 😹'}
+          </p>
+          <p className="text-indigo-400">Next challenge...</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className="fixed inset-0 bg-gradient-to-b from-indigo-500 to-purple-700 overflow-hidden select-none"
+      onMouseMove={(e) => handleMove(e.clientX, e.currentTarget.getBoundingClientRect())}
+      onTouchMove={(e) => handleMove(e.touches[0].clientX, e.currentTarget.getBoundingClientRect())}
+    >
+      {/* Header */}
+      <div className="absolute top-4 left-0 right-0 flex justify-center gap-4 z-10">
+        <div className="bg-white/90 rounded-full px-4 py-2 shadow-lg">
+          <span className="text-lg font-bold text-indigo-600">Letters: {noLetters}</span>
+        </div>
+        <div className="bg-white/90 rounded-full px-4 py-2 shadow-lg">
+          <span className="text-lg font-bold text-indigo-600">{timeLeft}s</span>
+        </div>
+      </div>
+
+      {/* Cat taunting */}
+      <div className="absolute top-20 left-1/2 -translate-x-1/2 text-center z-20">
+        <div className="text-4xl mb-2">😼</div>
+        {catMessage && (
+          <div className="bg-pink-500 text-white px-4 py-2 rounded-full font-bold animate-bounce">
+            {catMessage}
+          </div>
+        )}
+      </div>
+
+      {/* Skip */}
+      <button
+        onClick={() => {
+          if (!gameEndedRef.current) {
+            gameEndedRef.current = true;
+            onComplete(noLetters);
+          }
+        }}
+        className="absolute top-4 right-4 bg-white/50 rounded-full px-3 py-1 text-indigo-200 text-sm z-10"
+      >
+        Skip →
+      </button>
+
+      {/* Falling items */}
+      {items.map(item => (
+        <div
+          key={item.id}
+          className="absolute text-4xl font-bold transition-none pointer-events-none"
+          style={{
+            left: `${item.x}%`,
+            top: `${item.y}%`,
+            transform: "translate(-50%, -50%)",
+          }}
+        >
+          {item.type === "heart" ? "💕" : (
+            <span className="text-red-400 drop-shadow-lg">{item.type}</span>
+          )}
+        </div>
+      ))}
+
+      {/* Basket */}
+      <div
+        className="absolute bottom-20 text-5xl transition-all duration-75"
+        style={{ left: `${basketX}%`, transform: "translateX(-50%)" }}
+      >
+        🧺
+      </div>
+
+      {/* Progress */}
+      <div className="absolute bottom-8 left-0 right-0 text-center">
+        <div className="inline-flex gap-1">
+          {[...Array(5)].map((_, i) => (
+            <span key={i} className={cn(
+              "text-2xl transition-all",
+              i < noLetters ? "opacity-100 scale-110" : "opacity-30"
+            )}>
+              {i % 2 === 0 ? "N" : "O"}
+            </span>
+          ))}
+        </div>
+        <p className="text-white/60 text-sm mt-2">Collect 5 to spell "NO NO N..."</p>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================================
+// Game 2: SMASH THE HEARTS - Destroy the cat's love decorations!
+// ============================================================================
+function SmashTheHeartsGame({ onComplete }: { onComplete: (score: number) => void }) {
   const [phase, setPhase] = useState<"tutorial" | "playing" | "done">("tutorial");
   const [score, setScore] = useState(0);
-  const [lives, setLives] = useState(3);
-  const [bubbles, setBubbles] = useState<Array<{ id: number; x: number; y: number; type: "love" | "broken"; size: number }>>([]);
   const [timeLeft, setTimeLeft] = useState(12);
-  const [combo, setCombo] = useState(0);
-  const [lastPop, setLastPop] = useState<{ x: number; y: number; points: number } | null>(null);
+  const [hearts, setHearts] = useState<Array<{ id: number; x: number; y: number; type: "heart" | "cat"; scale: number; hit: boolean }>>([]);
+  const [catReaction, setCatReaction] = useState("");
+  const [shakeScreen, setShakeScreen] = useState(false);
 
   const onCompleteRef = useRef(onComplete);
   const gameEndedRef = useRef(false);
@@ -408,14 +651,22 @@ function BubblePopGame({ onComplete }: { onComplete: (score: number) => void }) 
   useEffect(() => { onCompleteRef.current = onComplete; }, [onComplete]);
   useEffect(() => { scoreRef.current = score; }, [score]);
 
+  const catCries = [
+    "MY DECORATIONS! 😿",
+    "STOP IT! 😾",
+    "I worked so hard! 😿",
+    "NOOOO! 🙀",
+    "You're so MEAN! 😿",
+    "Why are you like this?! 😾",
+  ];
+
   const startGame = () => {
     gameEndedRef.current = false;
-    setBubbles([]);
     setScore(0);
     scoreRef.current = 0;
-    setLives(3);
     setTimeLeft(12);
-    setCombo(0);
+    setHearts([]);
+    setCatReaction("");
     setPhase("playing");
   };
 
@@ -439,82 +690,78 @@ function BubblePopGame({ onComplete }: { onComplete: (score: number) => void }) 
     return () => clearInterval(timer);
   }, [phase]);
 
-  // Spawn bubbles
+  // Spawn hearts
   useEffect(() => {
     if (phase !== "playing") return;
     const spawn = () => {
       if (gameEndedRef.current) return;
-      setBubbles(prev => {
-        const recent = prev.slice(-6);
-        const isLove = Math.random() > 0.25; // 75% love, 25% broken
-        return [...recent, {
-          id: Date.now(),
-          x: 10 + Math.random() * 80,
-          y: 20 + Math.random() * 50,
-          type: isLove ? "love" : "broken",
-          size: 0.8 + Math.random() * 0.4,
-        }];
-      });
+      const isCat = Math.random() < 0.15; // 15% chance cat appears
+      setHearts(prev => [...prev.slice(-10), {
+        id: Date.now() + Math.random(),
+        x: 10 + Math.random() * 80,
+        y: 15 + Math.random() * 60,
+        type: isCat ? "cat" : "heart",
+        scale: 0.8 + Math.random() * 0.4,
+        hit: false,
+      }]);
     };
     spawn();
-    const interval = setInterval(spawn, 800);
+    const interval = setInterval(spawn, 500);
     return () => clearInterval(interval);
   }, [phase]);
 
-  const popBubble = (id: number, type: "love" | "broken", x: number, y: number) => {
-    setBubbles(prev => prev.filter(b => b.id !== id));
-
-    if (type === "love") {
-      const points = 10 + combo * 5;
+  const smashHeart = (id: number, type: "heart" | "cat") => {
+    if (type === "cat") {
+      // Hit the cat! Lose points
+      setScore(s => Math.max(0, s - 20));
+      setCatReaction("OW! That's ME! 😾");
+      setTimeout(() => setCatReaction(""), 1000);
+    } else {
+      // Smash heart! Gain points
+      const points = 10;
       setScore(s => {
         scoreRef.current = s + points;
         return s + points;
       });
-      setCombo(c => c + 1);
-      setLastPop({ x, y, points });
-      setTimeout(() => setLastPop(null), 500);
-    } else {
-      setLives(l => {
-        const newLives = l - 1;
-        if (newLives <= 0 && !gameEndedRef.current) {
-          gameEndedRef.current = true;
-          setPhase("done");
-          setTimeout(() => onCompleteRef.current(scoreRef.current), 1500);
-        }
-        return newLives;
-      });
-      setCombo(0);
+      setCatReaction(catCries[Math.floor(Math.random() * catCries.length)]);
+      setTimeout(() => setCatReaction(""), 800);
+      setShakeScreen(true);
+      setTimeout(() => setShakeScreen(false), 200);
     }
+    setHearts(prev => prev.map(h => h.id === id ? { ...h, hit: true } : h));
+    setTimeout(() => {
+      setHearts(prev => prev.filter(h => h.id !== id));
+    }, 200);
   };
 
   if (phase === "tutorial") {
     return (
-      <div className="fixed inset-0 bg-gradient-to-b from-cyan-400 to-blue-500 flex flex-col items-center justify-center p-6">
+      <div className="fixed inset-0 bg-gradient-to-b from-red-600 to-rose-800 flex flex-col items-center justify-center p-6">
         <div className="bg-white/95 rounded-3xl p-8 max-w-sm text-center shadow-2xl">
-          <div className="text-6xl mb-4">🫧</div>
-          <h2 className="text-2xl font-bold text-cyan-800 mb-3">Bubble Pop Blitz!</h2>
-          <p className="text-cyan-600 mb-4">
-            Pop the <span className="text-pink-500 font-bold">💖 love bubbles</span>!<br/>
-            Avoid the <span className="text-gray-500 font-bold">💔 broken hearts</span>!
+          <div className="text-6xl mb-4">💔</div>
+          <h2 className="text-2xl font-bold text-red-800 mb-3">Smash the Hearts!</h2>
+          <p className="text-red-600 mb-4">
+            The cat decorated everything with 💕!<br/>
+            <span className="font-bold">Destroy them to reject the love!</span>
           </p>
           <div className="flex justify-center gap-4 my-4">
             <div className="text-center">
-              <div className="text-4xl">💖</div>
-              <div className="text-xs text-green-600 font-bold">+Points!</div>
+              <div className="text-4xl">💕</div>
+              <div className="text-xs text-green-600 font-bold">SMASH! +10</div>
             </div>
             <div className="text-center">
-              <div className="text-4xl">💔</div>
-              <div className="text-xs text-red-600 font-bold">-1 Life!</div>
+              <div className="text-4xl">😺</div>
+              <div className="text-xs text-red-600 font-bold">DON'T HIT! -20</div>
             </div>
           </div>
-          <p className="text-cyan-500 text-sm mb-6">
-            Build combos for bonus points!
+          <p className="text-red-500 text-sm mb-6">
+            The cat will cry but STAY STRONG! 💪
           </p>
           <button
             onClick={startGame}
-            className="w-full py-4 bg-gradient-to-r from-cyan-500 to-blue-500 text-white rounded-2xl font-bold text-xl shadow-lg active:scale-95 transition-transform"
+            className="w-full py-4 bg-gradient-to-r from-red-500 to-rose-500 text-white rounded-2xl font-bold text-xl shadow-lg active:scale-95 transition-transform"
           >
-            Pop Pop Pop! 🫧
+            Destroy the Love! 💔
           </button>
         </div>
       </div>
@@ -522,42 +769,44 @@ function BubblePopGame({ onComplete }: { onComplete: (score: number) => void }) 
   }
 
   if (phase === "done") {
+    const won = score >= 50;
     return (
-      <div className="fixed inset-0 bg-gradient-to-b from-cyan-400 to-blue-500 flex flex-col items-center justify-center p-6">
+      <div className="fixed inset-0 bg-gradient-to-b from-red-600 to-rose-800 flex flex-col items-center justify-center p-6">
         <div className="bg-white/95 rounded-3xl p-8 max-w-sm text-center shadow-2xl">
-          <div className="text-6xl mb-4">{score >= 100 ? "🎉" : "🫧"}</div>
-          <h2 className="text-3xl font-bold text-cyan-800 mb-2">
-            {score >= 100 ? "Amazing!" : "Nice!"}
+          <div className="text-6xl mb-4">{won ? "💔" : "😿"}</div>
+          <h2 className="text-3xl font-bold text-red-800 mb-2">
+            {won ? "Hearts Destroyed!" : "Cat Protected Them!"}
           </h2>
-          <p className="text-5xl font-bold text-cyan-600 mb-4">{score} pts</p>
-          <p className="text-cyan-500">Moving to next challenge...</p>
+          <p className="text-4xl font-bold text-red-600 mb-2">{score} pts</p>
+          <p className="text-red-500 italic mb-4">
+            {won ? '"My beautiful decorations... 😿"' : '"Ha! You missed! 😹"'}
+          </p>
+          <p className="text-red-400">Next challenge...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="fixed inset-0 bg-gradient-to-b from-cyan-400 to-blue-500 overflow-hidden select-none">
+    <div className={cn(
+      "fixed inset-0 bg-gradient-to-b from-red-600 to-rose-800 overflow-hidden select-none transition-all",
+      shakeScreen && "animate-pulse"
+    )}>
       {/* Header */}
       <div className="absolute top-4 left-0 right-0 flex justify-center gap-4 z-10">
         <div className="bg-white/90 rounded-full px-4 py-2 shadow-lg">
-          <span className="text-lg font-bold text-cyan-600">{score} pts</span>
+          <span className="text-lg font-bold text-red-600">{score} pts</span>
         </div>
         <div className="bg-white/90 rounded-full px-4 py-2 shadow-lg">
-          <span className="text-lg font-bold text-cyan-600">{timeLeft}s</span>
-        </div>
-        <div className="bg-white/90 rounded-full px-4 py-2 shadow-lg flex gap-1">
-          {[...Array(3)].map((_, i) => (
-            <span key={i} className="text-lg">{i < lives ? "❤️" : "🖤"}</span>
-          ))}
+          <span className="text-lg font-bold text-red-600">{timeLeft}s</span>
         </div>
       </div>
 
-      {/* Combo indicator */}
-      {combo > 1 && (
+      {/* Cat reaction */}
+      {catReaction && (
         <div className="absolute top-20 left-1/2 -translate-x-1/2 z-20">
-          <div className="bg-yellow-400 text-yellow-900 px-4 py-1 rounded-full font-bold">
-            {combo}x COMBO! 🔥
+          <div className="bg-white text-red-600 px-4 py-2 rounded-full font-bold shadow-lg">
+            {catReaction}
           </div>
         </div>
       )}
@@ -570,526 +819,74 @@ function BubblePopGame({ onComplete }: { onComplete: (score: number) => void }) 
             onComplete(score);
           }
         }}
-        className="absolute top-4 right-4 bg-white/50 rounded-full px-3 py-1 text-cyan-700 text-sm z-10"
+        className="absolute top-4 right-4 bg-white/50 rounded-full px-3 py-1 text-red-200 text-sm z-10"
       >
         Skip →
       </button>
 
-      {/* Bubbles */}
-      {bubbles.map(b => (
+      {/* Hearts and cats */}
+      {hearts.map(h => (
         <button
-          key={b.id}
-          onClick={() => popBubble(b.id, b.type, b.x, b.y)}
-          className="absolute flex items-center justify-center active:scale-75 transition-transform"
+          key={h.id}
+          onClick={() => !h.hit && smashHeart(h.id, h.type)}
+          className={cn(
+            "absolute transition-all duration-100",
+            h.hit && "scale-0 rotate-45"
+          )}
           style={{
-            left: `${b.x}%`,
-            top: `${b.y}%`,
+            left: `${h.x}%`,
+            top: `${h.y}%`,
             transform: "translate(-50%, -50%)",
-            width: `${b.size * 5}rem`,
-            height: `${b.size * 5}rem`,
+            fontSize: `${h.scale * 4}rem`,
           }}
         >
-          <div className={cn(
-            "w-full h-full rounded-full flex items-center justify-center",
-            b.type === "love"
-              ? "bg-gradient-to-br from-pink-300/80 to-rose-400/80 shadow-lg shadow-pink-300/50"
-              : "bg-gradient-to-br from-gray-400/80 to-gray-600/80 shadow-lg shadow-gray-400/50"
-          )}>
-            <span className="text-4xl">{b.type === "love" ? "💖" : "💔"}</span>
-          </div>
+          {h.type === "heart" ? "💕" : "😺"}
         </button>
       ))}
 
-      {/* Pop feedback */}
-      {lastPop && (
-        <div
-          className="absolute pointer-events-none z-30 text-2xl font-bold text-yellow-300 animate-bounce"
-          style={{ left: `${lastPop.x}%`, top: `${lastPop.y}%`, transform: "translate(-50%, -50%)" }}
-        >
-          +{lastPop.points}!
-        </div>
-      )}
-
-      {/* Hint */}
+      {/* Instruction */}
       <div className="absolute bottom-8 left-0 right-0 text-center">
-        <p className="text-white/80 text-lg font-medium">👆 Pop 💖, avoid 💔!</p>
+        <p className="text-white/80 text-lg font-medium">👆 Tap 💕 to smash! Don't hit 😺!</p>
       </div>
     </div>
   );
 }
 
 // ============================================================================
-// Game 2: Love Potion Lab - Mix the perfect love potion!
+// Game 3: ESCAPE THE CAT - Run away but cat keeps blocking exits!
 // ============================================================================
-function LovePotionGame({ onComplete }: { onComplete: (score: number) => void }) {
+function EscapeTheCatGame({ onComplete }: { onComplete: (score: number) => void }) {
   const [phase, setPhase] = useState<"tutorial" | "playing" | "done">("tutorial");
-  const [recipe, setRecipe] = useState<string[]>([]);
-  const [playerInput, setPlayerInput] = useState<string[]>([]);
-  const [score, setScore] = useState(0);
-  const [round, setRound] = useState(0);
-  const [showingRecipe, setShowingRecipe] = useState(false);
-  const [potionColor, setPotionColor] = useState("from-purple-400 to-pink-400");
-  const [bubbling, setBubbling] = useState(false);
-  const maxRounds = 3;
-
-  const ingredients = [
-    { emoji: "🌹", name: "Rose", color: "bg-red-400" },
-    { emoji: "✨", name: "Sparkle", color: "bg-yellow-400" },
-    { emoji: "🍫", name: "Chocolate", color: "bg-amber-700" },
-    { emoji: "💎", name: "Crystal", color: "bg-cyan-400" },
-  ];
+  const [playerPos, setPlayerPos] = useState(50);
+  const [catPos, setCatPos] = useState(50);
+  const [exits, setExits] = useState<Array<{ id: number; x: number; blocked: boolean }>>([]);
+  const [escaped, setEscaped] = useState(0);
+  const [timeLeft, setTimeLeft] = useState(15);
+  const [catMessage, setCatMessage] = useState("");
 
   const onCompleteRef = useRef(onComplete);
   const gameEndedRef = useRef(false);
+  const escapedRef = useRef(0);
 
   useEffect(() => { onCompleteRef.current = onComplete; }, [onComplete]);
+  useEffect(() => { escapedRef.current = escaped; }, [escaped]);
 
-  const startGame = () => {
-    gameEndedRef.current = false;
-    setScore(0);
-    setRound(0);
-    setPhase("playing");
-    // Start first round after a brief delay
-    setTimeout(() => startRound(), 100);
-  };
-
-  const startRound = () => {
-    // Generate recipe (2-4 ingredients based on round)
-    const length = 2 + Math.min(round, 2);
-    const newRecipe: string[] = [];
-    for (let i = 0; i < length; i++) {
-      newRecipe.push(ingredients[Math.floor(Math.random() * ingredients.length)].emoji);
-    }
-    setRecipe(newRecipe);
-    setPlayerInput([]);
-    setShowingRecipe(true);
-    setBubbling(true);
-
-    // Show recipe for a moment
-    setTimeout(() => {
-      setShowingRecipe(false);
-      setBubbling(false);
-    }, 2000 + length * 500);
-  };
-
-  const addIngredient = (emoji: string) => {
-    if (showingRecipe || gameEndedRef.current) return;
-
-    const newInput = [...playerInput, emoji];
-    setPlayerInput(newInput);
-    setBubbling(true);
-    setTimeout(() => setBubbling(false), 300);
-
-    // Check if correct so far
-    if (recipe[newInput.length - 1] !== emoji) {
-      // Wrong! Potion explodes
-      setPotionColor("from-gray-600 to-gray-800");
-      if (!gameEndedRef.current) {
-        gameEndedRef.current = true;
-        setPhase("done");
-        setTimeout(() => onCompleteRef.current(score), 1500);
-      }
-      return;
-    }
-
-    // Completed recipe?
-    if (newInput.length === recipe.length) {
-      setScore(s => s + 1);
-      setPotionColor("from-pink-400 to-rose-500");
-      setBubbling(true);
-
-      const nextRound = round + 1;
-      if (nextRound >= maxRounds) {
-        // Won!
-        if (!gameEndedRef.current) {
-          gameEndedRef.current = true;
-          setPhase("done");
-          setTimeout(() => onCompleteRef.current(score + 1), 1500);
-        }
-      } else {
-        setRound(nextRound);
-        setTimeout(() => {
-          setPotionColor("from-purple-400 to-pink-400");
-          startRound();
-        }, 1000);
-      }
-    }
-  };
-
-  if (phase === "tutorial") {
-    return (
-      <div className="fixed inset-0 bg-gradient-to-b from-purple-600 to-indigo-800 flex flex-col items-center justify-center p-6">
-        <div className="bg-white/95 rounded-3xl p-8 max-w-sm text-center shadow-2xl">
-          <div className="text-6xl mb-4">🧪</div>
-          <h2 className="text-2xl font-bold text-purple-800 mb-3">Love Potion Lab!</h2>
-          <p className="text-purple-600 mb-4">
-            Watch the recipe, then tap ingredients<br/>in the <span className="font-bold">same order</span>!
-          </p>
-          <div className="flex justify-center gap-2 my-4">
-            {ingredients.map((ing, i) => (
-              <div key={i} className={cn("w-12 h-12 rounded-xl flex items-center justify-center text-2xl", ing.color)}>
-                {ing.emoji}
-              </div>
-            ))}
-          </div>
-          <p className="text-purple-500 text-sm mb-6">
-            Mix {maxRounds} potions to prove your love!
-          </p>
-          <button
-            onClick={startGame}
-            className="w-full py-4 bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-2xl font-bold text-xl shadow-lg active:scale-95 transition-transform"
-          >
-            Start Brewing! 🧪
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  if (phase === "done") {
-    return (
-      <div className="fixed inset-0 bg-gradient-to-b from-purple-600 to-indigo-800 flex flex-col items-center justify-center p-6">
-        <div className="bg-white/95 rounded-3xl p-8 max-w-sm text-center shadow-2xl">
-          <div className="text-6xl mb-4">{score >= maxRounds ? "💖" : "💨"}</div>
-          <h2 className="text-3xl font-bold text-purple-800 mb-2">
-            {score >= maxRounds ? "Perfect Potion!" : "Potion Exploded!"}
-          </h2>
-          <p className="text-5xl font-bold text-purple-600 mb-4">{score}/{maxRounds} 🧪</p>
-          <p className="text-purple-500">Moving to next challenge...</p>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="fixed inset-0 bg-gradient-to-b from-purple-600 to-indigo-800 flex flex-col items-center justify-center p-6">
-      {/* Header */}
-      <div className="absolute top-4 left-0 right-0 flex justify-center gap-4 z-10">
-        <div className="bg-white/90 rounded-full px-4 py-2 shadow-lg">
-          <span className="text-lg font-bold text-purple-600">Potion {round + 1}/{maxRounds}</span>
-        </div>
-        <div className="bg-white/90 rounded-full px-4 py-2 shadow-lg">
-          <span className="text-lg font-bold text-purple-600">Score: {score}</span>
-        </div>
-      </div>
-
-      {/* Skip */}
-      <button
-        onClick={() => {
-          if (!gameEndedRef.current) {
-            gameEndedRef.current = true;
-            onComplete(score);
-          }
-        }}
-        className="absolute top-4 right-4 bg-white/50 rounded-full px-3 py-1 text-purple-200 text-sm z-10"
-      >
-        Skip →
-      </button>
-
-      {/* Cauldron */}
-      <div className="relative mb-8">
-        <div className="text-8xl">🫕</div>
-        <div className={cn(
-          "absolute inset-x-4 top-2 h-12 rounded-full bg-gradient-to-r opacity-80 transition-all",
-          potionColor,
-          bubbling && "animate-pulse"
-        )} />
-        {bubbling && (
-          <div className="absolute -top-4 left-1/2 -translate-x-1/2 text-2xl animate-bounce">
-            ✨
-          </div>
-        )}
-      </div>
-
-      {/* Recipe display */}
-      <div className="bg-white/20 rounded-2xl p-4 mb-8 min-h-[80px] flex items-center justify-center gap-2">
-        {showingRecipe ? (
-          <>
-            <span className="text-white/80 text-sm mr-2">Recipe:</span>
-            {recipe.map((emoji, i) => (
-              <span key={i} className="text-3xl animate-bounce" style={{ animationDelay: `${i * 0.1}s` }}>
-                {emoji}
-              </span>
-            ))}
-          </>
-        ) : (
-          <>
-            <span className="text-white/80 text-sm mr-2">Your mix:</span>
-            {playerInput.map((emoji, i) => (
-              <span key={i} className="text-3xl">{emoji}</span>
-            ))}
-            {playerInput.length < recipe.length && (
-              <span className="text-white/40 text-2xl">?</span>
-            )}
-          </>
-        )}
-      </div>
-
-      {/* Status */}
-      <div className="mb-4">
-        <div className="bg-white/90 rounded-full px-6 py-2 shadow-lg">
-          <span className="text-lg font-bold text-purple-600">
-            {showingRecipe ? "Memorize! 👀" : "Mix it! 👆"}
-          </span>
-        </div>
-      </div>
-
-      {/* Ingredients */}
-      <div className="grid grid-cols-4 gap-3">
-        {ingredients.map((ing, i) => (
-          <button
-            key={i}
-            onClick={() => addIngredient(ing.emoji)}
-            disabled={showingRecipe}
-            className={cn(
-              "w-16 h-16 rounded-2xl text-3xl flex items-center justify-center transition-all shadow-lg active:scale-90",
-              ing.color,
-              showingRecipe && "opacity-50 cursor-not-allowed"
-            )}
-          >
-            {ing.emoji}
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-// ============================================================================
-// Game 3: Wheel of Love - Spin for your destiny!
-// ============================================================================
-function FortuneWheelGame({ onComplete }: { onComplete: (score: number) => void }) {
-  const [phase, setPhase] = useState<"tutorial" | "playing" | "done">("tutorial");
-  const [spinning, setSpinning] = useState(false);
-  const [rotation, setRotation] = useState(0);
-  const [result, setResult] = useState<string | null>(null);
-  const [score, setScore] = useState(0);
-  const [spinsLeft, setSpinsLeft] = useState(3);
-
-  const segments = [
-    { label: "💖 LOVE", points: 30, color: "bg-pink-500" },
-    { label: "😺 Cat", points: 20, color: "bg-amber-400" },
-    { label: "✨ Magic", points: 25, color: "bg-purple-500" },
-    { label: "🌹 Rose", points: 15, color: "bg-red-500" },
-    { label: "💎 Rare", points: 50, color: "bg-cyan-400" },
-    { label: "🍀 Lucky", points: 35, color: "bg-green-500" },
-    { label: "💫 Star", points: 20, color: "bg-yellow-400" },
-    { label: "💔 Oops", points: 0, color: "bg-gray-500" },
+  const catTaunts = [
+    "Where do you think YOU'RE going?! 😾",
+    "BLOCKED! 😹",
+    "Can't escape LOVE! 💕",
+    "Nice try! 😼",
+    "I'm FASTER! 😸",
   ];
 
-  const onCompleteRef = useRef(onComplete);
-  const gameEndedRef = useRef(false);
-  const scoreRef = useRef(0);
-
-  useEffect(() => { onCompleteRef.current = onComplete; }, [onComplete]);
-  useEffect(() => { scoreRef.current = score; }, [score]);
-
   const startGame = () => {
     gameEndedRef.current = false;
-    setScore(0);
-    scoreRef.current = 0;
-    setSpinsLeft(3);
-    setResult(null);
-    setPhase("playing");
-  };
-
-  const spin = () => {
-    if (spinning || spinsLeft <= 0) return;
-
-    setSpinning(true);
-    setResult(null);
-    setSpinsLeft(s => s - 1);
-
-    // Random rotation (3-5 full spins + random segment)
-    const spins = 3 + Math.random() * 2;
-    const segmentAngle = 360 / segments.length;
-    const landingSegment = Math.floor(Math.random() * segments.length);
-    const finalRotation = rotation + (spins * 360) + (landingSegment * segmentAngle) + (segmentAngle / 2);
-
-    setRotation(finalRotation);
-
-    // Show result after spin
-    setTimeout(() => {
-      const segment = segments[landingSegment];
-      setResult(segment.label);
-      const newScore = scoreRef.current + segment.points;
-      setScore(newScore);
-      scoreRef.current = newScore;
-      setSpinning(false);
-
-      // Check if game over
-      if (spinsLeft <= 1 && !gameEndedRef.current) {
-        gameEndedRef.current = true;
-        setTimeout(() => {
-          setPhase("done");
-          setTimeout(() => onCompleteRef.current(scoreRef.current), 1500);
-        }, 1500);
-      }
-    }, 3500);
-  };
-
-  if (phase === "tutorial") {
-    return (
-      <div className="fixed inset-0 bg-gradient-to-b from-amber-400 to-orange-500 flex flex-col items-center justify-center p-6">
-        <div className="bg-white/95 rounded-3xl p-8 max-w-sm text-center shadow-2xl">
-          <div className="text-6xl mb-4">🎡</div>
-          <h2 className="text-2xl font-bold text-amber-800 mb-3">Wheel of Love!</h2>
-          <p className="text-amber-600 mb-4">
-            Spin the wheel 3 times!<br/>
-            <span className="font-bold">Collect as many points as you can!</span>
-          </p>
-          <div className="flex flex-wrap justify-center gap-2 my-4">
-            <span className="bg-pink-200 text-pink-700 px-2 py-1 rounded-full text-sm">💖 30pts</span>
-            <span className="bg-cyan-200 text-cyan-700 px-2 py-1 rounded-full text-sm">💎 50pts!</span>
-            <span className="bg-gray-200 text-gray-700 px-2 py-1 rounded-full text-sm">💔 0pts</span>
-          </div>
-          <button
-            onClick={startGame}
-            className="w-full py-4 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-2xl font-bold text-xl shadow-lg active:scale-95 transition-transform"
-          >
-            Spin the Wheel! 🎡
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  if (phase === "done") {
-    return (
-      <div className="fixed inset-0 bg-gradient-to-b from-amber-400 to-orange-500 flex flex-col items-center justify-center p-6">
-        <div className="bg-white/95 rounded-3xl p-8 max-w-sm text-center shadow-2xl">
-          <div className="text-6xl mb-4">{score >= 80 ? "🏆" : "🎡"}</div>
-          <h2 className="text-3xl font-bold text-amber-800 mb-2">
-            {score >= 80 ? "Jackpot!" : "Nice Spins!"}
-          </h2>
-          <p className="text-5xl font-bold text-amber-600 mb-4">{score} pts</p>
-          <p className="text-amber-500">Moving to next challenge...</p>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="fixed inset-0 bg-gradient-to-b from-amber-400 to-orange-500 flex flex-col items-center justify-center p-6">
-      {/* Header */}
-      <div className="absolute top-4 left-0 right-0 flex justify-center gap-4 z-10">
-        <div className="bg-white/90 rounded-full px-4 py-2 shadow-lg">
-          <span className="text-lg font-bold text-amber-600">{score} pts</span>
-        </div>
-        <div className="bg-white/90 rounded-full px-4 py-2 shadow-lg">
-          <span className="text-lg font-bold text-amber-600">{spinsLeft} spins left</span>
-        </div>
-      </div>
-
-      {/* Skip */}
-      <button
-        onClick={() => {
-          if (!gameEndedRef.current) {
-            gameEndedRef.current = true;
-            onComplete(score);
-          }
-        }}
-        className="absolute top-4 right-4 bg-white/50 rounded-full px-3 py-1 text-amber-700 text-sm z-10"
-      >
-        Skip →
-      </button>
-
-      {/* Wheel */}
-      <div className="relative mb-8">
-        {/* Pointer */}
-        <div className="absolute -top-4 left-1/2 -translate-x-1/2 z-10 text-4xl">
-          ▼
-        </div>
-
-        {/* Wheel container */}
-        <div
-          className="w-64 h-64 rounded-full border-8 border-white shadow-2xl overflow-hidden relative"
-          style={{
-            transform: `rotate(${rotation}deg)`,
-            transition: spinning ? "transform 3.5s cubic-bezier(0.17, 0.67, 0.12, 0.99)" : "none",
-          }}
-        >
-          {segments.map((seg, i) => {
-            const angle = (360 / segments.length) * i;
-            return (
-              <div
-                key={i}
-                className={cn("absolute w-1/2 h-1/2 origin-bottom-right", seg.color)}
-                style={{
-                  transform: `rotate(${angle}deg) skewY(${90 - 360 / segments.length}deg)`,
-                  top: 0,
-                  left: 0,
-                }}
-              >
-                <span
-                  className="absolute text-white text-xs font-bold"
-                  style={{
-                    transform: `skewY(-${90 - 360 / segments.length}deg) rotate(${180 / segments.length}deg)`,
-                    left: "60%",
-                    top: "20%",
-                  }}
-                >
-                  {seg.label.split(" ")[0]}
-                </span>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Result */}
-      {result && (
-        <div className="mb-4 bg-white/90 rounded-full px-6 py-3 shadow-lg">
-          <span className="text-2xl font-bold text-amber-700">{result}!</span>
-        </div>
-      )}
-
-      {/* Spin button */}
-      <button
-        onClick={spin}
-        disabled={spinning || spinsLeft <= 0}
-        className={cn(
-          "px-12 py-4 rounded-2xl font-bold text-xl shadow-lg transition-all",
-          spinning
-            ? "bg-gray-400 text-white cursor-not-allowed"
-            : "bg-white text-amber-600 active:scale-95"
-        )}
-      >
-        {spinning ? "Spinning... 🎡" : "SPIN! 🎲"}
-      </button>
-    </div>
-  );
-}
-
-// ============================================================================
-// Game 4: Heart Maze - Guide the heart to the cat!
-// ============================================================================
-function HeartMazeGame({ onComplete }: { onComplete: (score: number) => void }) {
-  const [phase, setPhase] = useState<"tutorial" | "playing" | "done">("tutorial");
-  const [playerPos, setPlayerPos] = useState({ x: 0, y: 2 });
-  const [moves, setMoves] = useState(0);
-  const [timeLeft, setTimeLeft] = useState(20);
-  const catPos = { x: 4, y: 2 };
-
-  // Simple 5x5 maze (0 = path, 1 = wall)
-  const maze = [
-    [1, 1, 1, 1, 1],
-    [0, 0, 0, 1, 0],
-    [0, 1, 0, 0, 0],
-    [0, 1, 1, 1, 0],
-    [0, 0, 0, 0, 0],
-  ];
-
-  const onCompleteRef = useRef(onComplete);
-  const gameEndedRef = useRef(false);
-
-  useEffect(() => { onCompleteRef.current = onComplete; }, [onComplete]);
-
-  const startGame = () => {
-    gameEndedRef.current = false;
-    setPlayerPos({ x: 0, y: 2 });
-    setMoves(0);
-    setTimeLeft(20);
+    setPlayerPos(50);
+    setCatPos(50);
+    setEscaped(0);
+    escapedRef.current = 0;
+    setTimeLeft(15);
+    setExits([]);
     setPhase("playing");
   };
 
@@ -1103,7 +900,7 @@ function HeartMazeGame({ onComplete }: { onComplete: (score: number) => void }) 
           if (!gameEndedRef.current) {
             gameEndedRef.current = true;
             setPhase("done");
-            setTimeout(() => onCompleteRef.current(0), 1500);
+            setTimeout(() => onCompleteRef.current(escapedRef.current), 1500);
           }
           return 0;
         }
@@ -1113,56 +910,83 @@ function HeartMazeGame({ onComplete }: { onComplete: (score: number) => void }) 
     return () => clearInterval(timer);
   }, [phase]);
 
-  const move = (dx: number, dy: number) => {
-    if (phase !== "playing" || gameEndedRef.current) return;
+  // Spawn exits
+  useEffect(() => {
+    if (phase !== "playing") return;
+    const spawn = () => {
+      if (gameEndedRef.current) return;
+      setExits(prev => {
+        if (prev.length >= 3) return prev;
+        const x = Math.random() < 0.5 ? 10 + Math.random() * 30 : 60 + Math.random() * 30;
+        return [...prev, { id: Date.now(), x, blocked: false }];
+      });
+    };
+    spawn();
+    const interval = setInterval(spawn, 2000);
+    return () => clearInterval(interval);
+  }, [phase]);
 
-    const newX = playerPos.x + dx;
-    const newY = playerPos.y + dy;
+  // Cat chases player and blocks exits
+  useEffect(() => {
+    if (phase !== "playing") return;
+    const chase = setInterval(() => {
+      setCatPos(prev => {
+        const diff = playerPos - prev;
+        return prev + diff * 0.15;
+      });
+      // Cat blocks nearby exits
+      setExits(prev => prev.map(exit => ({
+        ...exit,
+        blocked: Math.abs(exit.x - catPos) < 20,
+      })));
+    }, 100);
+    return () => clearInterval(chase);
+  }, [phase, playerPos, catPos]);
 
-    // Check bounds and walls
-    if (newX < 0 || newX >= 5 || newY < 0 || newY >= 5) return;
-    if (maze[newY][newX] === 1) return;
-
-    setPlayerPos({ x: newX, y: newY });
-    setMoves(m => m + 1);
-
-    // Check win
-    if (newX === catPos.x && newY === catPos.y && !gameEndedRef.current) {
-      gameEndedRef.current = true;
-      const bonus = Math.max(0, 20 - moves);
-      setPhase("done");
-      setTimeout(() => onCompleteRef.current(10 + bonus), 1500);
+  const tryExit = (exit: { id: number; x: number; blocked: boolean }) => {
+    if (exit.blocked) {
+      setCatMessage(catTaunts[Math.floor(Math.random() * catTaunts.length)]);
+      setTimeout(() => setCatMessage(""), 1000);
+    } else {
+      setEscaped(e => e + 1);
+      setExits(prev => prev.filter(e => e.id !== exit.id));
     }
+  };
+
+  // Handle touch/mouse for player
+  const handleMove = (clientX: number, rect: DOMRect) => {
+    const x = ((clientX - rect.left) / rect.width) * 100;
+    setPlayerPos(Math.max(5, Math.min(95, x)));
   };
 
   if (phase === "tutorial") {
     return (
-      <div className="fixed inset-0 bg-gradient-to-b from-green-400 to-teal-500 flex flex-col items-center justify-center p-6">
+      <div className="fixed inset-0 bg-gradient-to-b from-slate-700 to-slate-900 flex flex-col items-center justify-center p-6">
         <div className="bg-white/95 rounded-3xl p-8 max-w-sm text-center shadow-2xl">
-          <div className="text-6xl mb-4">🗺️</div>
-          <h2 className="text-2xl font-bold text-green-800 mb-3">Heart's Journey!</h2>
-          <p className="text-green-600 mb-4">
-            Guide the 💖 through the maze<br/>to reach the 😺 cat!
+          <div className="text-6xl mb-4">🚪</div>
+          <h2 className="text-2xl font-bold text-slate-800 mb-3">Escape the Cat!</h2>
+          <p className="text-slate-600 mb-4">
+            Exit doors appear! Run to them!<br/>
+            <span className="font-bold text-red-500">But the cat will block you!</span>
           </p>
           <div className="flex justify-center gap-4 my-4">
             <div className="text-center">
-              <div className="text-4xl">💖</div>
-              <div className="text-xs text-green-600">You</div>
+              <div className="text-4xl">🚪</div>
+              <div className="text-xs text-green-600 font-bold">Run here!</div>
             </div>
-            <div className="text-2xl">→</div>
             <div className="text-center">
-              <div className="text-4xl">😺</div>
-              <div className="text-xs text-green-600">Goal</div>
+              <div className="text-4xl">😼</div>
+              <div className="text-xs text-red-600 font-bold">Blocks you!</div>
             </div>
           </div>
-          <p className="text-green-500 text-sm mb-6">
-            Use the arrows to move!<br/>Fewer moves = more points!
+          <p className="text-slate-500 text-sm mb-6">
+            Slide to move! Escape through unblocked doors!
           </p>
           <button
             onClick={startGame}
-            className="w-full py-4 bg-gradient-to-r from-green-500 to-teal-500 text-white rounded-2xl font-bold text-xl shadow-lg active:scale-95 transition-transform"
+            className="w-full py-4 bg-gradient-to-r from-slate-600 to-slate-800 text-white rounded-2xl font-bold text-xl shadow-lg active:scale-95 transition-transform"
           >
-            Find the Way! 🗺️
+            Try to Escape! 🏃
           </button>
         </div>
       </div>
@@ -1170,101 +994,309 @@ function HeartMazeGame({ onComplete }: { onComplete: (score: number) => void }) 
   }
 
   if (phase === "done") {
-    const won = playerPos.x === catPos.x && playerPos.y === catPos.y;
+    const won = escaped >= 3;
     return (
-      <div className="fixed inset-0 bg-gradient-to-b from-green-400 to-teal-500 flex flex-col items-center justify-center p-6">
+      <div className="fixed inset-0 bg-gradient-to-b from-slate-700 to-slate-900 flex flex-col items-center justify-center p-6">
         <div className="bg-white/95 rounded-3xl p-8 max-w-sm text-center shadow-2xl">
-          <div className="text-6xl mb-4">{won ? "😻" : "😿"}</div>
-          <h2 className="text-3xl font-bold text-green-800 mb-2">
-            {won ? "Found the Cat!" : "Time's Up!"}
+          <div className="text-6xl mb-4">{won ? "🏃" : "😹"}</div>
+          <h2 className="text-3xl font-bold text-slate-800 mb-2">
+            {won ? "You Escaped!" : "Cat Caught You!"}
           </h2>
-          <p className="text-xl text-green-600 mb-4">
-            {won ? `${moves} moves used!` : "Try again next time!"}
+          <p className="text-4xl font-bold text-slate-600 mb-2">{escaped} escapes</p>
+          <p className="text-slate-500 italic mb-4">
+            {won ? '"FINE! But you can\'t escape FOREVER!" 😾' : '"You\'re MINE now!" 😹'}
           </p>
-          <p className="text-green-500">Moving to next challenge...</p>
+          <p className="text-slate-400">Next challenge...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="fixed inset-0 bg-gradient-to-b from-green-400 to-teal-500 flex flex-col items-center justify-center p-6">
+    <div
+      className="fixed inset-0 bg-gradient-to-b from-slate-700 to-slate-900 overflow-hidden select-none"
+      onMouseMove={(e) => handleMove(e.clientX, e.currentTarget.getBoundingClientRect())}
+      onTouchMove={(e) => handleMove(e.touches[0].clientX, e.currentTarget.getBoundingClientRect())}
+    >
       {/* Header */}
       <div className="absolute top-4 left-0 right-0 flex justify-center gap-4 z-10">
         <div className="bg-white/90 rounded-full px-4 py-2 shadow-lg">
-          <span className="text-lg font-bold text-green-600">{moves} moves</span>
+          <span className="text-lg font-bold text-slate-600">Escapes: {escaped}</span>
         </div>
         <div className="bg-white/90 rounded-full px-4 py-2 shadow-lg">
-          <span className="text-lg font-bold text-green-600">{timeLeft}s ⏱️</span>
+          <span className="text-lg font-bold text-slate-600">{timeLeft}s</span>
         </div>
       </div>
+
+      {/* Cat message */}
+      {catMessage && (
+        <div className="absolute top-20 left-1/2 -translate-x-1/2 z-20">
+          <div className="bg-pink-500 text-white px-4 py-2 rounded-full font-bold">
+            {catMessage}
+          </div>
+        </div>
+      )}
 
       {/* Skip */}
       <button
         onClick={() => {
           if (!gameEndedRef.current) {
             gameEndedRef.current = true;
-            onComplete(0);
+            onComplete(escaped);
           }
         }}
-        className="absolute top-4 right-4 bg-white/50 rounded-full px-3 py-1 text-green-700 text-sm z-10"
+        className="absolute top-4 right-4 bg-white/50 rounded-full px-3 py-1 text-slate-300 text-sm z-10"
       >
         Skip →
       </button>
 
-      {/* Maze */}
-      <div className="bg-white/20 rounded-2xl p-3 mb-8">
-        <div className="grid grid-cols-5 gap-1">
-          {maze.map((row, y) =>
-            row.map((cell, x) => (
-              <div
-                key={`${x}-${y}`}
-                className={cn(
-                  "w-12 h-12 rounded-lg flex items-center justify-center text-3xl",
-                  cell === 1 ? "bg-green-800" : "bg-green-200"
-                )}
-              >
-                {playerPos.x === x && playerPos.y === y && "💖"}
-                {catPos.x === x && catPos.y === y && playerPos.x !== x && "😺"}
-              </div>
-            ))
+      {/* Exits */}
+      {exits.map(exit => (
+        <button
+          key={exit.id}
+          onClick={() => tryExit(exit)}
+          className={cn(
+            "absolute top-1/3 text-6xl transition-all",
+            exit.blocked ? "opacity-50 grayscale" : "animate-pulse"
           )}
+          style={{ left: `${exit.x}%`, transform: "translateX(-50%)" }}
+        >
+          🚪
+          {exit.blocked && (
+            <span className="absolute -top-2 -right-2 text-2xl">🚫</span>
+          )}
+        </button>
+      ))}
+
+      {/* Cat */}
+      <div
+        className="absolute bottom-32 text-6xl transition-all duration-100"
+        style={{ left: `${catPos}%`, transform: "translateX(-50%)" }}
+      >
+        😼
+      </div>
+
+      {/* Player */}
+      <div
+        className="absolute bottom-20 text-5xl transition-all duration-75"
+        style={{ left: `${playerPos}%`, transform: "translateX(-50%)" }}
+      >
+        🏃
+      </div>
+
+      {/* Instruction */}
+      <div className="absolute bottom-8 left-0 right-0 text-center">
+        <p className="text-white/60 text-sm">👆 Slide to move! Tap 🚪 to escape!</p>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================================
+// Game 4: REJECT THE LOVE LETTERS - Tear up the cat's love letters!
+// ============================================================================
+function RejectLettersGame({ onComplete }: { onComplete: (score: number) => void }) {
+  const [phase, setPhase] = useState<"tutorial" | "playing" | "done">("tutorial");
+  const [letters, setLetters] = useState<Array<{ id: number; x: number; y: number; torn: boolean; text: string }>>([]);
+  const [score, setScore] = useState(0);
+  const [timeLeft, setTimeLeft] = useState(12);
+  const [catReaction, setCatReaction] = useState("");
+
+  const onCompleteRef = useRef(onComplete);
+  const gameEndedRef = useRef(false);
+  const scoreRef = useRef(0);
+
+  useEffect(() => { onCompleteRef.current = onComplete; }, [onComplete]);
+  useEffect(() => { scoreRef.current = score; }, [score]);
+
+  const letterTexts = [
+    "I love you! 💕",
+    "Be mine! 💖",
+    "XOXO 😘",
+    "Forever yours 💗",
+    "My heart is yours 💝",
+    "You're purrfect! 😻",
+  ];
+
+  const catCries = [
+    "MY LOVE LETTER! 😿",
+    "I spent HOURS on that! 😾",
+    "You're so COLD! 💔",
+    "WHYYY?! 🙀",
+    "*dramatic sobbing* 😿",
+  ];
+
+  const startGame = () => {
+    gameEndedRef.current = false;
+    setScore(0);
+    scoreRef.current = 0;
+    setTimeLeft(12);
+    setLetters([]);
+    setPhase("playing");
+  };
+
+  // Timer
+  useEffect(() => {
+    if (phase !== "playing") return;
+    const timer = setInterval(() => {
+      setTimeLeft(t => {
+        if (t <= 1) {
+          clearInterval(timer);
+          if (!gameEndedRef.current) {
+            gameEndedRef.current = true;
+            setPhase("done");
+            setTimeout(() => onCompleteRef.current(scoreRef.current), 1500);
+          }
+          return 0;
+        }
+        return t - 1;
+      });
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [phase]);
+
+  // Spawn letters
+  useEffect(() => {
+    if (phase !== "playing") return;
+    const spawn = () => {
+      if (gameEndedRef.current) return;
+      setLetters(prev => [...prev.slice(-6), {
+        id: Date.now() + Math.random(),
+        x: 10 + Math.random() * 80,
+        y: 20 + Math.random() * 50,
+        torn: false,
+        text: letterTexts[Math.floor(Math.random() * letterTexts.length)],
+      }]);
+    };
+    spawn();
+    const interval = setInterval(spawn, 800);
+    return () => clearInterval(interval);
+  }, [phase]);
+
+  const tearLetter = (id: number) => {
+    setLetters(prev => prev.map(l => l.id === id ? { ...l, torn: true } : l));
+    setScore(s => {
+      scoreRef.current = s + 10;
+      return s + 10;
+    });
+    setCatReaction(catCries[Math.floor(Math.random() * catCries.length)]);
+    setTimeout(() => setCatReaction(""), 800);
+    setTimeout(() => {
+      setLetters(prev => prev.filter(l => l.id !== id));
+    }, 300);
+  };
+
+  if (phase === "tutorial") {
+    return (
+      <div className="fixed inset-0 bg-gradient-to-b from-rose-400 to-pink-600 flex flex-col items-center justify-center p-6">
+        <div className="bg-white/95 rounded-3xl p-8 max-w-sm text-center shadow-2xl">
+          <div className="text-6xl mb-4">💌</div>
+          <h2 className="text-2xl font-bold text-rose-800 mb-3">Reject the Love Letters!</h2>
+          <p className="text-rose-600 mb-4">
+            The cat keeps sending love letters!<br/>
+            <span className="font-bold">Tap to TEAR them up!</span>
+          </p>
+          <div className="flex justify-center gap-4 my-4">
+            <div className="text-center">
+              <div className="text-4xl">💌</div>
+              <div className="text-xs text-rose-600">Love Letter</div>
+            </div>
+            <div className="text-2xl">→</div>
+            <div className="text-center">
+              <div className="text-4xl">📄💔</div>
+              <div className="text-xs text-green-600">TORN!</div>
+            </div>
+          </div>
+          <p className="text-rose-500 text-sm mb-6">
+            Break the cat's heart! 💔
+          </p>
+          <button
+            onClick={startGame}
+            className="w-full py-4 bg-gradient-to-r from-rose-500 to-pink-500 text-white rounded-2xl font-bold text-xl shadow-lg active:scale-95 transition-transform"
+          >
+            Reject Everything! 💔
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  if (phase === "done") {
+    const won = score >= 50;
+    return (
+      <div className="fixed inset-0 bg-gradient-to-b from-rose-400 to-pink-600 flex flex-col items-center justify-center p-6">
+        <div className="bg-white/95 rounded-3xl p-8 max-w-sm text-center shadow-2xl">
+          <div className="text-6xl mb-4">{won ? "💔" : "💌"}</div>
+          <h2 className="text-3xl font-bold text-rose-800 mb-2">
+            {won ? "Letters Destroyed!" : "Too Many Letters!"}
+          </h2>
+          <p className="text-4xl font-bold text-rose-600 mb-2">{score} pts</p>
+          <p className="text-rose-500 italic mb-4">
+            {won ? '"All my beautiful words... 😿"' : '"You read them! Ha!" 😹'}
+          </p>
+          <p className="text-rose-400">Next challenge...</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="fixed inset-0 bg-gradient-to-b from-rose-400 to-pink-600 overflow-hidden select-none">
+      {/* Header */}
+      <div className="absolute top-4 left-0 right-0 flex justify-center gap-4 z-10">
+        <div className="bg-white/90 rounded-full px-4 py-2 shadow-lg">
+          <span className="text-lg font-bold text-rose-600">{score} pts</span>
+        </div>
+        <div className="bg-white/90 rounded-full px-4 py-2 shadow-lg">
+          <span className="text-lg font-bold text-rose-600">{timeLeft}s</span>
         </div>
       </div>
 
-      {/* Controls */}
-      <div className="grid grid-cols-3 gap-2">
-        <div />
-        <button
-          onClick={() => move(0, -1)}
-          className="w-16 h-16 bg-white rounded-xl text-3xl shadow-lg active:scale-90 transition-transform"
-        >
-          ⬆️
-        </button>
-        <div />
-        <button
-          onClick={() => move(-1, 0)}
-          className="w-16 h-16 bg-white rounded-xl text-3xl shadow-lg active:scale-90 transition-transform"
-        >
-          ⬅️
-        </button>
-        <div className="w-16 h-16 flex items-center justify-center text-2xl">
-          💖
+      {/* Cat reaction */}
+      {catReaction && (
+        <div className="absolute top-20 left-1/2 -translate-x-1/2 z-20">
+          <div className="bg-white text-rose-600 px-4 py-2 rounded-full font-bold shadow-lg">
+            {catReaction}
+          </div>
         </div>
+      )}
+
+      {/* Skip */}
+      <button
+        onClick={() => {
+          if (!gameEndedRef.current) {
+            gameEndedRef.current = true;
+            onComplete(score);
+          }
+        }}
+        className="absolute top-4 right-4 bg-white/50 rounded-full px-3 py-1 text-rose-200 text-sm z-10"
+      >
+        Skip →
+      </button>
+
+      {/* Letters */}
+      {letters.map(l => (
         <button
-          onClick={() => move(1, 0)}
-          className="w-16 h-16 bg-white rounded-xl text-3xl shadow-lg active:scale-90 transition-transform"
+          key={l.id}
+          onClick={() => !l.torn && tearLetter(l.id)}
+          className={cn(
+            "absolute transition-all duration-200 p-3 bg-white rounded-xl shadow-lg",
+            l.torn && "scale-0 rotate-45 opacity-0"
+          )}
+          style={{
+            left: `${l.x}%`,
+            top: `${l.y}%`,
+            transform: "translate(-50%, -50%)",
+          }}
         >
-          ➡️
+          <div className="text-3xl mb-1">💌</div>
+          <div className="text-xs text-pink-500 max-w-[80px] truncate">{l.text}</div>
         </button>
-        <div />
-        <button
-          onClick={() => move(0, 1)}
-          className="w-16 h-16 bg-white rounded-xl text-3xl shadow-lg active:scale-90 transition-transform"
-        >
-          ⬇️
-        </button>
-        <div />
+      ))}
+
+      {/* Instruction */}
+      <div className="absolute bottom-8 left-0 right-0 text-center">
+        <p className="text-white/80 text-lg font-medium">👆 Tap love letters to TEAR them up!</p>
       </div>
     </div>
   );
@@ -1561,6 +1593,7 @@ export default function ValentineCat() {
   const [scene, setScene] = useState<GameScene>("title");
   const [dialogIndex, setDialogIndex] = useState(0);
   const [showChapterTitle, setShowChapterTitle] = useState(false);
+  const [pendingScene, setPendingScene] = useState<GameScene | null>(null);
   const [unlockedAchievements, setUnlockedAchievements] = useState<Set<string>>(new Set());
   const [showAchievement, setShowAchievement] = useState<Achievement | null>(null);
   const [stats, setStats] = useState({ noCount: 0, yesTime: 0, petCount: 0, totalScore: 0 });
@@ -1590,9 +1623,11 @@ export default function ValentineCat() {
   // Move to next scene
   const nextScene = useCallback((next: GameScene) => {
     if (next in CHAPTER_TITLES) {
+      setPendingScene(next);
       setShowChapterTitle(true);
       setTimeout(() => {
         setShowChapterTitle(false);
+        setPendingScene(null);
         setScene(next);
       }, 3000);
     } else {
@@ -1729,9 +1764,9 @@ export default function ValentineCat() {
     );
   }
 
-  // Chapter Title
-  if (showChapterTitle && scene in CHAPTER_TITLES) {
-    return <ChapterTitle chapter={scene as keyof typeof CHAPTER_TITLES} onComplete={() => setShowChapterTitle(false)} />;
+  // Chapter Title - use pendingScene to show the NEXT scene's title, not current
+  if (showChapterTitle && pendingScene && pendingScene in CHAPTER_TITLES) {
+    return <ChapterTitle chapter={pendingScene as keyof typeof CHAPTER_TITLES} onComplete={() => setShowChapterTitle(false)} />;
   }
 
   // Chapter 1: The Big Question - Simple Yes/No with funny No button behavior
@@ -1808,7 +1843,7 @@ export default function ValentineCat() {
                     if (newCount >= 3) {
                       setTimeout(() => {
                         setCatMessage("Fine! Prove your love through CHALLENGES! 😼");
-                        setTimeout(() => nextScene("chapter1_boss"), 1500);
+                        setTimeout(() => nextScene("chapter1_catch_no"), 1500);
                       }, 1000);
                     }
                   }}
@@ -1843,56 +1878,56 @@ export default function ValentineCat() {
     );
   }
 
-  // Chapter 1 Boss: Bubble Pop Blitz - Pop love bubbles!
-  if (scene === "chapter1_boss") {
+  // Game 1: Catch the NO - Collect N and O letters!
+  if (scene === "chapter1_catch_no") {
     return (
-      <BubblePopGame
+      <CatchTheNoGame
         onComplete={(score: number) => {
           setStats(s => ({ ...s, totalScore: s.totalScore + score }));
-          nextScene("chapter2_love_potion");
+          nextScene("chapter2_smash_hearts");
         }}
       />
     );
   }
 
-  // Chapter 2: Love Potion Lab - Mix the perfect potion!
-  if (scene === "chapter2_love_potion") {
+  // Game 2: Smash the Hearts - Destroy the decorations!
+  if (scene === "chapter2_smash_hearts") {
     return (
-      <LovePotionGame
+      <SmashTheHeartsGame
         onComplete={(score: number) => {
           setStats(s => ({ ...s, totalScore: s.totalScore + score }));
-          nextScene("chapter2_fortune");
+          nextScene("chapter2_escape");
         }}
       />
     );
   }
 
-  // Chapter 2: Fortune Wheel - Spin for your destiny!
-  if (scene === "chapter2_fortune") {
+  // Game 3: Escape the Cat - Run for the exits!
+  if (scene === "chapter2_escape") {
     return (
-      <FortuneWheelGame
+      <EscapeTheCatGame
         onComplete={(score: number) => {
           setStats(s => ({ ...s, totalScore: s.totalScore + score }));
-          nextScene("chapter2_maze");
+          nextScene("chapter2_reject_letters");
         }}
       />
     );
   }
 
-  // Chapter 2: Heart Maze - Guide the heart to the cat!
-  if (scene === "chapter2_maze") {
+  // Game 4: Reject the Letters - Tear them all up!
+  if (scene === "chapter2_reject_letters") {
     return (
-      <HeartMazeGame
+      <RejectLettersGame
         onComplete={(score: number) => {
           setStats(s => ({ ...s, totalScore: s.totalScore + score }));
-          if (score >= 20) unlockAchievement("puzzle_solver");
+          if (score >= 50) unlockAchievement("puzzle_solver");
           nextScene("chapter3_boss_battle");
         }}
       />
     );
   }
 
-  // Chapter 3: Boss Battle - The Drama King!
+  // Final Boss Battle - The cat won't give up!
   if (scene === "chapter3_boss_battle") {
     return (
       <DramaKingBattle
@@ -1901,9 +1936,9 @@ export default function ValentineCat() {
             unlockAchievement("rhythm_master");
             nextScene("chapter3_final");
           } else {
-            // Lost - go back to maze
-            setCatMessage("My DRAMA is too powerful! 👑 Try again!");
-            setScene("chapter2_maze");
+            // Lost - try again from letters game
+            setCatMessage("You can't defeat my LOVE! 😼 Try again!");
+            setScene("chapter2_reject_letters");
           }
         }}
       />
