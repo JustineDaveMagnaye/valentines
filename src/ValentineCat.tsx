@@ -395,32 +395,30 @@ function CatSprite({ emotion = "happy", size = "md", className, animate = false 
 function TapGame({ onComplete }: { onComplete: (score: number) => void }) {
   const [phase, setPhase] = useState<"tutorial" | "playing" | "done">("tutorial");
   const [score, setScore] = useState(0);
-  const [hearts, setHearts] = useState<Array<{ id: number; x: number; y: number; tapped: boolean }>>([]);
+  const [hearts, setHearts] = useState<Array<{ id: number; x: number; y: number }>>([]);
   const [timeLeft, setTimeLeft] = useState(10);
 
-  // Use refs to avoid stale closures and dependency issues
   const scoreRef = useRef(score);
   const onCompleteRef = useRef(onComplete);
   const gameEndedRef = useRef(false);
 
-  // Keep refs updated
   useEffect(() => { scoreRef.current = score; }, [score]);
   useEffect(() => { onCompleteRef.current = onComplete; }, [onComplete]);
 
-  // Start game after tutorial
   const startGame = () => {
     gameEndedRef.current = false;
+    setHearts([]);
+    setScore(0);
+    setTimeLeft(10);
     setPhase("playing");
   };
 
-  // Timer - runs independently once game starts
+  // Timer
   useEffect(() => {
     if (phase !== "playing") return;
-
     const timer = setInterval(() => {
       setTimeLeft(t => {
         if (t <= 1) {
-          // Time's up!
           clearInterval(timer);
           if (!gameEndedRef.current) {
             gameEndedRef.current = true;
@@ -432,36 +430,33 @@ function TapGame({ onComplete }: { onComplete: (score: number) => void }) {
         return t - 1;
       });
     }, 1000);
-
     return () => clearInterval(timer);
-  }, [phase]); // Only depends on phase, not timeLeft
+  }, [phase]);
 
-  // Spawn hearts in easy-to-reach positions
+  // Spawn hearts - simpler, less frequent
   useEffect(() => {
     if (phase !== "playing") return;
     const spawn = () => {
       setHearts(prev => {
-        // Remove old hearts and add new one
-        const filtered = prev.filter(h => !h.tapped && Date.now() - h.id < 2000);
-        return [...filtered, {
+        // Keep max 4 hearts on screen
+        const recent = prev.slice(-3);
+        return [...recent, {
           id: Date.now(),
-          x: 15 + Math.random() * 70, // Keep away from edges
-          y: 20 + Math.random() * 50, // Keep in middle area
-          tapped: false,
+          x: 15 + Math.random() * 70,
+          y: 25 + Math.random() * 45,
         }];
       });
     };
     spawn();
-    const interval = setInterval(spawn, 800);
+    const interval = setInterval(spawn, 1000); // Slower spawn rate
     return () => clearInterval(interval);
   }, [phase]);
 
   const tapHeart = (id: number) => {
-    setHearts(prev => prev.map(h => h.id === id ? { ...h, tapped: true } : h));
+    setHearts(prev => prev.filter(h => h.id !== id));
     setScore(s => s + 1);
   };
 
-  // Tutorial screen
   if (phase === "tutorial") {
     return (
       <div className="fixed inset-0 bg-gradient-to-b from-pink-400 to-rose-500 flex flex-col items-center justify-center p-6">
@@ -484,7 +479,6 @@ function TapGame({ onComplete }: { onComplete: (score: number) => void }) {
     );
   }
 
-  // Done screen
   if (phase === "done") {
     return (
       <div className="fixed inset-0 bg-gradient-to-b from-pink-400 to-rose-500 flex flex-col items-center justify-center p-6">
@@ -498,7 +492,6 @@ function TapGame({ onComplete }: { onComplete: (score: number) => void }) {
     );
   }
 
-  // Playing
   return (
     <div className="fixed inset-0 bg-gradient-to-b from-pink-400 to-rose-500 overflow-hidden select-none">
       {/* Header */}
@@ -508,218 +501,6 @@ function TapGame({ onComplete }: { onComplete: (score: number) => void }) {
         </div>
         <div className="bg-white/90 rounded-full px-6 py-2 shadow-lg">
           <span className="text-2xl font-bold text-pink-600">{timeLeft}s ⏱️</span>
-        </div>
-      </div>
-
-      {/* Skip button */}
-      <button
-        onClick={() => {
-          if (!gameEndedRef.current) {
-            gameEndedRef.current = true;
-            onComplete(score);
-          }
-        }}
-        className="absolute top-4 right-4 bg-white/50 rounded-full px-3 py-1 text-pink-700 text-sm z-10"
-      >
-        Skip →
-      </button>
-
-      {/* Hearts to tap */}
-      {hearts.filter(h => !h.tapped).map(h => (
-        <button
-          key={h.id}
-          onClick={() => tapHeart(h.id)}
-          className="absolute text-5xl transform -translate-x-1/2 -translate-y-1/2 active:scale-75 transition-transform animate-pulse"
-          style={{ left: `${h.x}%`, top: `${h.y}%` }}
-        >
-          💖
-        </button>
-      ))}
-
-      {/* Tap feedback */}
-      {hearts.filter(h => h.tapped).map(h => (
-        <div
-          key={h.id}
-          className="absolute text-4xl transform -translate-x-1/2 -translate-y-1/2 animate-ping pointer-events-none"
-          style={{ left: `${h.x}%`, top: `${h.y}%` }}
-        >
-          ✨
-        </div>
-      ))}
-
-      {/* Hint */}
-      <div className="absolute bottom-8 left-0 right-0 text-center">
-        <p className="text-white/80 text-lg font-medium">👆 Tap the hearts!</p>
-      </div>
-    </div>
-  );
-}
-
-// ============================================================================
-// LOVE LETTER GAME - Catch falling letters to spell "LOVE"!
-// ============================================================================
-function LoveLetterGame({ onComplete }: { onComplete: (score: number) => void }) {
-  const [phase, setPhase] = useState<"tutorial" | "playing" | "done">("tutorial");
-  const [collected, setCollected] = useState<string[]>([]);
-  const [letters, setLetters] = useState<Array<{ id: number; letter: string; x: number; y: number; caught: boolean }>>([]);
-  const [basketX, setBasketX] = useState(50);
-  const [score, setScore] = useState(0);
-  const [round, setRound] = useState(0);
-  const targetWord = "LOVE";
-  const totalRounds = 3;
-
-  const onCompleteRef = useRef(onComplete);
-  const gameEndedRef = useRef(false);
-  const animFrameRef = useRef<number>(0);
-
-  useEffect(() => { onCompleteRef.current = onComplete; }, [onComplete]);
-
-  const startGame = () => {
-    gameEndedRef.current = false;
-    setPhase("playing");
-    spawnLetters();
-  };
-
-  const spawnLetters = () => {
-    // Spawn L, O, V, E plus some decoys
-    const needed = targetWord.split("");
-    const decoys = ["X", "Z", "Q", "W", "K"];
-    const all = [...needed, ...decoys.slice(0, 3)];
-    // Shuffle
-    for (let i = all.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [all[i], all[j]] = [all[j], all[i]];
-    }
-    setLetters(all.map((letter, i) => ({
-      id: Date.now() + i,
-      letter,
-      x: 10 + (i * 12) + Math.random() * 5,
-      y: -10 - (i * 15),
-      caught: false,
-    })));
-    setCollected([]);
-  };
-
-  // Animate letters falling
-  useEffect(() => {
-    if (phase !== "playing") return;
-
-    const animate = () => {
-      setLetters(prev => {
-        const updated = prev.map(l => {
-          if (l.caught) return l;
-          const newY = l.y + 0.5;
-          // Check if caught by basket
-          if (newY >= 75 && newY <= 85 && Math.abs(l.x - basketX) < 12) {
-            // Caught!
-            const isTarget = targetWord.includes(l.letter);
-            if (isTarget) {
-              setCollected(c => {
-                const newCollected = [...c, l.letter];
-                // Check if spelled LOVE
-                if (newCollected.join("") === targetWord) {
-                  setScore(s => s + 1);
-                  const nextRound = round + 1;
-                  if (nextRound >= totalRounds && !gameEndedRef.current) {
-                    gameEndedRef.current = true;
-                    setTimeout(() => {
-                      setPhase("done");
-                      setTimeout(() => onCompleteRef.current(score + 1), 1500);
-                    }, 500);
-                  } else {
-                    setRound(nextRound);
-                    setTimeout(spawnLetters, 800);
-                  }
-                }
-                return newCollected;
-              });
-            }
-            return { ...l, caught: true };
-          }
-          // Miss if too low
-          if (newY > 100) return { ...l, caught: true };
-          return { ...l, y: newY };
-        });
-        return updated;
-      });
-      animFrameRef.current = requestAnimationFrame(animate);
-    };
-
-    animFrameRef.current = requestAnimationFrame(animate);
-    return () => cancelAnimationFrame(animFrameRef.current);
-  }, [phase, basketX, round, score]);
-
-  const handleMove = (clientX: number) => {
-    const pct = (clientX / window.innerWidth) * 100;
-    setBasketX(Math.max(10, Math.min(90, pct)));
-  };
-
-  // Tutorial
-  if (phase === "tutorial") {
-    return (
-      <div className="fixed inset-0 bg-gradient-to-b from-pink-400 to-purple-500 flex flex-col items-center justify-center p-6">
-        <div className="bg-white/95 rounded-3xl p-8 max-w-sm text-center shadow-2xl">
-          <div className="text-6xl mb-4">💌</div>
-          <h2 className="text-2xl font-bold text-pink-800 mb-3">Love Letter!</h2>
-          <p className="text-pink-600 mb-4">
-            Catch the letters to spell <span className="font-bold text-red-500">LOVE</span>!
-          </p>
-          <div className="flex justify-center gap-2 my-4 text-3xl">
-            <span className="bg-pink-200 rounded-lg px-3 py-1">L</span>
-            <span className="bg-pink-200 rounded-lg px-3 py-1">O</span>
-            <span className="bg-pink-200 rounded-lg px-3 py-1">V</span>
-            <span className="bg-pink-200 rounded-lg px-3 py-1">E</span>
-          </div>
-          <p className="text-pink-500 text-sm mb-6">
-            Move the basket to catch letters!<br/>Avoid wrong letters!
-          </p>
-          <button
-            onClick={startGame}
-            className="w-full py-4 bg-gradient-to-r from-pink-500 to-purple-500 text-white rounded-2xl font-bold text-xl shadow-lg active:scale-95 transition-transform"
-          >
-            Start Catching! 💕
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  // Done
-  if (phase === "done") {
-    return (
-      <div className="fixed inset-0 bg-gradient-to-b from-pink-400 to-purple-500 flex flex-col items-center justify-center p-6">
-        <div className="bg-white/95 rounded-3xl p-8 max-w-sm text-center shadow-2xl">
-          <div className="text-6xl mb-4">💌</div>
-          <h2 className="text-3xl font-bold text-pink-800 mb-2">Love Letter Complete!</h2>
-          <p className="text-5xl font-bold text-pink-600 mb-4">{score}/{totalRounds} 💕</p>
-          <p className="text-pink-500">Moving to next challenge...</p>
-        </div>
-      </div>
-    );
-  }
-
-  // Playing
-  return (
-    <div
-      className="fixed inset-0 bg-gradient-to-b from-pink-400 to-purple-500 overflow-hidden select-none"
-      onMouseMove={(e) => handleMove(e.clientX)}
-      onTouchMove={(e) => handleMove(e.touches[0].clientX)}
-      style={{ touchAction: "none" }}
-    >
-      {/* Header */}
-      <div className="absolute top-4 left-0 right-0 flex justify-center gap-4 z-10">
-        <div className="bg-white/90 rounded-full px-4 py-2 shadow-lg">
-          <span className="text-lg font-bold text-pink-600">Round {round + 1}/{totalRounds}</span>
-        </div>
-        <div className="bg-white/90 rounded-full px-4 py-2 shadow-lg flex gap-1">
-          {targetWord.split("").map((l, i) => (
-            <span key={i} className={cn(
-              "w-8 h-8 rounded flex items-center justify-center font-bold text-lg",
-              collected.includes(l) && collected.indexOf(l) <= i ? "bg-green-400 text-white" : "bg-pink-200 text-pink-400"
-            )}>
-              {collected[i] || "?"}
-            </span>
-          ))}
         </div>
       </div>
 
@@ -736,31 +517,252 @@ function LoveLetterGame({ onComplete }: { onComplete: (score: number) => void })
         Skip →
       </button>
 
-      {/* Falling letters */}
-      {letters.filter(l => !l.caught).map(l => (
-        <div
-          key={l.id}
-          className={cn(
-            "absolute text-4xl font-bold w-12 h-12 rounded-xl flex items-center justify-center shadow-lg transition-transform",
-            targetWord.includes(l.letter) ? "bg-white text-pink-600" : "bg-gray-300 text-gray-500"
-          )}
-          style={{ left: `${l.x}%`, top: `${l.y}%`, transform: "translate(-50%, -50%)" }}
+      {/* Hearts - bigger touch targets, no heavy animations */}
+      {hearts.map(h => (
+        <button
+          key={h.id}
+          onClick={() => tapHeart(h.id)}
+          className="absolute w-20 h-20 flex items-center justify-center text-6xl active:scale-90 transition-transform"
+          style={{ left: `${h.x}%`, top: `${h.y}%`, transform: "translate(-50%, -50%)" }}
         >
-          {l.letter}
-        </div>
+          💖
+        </button>
       ))}
 
-      {/* Basket */}
-      <div
-        className="absolute bottom-20 text-6xl transition-all"
-        style={{ left: `${basketX}%`, transform: "translateX(-50%)" }}
-      >
-        🧺
+      {/* Hint */}
+      <div className="absolute bottom-8 left-0 right-0 text-center">
+        <p className="text-white/80 text-lg font-medium">👆 Tap the hearts!</p>
       </div>
+    </div>
+  );
+}
+
+// ============================================================================
+// LOVE LETTER GAME - Catch falling hearts to collect LOVE letters!
+// ============================================================================
+function LoveLetterGame({ onComplete }: { onComplete: (score: number) => void }) {
+  const [phase, setPhase] = useState<"tutorial" | "playing" | "done">("tutorial");
+  const [collected, setCollected] = useState<string[]>([]);
+  const [hearts, setHearts] = useState<Array<{ id: number; letter: string; x: number; y: number }>>([]);
+  const [timeLeft, setTimeLeft] = useState(15);
+  const targetWord = ["L", "O", "V", "E"];
+
+  const onCompleteRef = useRef(onComplete);
+  const gameEndedRef = useRef(false);
+  const animFrameRef = useRef<number>(0);
+  const lastSpawnRef = useRef(0);
+
+  useEffect(() => { onCompleteRef.current = onComplete; }, [onComplete]);
+
+  const startGame = () => {
+    gameEndedRef.current = false;
+    setCollected([]);
+    setHearts([]);
+    setTimeLeft(15);
+    setPhase("playing");
+  };
+
+  // Timer
+  useEffect(() => {
+    if (phase !== "playing") return;
+    const timer = setInterval(() => {
+      setTimeLeft(t => {
+        if (t <= 1) {
+          clearInterval(timer);
+          if (!gameEndedRef.current) {
+            gameEndedRef.current = true;
+            setPhase("done");
+            setTimeout(() => onCompleteRef.current(collected.length), 1500);
+          }
+          return 0;
+        }
+        return t - 1;
+      });
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [phase, collected.length]);
+
+  // Check for win
+  useEffect(() => {
+    if (phase === "playing" && collected.length === 4 && !gameEndedRef.current) {
+      gameEndedRef.current = true;
+      setPhase("done");
+      setTimeout(() => onCompleteRef.current(4), 1500);
+    }
+  }, [collected, phase]);
+
+  // Animate hearts falling - MUCH slower and spawn needed letters
+  useEffect(() => {
+    if (phase !== "playing") return;
+
+    const animate = () => {
+      const now = Date.now();
+
+      // Spawn new hearts periodically
+      if (now - lastSpawnRef.current > 1200) {
+        lastSpawnRef.current = now;
+
+        // Figure out which letter we need next
+        const nextNeeded = targetWord[collected.length];
+
+        // 70% chance to spawn the needed letter, 30% random
+        const shouldSpawnNeeded = Math.random() < 0.7;
+        const letter = shouldSpawnNeeded && nextNeeded ? nextNeeded : targetWord[Math.floor(Math.random() * 4)];
+
+        setHearts(prev => {
+          // Keep max 5 hearts on screen
+          const recent = prev.slice(-4);
+          return [...recent, {
+            id: now,
+            letter,
+            x: 15 + Math.random() * 70,
+            y: -5,
+          }];
+        });
+      }
+
+      // Move hearts down - VERY SLOW
+      setHearts(prev => prev.map(h => ({ ...h, y: h.y + 0.15 })).filter(h => h.y < 95));
+
+      animFrameRef.current = requestAnimationFrame(animate);
+    };
+
+    animFrameRef.current = requestAnimationFrame(animate);
+    return () => cancelAnimationFrame(animFrameRef.current);
+  }, [phase, collected.length]);
+
+  // Tap a heart to collect it
+  const collectHeart = (id: number, letter: string) => {
+    // Check if this is the next letter we need
+    const nextNeeded = targetWord[collected.length];
+    if (letter === nextNeeded) {
+      setCollected(prev => [...prev, letter]);
+      setHearts(prev => prev.filter(h => h.id !== id));
+    }
+  };
+
+  // Tutorial
+  if (phase === "tutorial") {
+    return (
+      <div className="fixed inset-0 bg-gradient-to-b from-pink-400 to-purple-500 flex flex-col items-center justify-center p-6">
+        <div className="bg-white/95 rounded-3xl p-8 max-w-sm text-center shadow-2xl">
+          <div className="text-6xl mb-4">💌</div>
+          <h2 className="text-2xl font-bold text-pink-800 mb-3">Love Letter!</h2>
+          <p className="text-pink-600 mb-4">
+            Tap the hearts in order to spell <span className="font-bold text-red-500">LOVE</span>!
+          </p>
+          <div className="flex justify-center gap-2 my-4 text-3xl">
+            <span className="bg-pink-200 rounded-lg px-3 py-1">L</span>
+            <span className="text-pink-400">→</span>
+            <span className="bg-pink-200 rounded-lg px-3 py-1">O</span>
+            <span className="text-pink-400">→</span>
+            <span className="bg-pink-200 rounded-lg px-3 py-1">V</span>
+            <span className="text-pink-400">→</span>
+            <span className="bg-pink-200 rounded-lg px-3 py-1">E</span>
+          </div>
+          <p className="text-pink-500 text-sm mb-6">
+            First tap L, then O, then V, then E!<br/>Look for the letter you need!
+          </p>
+          <button
+            onClick={startGame}
+            className="w-full py-4 bg-gradient-to-r from-pink-500 to-purple-500 text-white rounded-2xl font-bold text-xl shadow-lg active:scale-95 transition-transform"
+          >
+            Got it! Let's go! 💕
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Done
+  if (phase === "done") {
+    return (
+      <div className="fixed inset-0 bg-gradient-to-b from-pink-400 to-purple-500 flex flex-col items-center justify-center p-6">
+        <div className="bg-white/95 rounded-3xl p-8 max-w-sm text-center shadow-2xl">
+          <div className="text-6xl mb-4">{collected.length === 4 ? "💌" : "💕"}</div>
+          <h2 className="text-3xl font-bold text-pink-800 mb-2">
+            {collected.length === 4 ? "LOVE Spelled!" : "Nice Try!"}
+          </h2>
+          <p className="text-5xl font-bold text-pink-600 mb-4">{collected.join("")} 💕</p>
+          <p className="text-pink-500">Moving to next challenge...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Playing
+  const nextNeeded = targetWord[collected.length];
+
+  return (
+    <div className="fixed inset-0 bg-gradient-to-b from-pink-400 to-purple-500 overflow-hidden select-none">
+      {/* Header */}
+      <div className="absolute top-4 left-0 right-0 flex justify-center gap-4 z-10">
+        <div className="bg-white/90 rounded-full px-4 py-2 shadow-lg">
+          <span className="text-lg font-bold text-pink-600">{timeLeft}s ⏱️</span>
+        </div>
+        <div className="bg-white/90 rounded-full px-4 py-2 shadow-lg flex gap-1">
+          {targetWord.map((l, i) => (
+            <span key={i} className={cn(
+              "w-10 h-10 rounded-lg flex items-center justify-center font-bold text-xl",
+              i < collected.length ? "bg-green-400 text-white" :
+              i === collected.length ? "bg-yellow-300 text-yellow-800 animate-pulse" :
+              "bg-pink-200 text-pink-400"
+            )}>
+              {i < collected.length ? collected[i] : l}
+            </span>
+          ))}
+        </div>
+      </div>
+
+      {/* Skip */}
+      <button
+        onClick={() => {
+          if (!gameEndedRef.current) {
+            gameEndedRef.current = true;
+            onComplete(collected.length);
+          }
+        }}
+        className="absolute top-4 right-4 bg-white/50 rounded-full px-3 py-1 text-pink-700 text-sm z-10"
+      >
+        Skip →
+      </button>
+
+      {/* What to look for */}
+      <div className="absolute top-20 left-0 right-0 text-center z-10">
+        <div className="inline-block bg-white/90 rounded-full px-6 py-2 shadow-lg">
+          <span className="text-lg text-pink-600">
+            Tap the <span className="font-bold text-2xl text-red-500">{nextNeeded}</span> heart!
+          </span>
+        </div>
+      </div>
+
+      {/* Falling hearts with letters - BIG tap targets */}
+      {hearts.map(h => (
+        <button
+          key={h.id}
+          onClick={() => collectHeart(h.id, h.letter)}
+          className={cn(
+            "absolute w-20 h-20 rounded-2xl flex items-center justify-center shadow-xl transition-transform active:scale-90",
+            h.letter === nextNeeded
+              ? "bg-gradient-to-br from-pink-400 to-rose-500 ring-4 ring-yellow-300"
+              : "bg-gradient-to-br from-pink-300 to-rose-400 opacity-60"
+          )}
+          style={{ left: `${h.x}%`, top: `${h.y}%`, transform: "translate(-50%, -50%)" }}
+        >
+          <span className="text-white text-3xl font-bold">{h.letter}</span>
+          <span className="absolute -top-1 -right-1 text-2xl">💖</span>
+        </button>
+      ))}
 
       {/* Instructions */}
       <div className="absolute bottom-8 left-0 right-0 text-center">
-        <p className="text-white/80 text-lg font-medium">👆 Move to catch L-O-V-E!</p>
+        <p className="text-white/90 text-lg font-medium">
+          👆 Tap hearts in order: {targetWord.map((l, i) => (
+            <span key={i} className={i < collected.length ? "line-through opacity-50" : i === collected.length ? "font-bold text-yellow-300" : ""}>
+              {l}
+            </span>
+          )).reduce((acc: React.ReactNode[], el, i) => i === 0 ? [el] : [...acc, " → ", el], [])}
+        </p>
       </div>
     </div>
   );
