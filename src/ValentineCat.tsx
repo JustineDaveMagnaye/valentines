@@ -24,10 +24,11 @@ type GameScene =
   | "intro_cutscene"
   | "chapter1_chase"
   | "chapter1_boss"
-  | "chapter2_puzzle"
-  | "chapter2_rhythm"
+  | "chapter2_love_letter"
+  | "chapter2_cupid"
+  | "chapter2_simon"
+  | "chapter3_boss_battle"
   | "chapter3_final"
-  | "boss_battle"
   | "ending_good"
   | "ending_perfect"
   | "ending_friend";
@@ -74,11 +75,12 @@ const INTRO_DIALOG: DialogLine[] = [
 
 const CHAPTER_TITLES = {
   chapter1_chase: { num: 1, title: "The Chase Begins", subtitle: "Catch that No button!" },
-  chapter1_boss: { num: 1, title: "Mini Boss", subtitle: "The Shield Cat Awakens" },
-  chapter2_puzzle: { num: 2, title: "Heart Puzzle", subtitle: "Piece together the love" },
-  chapter2_rhythm: { num: 2, title: "Dance of Hearts", subtitle: "Feel the beat!" },
+  chapter1_boss: { num: 1, title: "Heart Collector", subtitle: "Prove your love!" },
+  chapter2_love_letter: { num: 2, title: "Love Letter", subtitle: "Catch the letters!" },
+  chapter2_cupid: { num: 2, title: "Cupid's Arrow", subtitle: "Aim for the heart!" },
+  chapter2_simon: { num: 2, title: "Love Melody", subtitle: "Follow the rhythm of love!" },
+  chapter3_boss_battle: { num: "💀", title: "BOSS BATTLE", subtitle: "The Ultimate Test!" },
   chapter3_final: { num: 3, title: "Final Decision", subtitle: "The moment of truth" },
-  boss_battle: { num: "💀", title: "BOSS BATTLE", subtitle: "Ultimate Dramatic Cat" },
 };
 
 const CAT_EMOTIONS = {
@@ -396,20 +398,43 @@ function TapGame({ onComplete }: { onComplete: (score: number) => void }) {
   const [hearts, setHearts] = useState<Array<{ id: number; x: number; y: number; tapped: boolean }>>([]);
   const [timeLeft, setTimeLeft] = useState(10);
 
-  // Start game after tutorial
-  const startGame = () => setPhase("playing");
+  // Use refs to avoid stale closures and dependency issues
+  const scoreRef = useRef(score);
+  const onCompleteRef = useRef(onComplete);
+  const gameEndedRef = useRef(false);
 
-  // Timer
+  // Keep refs updated
+  useEffect(() => { scoreRef.current = score; }, [score]);
+  useEffect(() => { onCompleteRef.current = onComplete; }, [onComplete]);
+
+  // Start game after tutorial
+  const startGame = () => {
+    gameEndedRef.current = false;
+    setPhase("playing");
+  };
+
+  // Timer - runs independently once game starts
   useEffect(() => {
     if (phase !== "playing") return;
-    if (timeLeft <= 0) {
-      setPhase("done");
-      setTimeout(() => onComplete(score), 1500);
-      return;
-    }
-    const timer = setInterval(() => setTimeLeft(t => t - 1), 1000);
+
+    const timer = setInterval(() => {
+      setTimeLeft(t => {
+        if (t <= 1) {
+          // Time's up!
+          clearInterval(timer);
+          if (!gameEndedRef.current) {
+            gameEndedRef.current = true;
+            setPhase("done");
+            setTimeout(() => onCompleteRef.current(scoreRef.current), 1500);
+          }
+          return 0;
+        }
+        return t - 1;
+      });
+    }, 1000);
+
     return () => clearInterval(timer);
-  }, [timeLeft, phase, score, onComplete]);
+  }, [phase]); // Only depends on phase, not timeLeft
 
   // Spawn hearts in easy-to-reach positions
   useEffect(() => {
@@ -488,7 +513,12 @@ function TapGame({ onComplete }: { onComplete: (score: number) => void }) {
 
       {/* Skip button */}
       <button
-        onClick={() => onComplete(score)}
+        onClick={() => {
+          if (!gameEndedRef.current) {
+            gameEndedRef.current = true;
+            onComplete(score);
+          }
+        }}
         className="absolute top-4 right-4 bg-white/50 rounded-full px-3 py-1 text-pink-700 text-sm z-10"
       >
         Skip →
@@ -525,226 +555,129 @@ function TapGame({ onComplete }: { onComplete: (score: number) => void }) {
   );
 }
 
-// Simple match game - find the matching pairs!
-function MatchGame({ onComplete }: { onComplete: () => void }) {
+// ============================================================================
+// LOVE LETTER GAME - Catch falling letters to spell "LOVE"!
+// ============================================================================
+function LoveLetterGame({ onComplete }: { onComplete: (score: number) => void }) {
   const [phase, setPhase] = useState<"tutorial" | "playing" | "done">("tutorial");
-  const [cards, setCards] = useState<Array<{ id: number; emoji: string; flipped: boolean; matched: boolean }>>([]);
-  const [flippedIds, setFlippedIds] = useState<number[]>([]);
-  const [matches, setMatches] = useState(0);
-  const [canFlip, setCanFlip] = useState(true);
-
-  const emojis = ["💖", "💕", "💗", "💘"];
-  const totalPairs = 4;
-
-  // Initialize cards
-  useEffect(() => {
-    const pairs = emojis.flatMap((emoji, i) => [
-      { id: i * 2, emoji, flipped: false, matched: false },
-      { id: i * 2 + 1, emoji, flipped: false, matched: false },
-    ]);
-    // Simple shuffle
-    for (let i = pairs.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [pairs[i], pairs[j]] = [pairs[j], pairs[i]];
-    }
-    setCards(pairs);
-  }, []);
-
-  const startGame = () => setPhase("playing");
-
-  const flipCard = (id: number) => {
-    if (!canFlip || phase !== "playing") return;
-    const card = cards.find(c => c.id === id);
-    if (!card || card.flipped || card.matched) return;
-
-    // Flip the card
-    setCards(prev => prev.map(c => c.id === id ? { ...c, flipped: true } : c));
-    const newFlipped = [...flippedIds, id];
-    setFlippedIds(newFlipped);
-
-    // Check for match when 2 cards flipped
-    if (newFlipped.length === 2) {
-      setCanFlip(false);
-      const [first, second] = newFlipped.map(fid => cards.find(c => c.id === fid)!);
-
-      setTimeout(() => {
-        if (first.emoji === second.emoji) {
-          // Match!
-          setCards(prev => prev.map(c =>
-            c.id === first.id || c.id === second.id ? { ...c, matched: true } : c
-          ));
-          setMatches(m => {
-            const newMatches = m + 1;
-            if (newMatches >= totalPairs) {
-              setPhase("done");
-              setTimeout(() => onComplete(), 1500);
-            }
-            return newMatches;
-          });
-        } else {
-          // No match - flip back
-          setCards(prev => prev.map(c =>
-            c.id === first.id || c.id === second.id ? { ...c, flipped: false } : c
-          ));
-        }
-        setFlippedIds([]);
-        setCanFlip(true);
-      }, 800);
-    }
-  };
-
-  // Tutorial screen
-  if (phase === "tutorial") {
-    return (
-      <div className="fixed inset-0 bg-gradient-to-b from-purple-400 to-indigo-500 flex flex-col items-center justify-center p-6">
-        <div className="bg-white/95 rounded-3xl p-8 max-w-sm text-center shadow-2xl">
-          <div className="text-6xl mb-4">🎴</div>
-          <h2 className="text-2xl font-bold text-purple-800 mb-3">Memory Match!</h2>
-          <p className="text-purple-600 mb-2">
-            Find the matching heart pairs!
-          </p>
-          <div className="flex justify-center gap-2 my-4">
-            <div className="w-12 h-12 bg-purple-200 rounded-lg flex items-center justify-center text-2xl">💖</div>
-            <div className="w-12 h-12 bg-purple-200 rounded-lg flex items-center justify-center text-2xl">💖</div>
-            <span className="self-center text-2xl">✓</span>
-          </div>
-          <p className="text-purple-500 text-sm mb-6">
-            Tap two cards to flip them.<br/>Match all 4 pairs to win!
-          </p>
-          <button
-            onClick={startGame}
-            className="w-full py-4 bg-gradient-to-r from-purple-500 to-indigo-500 text-white rounded-2xl font-bold text-xl shadow-lg active:scale-95 transition-transform"
-          >
-            Let's Play! 🎮
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  // Done screen
-  if (phase === "done") {
-    return (
-      <div className="fixed inset-0 bg-gradient-to-b from-purple-400 to-indigo-500 flex flex-col items-center justify-center p-6">
-        <div className="bg-white/95 rounded-3xl p-8 max-w-sm text-center shadow-2xl">
-          <div className="text-6xl mb-4">🏆</div>
-          <h2 className="text-3xl font-bold text-purple-800 mb-2">Perfect!</h2>
-          <p className="text-purple-600 mb-4">You found all the pairs!</p>
-          <p className="text-purple-500">Moving to next challenge...</p>
-        </div>
-      </div>
-    );
-  }
-
-  // Playing
-  return (
-    <div className="fixed inset-0 bg-gradient-to-b from-purple-400 to-indigo-500 flex flex-col items-center justify-center p-4">
-      {/* Header */}
-      <div className="mb-6">
-        <div className="bg-white/90 rounded-full px-6 py-2 shadow-lg">
-          <span className="text-xl font-bold text-purple-600">Matches: {matches}/{totalPairs} 💕</span>
-        </div>
-      </div>
-
-      {/* Skip button */}
-      <button
-        onClick={onComplete}
-        className="absolute top-4 right-4 bg-white/50 rounded-full px-3 py-1 text-purple-700 text-sm"
-      >
-        Skip →
-      </button>
-
-      {/* Card grid */}
-      <div className="grid grid-cols-4 gap-3">
-        {cards.map(card => (
-          <button
-            key={card.id}
-            onClick={() => flipCard(card.id)}
-            disabled={card.flipped || card.matched || !canFlip}
-            className={cn(
-              "w-16 h-20 rounded-xl text-3xl flex items-center justify-center transition-all shadow-lg",
-              card.matched && "bg-green-300 scale-95",
-              card.flipped && !card.matched && "bg-white",
-              !card.flipped && !card.matched && "bg-purple-600 hover:bg-purple-500 active:scale-95"
-            )}
-          >
-            {(card.flipped || card.matched) ? card.emoji : "❓"}
-          </button>
-        ))}
-      </div>
-
-      {/* Hint */}
-      <p className="mt-6 text-white/80 text-center">👆 Tap cards to find matches!</p>
-    </div>
-  );
-}
-
-// Simple slider - drag the heart to the goal!
-function SliderGame({ onComplete }: { onComplete: (score: number) => void }) {
-  const [phase, setPhase] = useState<"tutorial" | "playing" | "done">("tutorial");
+  const [collected, setCollected] = useState<string[]>([]);
+  const [letters, setLetters] = useState<Array<{ id: number; letter: string; x: number; y: number; caught: boolean }>>([]);
+  const [basketX, setBasketX] = useState(50);
   const [score, setScore] = useState(0);
   const [round, setRound] = useState(0);
-  const [heartX, setHeartX] = useState(50);
-  const [goalX, setGoalX] = useState(75);
-  const [isDragging, setIsDragging] = useState(false);
-  const totalRounds = 5;
+  const targetWord = "LOVE";
+  const totalRounds = 3;
+
+  const onCompleteRef = useRef(onComplete);
+  const gameEndedRef = useRef(false);
+  const animFrameRef = useRef<number>(0);
+
+  useEffect(() => { onCompleteRef.current = onComplete; }, [onComplete]);
 
   const startGame = () => {
+    gameEndedRef.current = false;
     setPhase("playing");
-    newRound();
+    spawnLetters();
   };
 
-  const newRound = () => {
-    setHeartX(10 + Math.random() * 30); // Start on left side
-    setGoalX(60 + Math.random() * 30); // Goal on right side
+  const spawnLetters = () => {
+    // Spawn L, O, V, E plus some decoys
+    const needed = targetWord.split("");
+    const decoys = ["X", "Z", "Q", "W", "K"];
+    const all = [...needed, ...decoys.slice(0, 3)];
+    // Shuffle
+    for (let i = all.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [all[i], all[j]] = [all[j], all[i]];
+    }
+    setLetters(all.map((letter, i) => ({
+      id: Date.now() + i,
+      letter,
+      x: 10 + (i * 12) + Math.random() * 5,
+      y: -10 - (i * 15),
+      caught: false,
+    })));
+    setCollected([]);
   };
+
+  // Animate letters falling
+  useEffect(() => {
+    if (phase !== "playing") return;
+
+    const animate = () => {
+      setLetters(prev => {
+        const updated = prev.map(l => {
+          if (l.caught) return l;
+          const newY = l.y + 0.5;
+          // Check if caught by basket
+          if (newY >= 75 && newY <= 85 && Math.abs(l.x - basketX) < 12) {
+            // Caught!
+            const isTarget = targetWord.includes(l.letter);
+            if (isTarget) {
+              setCollected(c => {
+                const newCollected = [...c, l.letter];
+                // Check if spelled LOVE
+                if (newCollected.join("") === targetWord) {
+                  setScore(s => s + 1);
+                  const nextRound = round + 1;
+                  if (nextRound >= totalRounds && !gameEndedRef.current) {
+                    gameEndedRef.current = true;
+                    setTimeout(() => {
+                      setPhase("done");
+                      setTimeout(() => onCompleteRef.current(score + 1), 1500);
+                    }, 500);
+                  } else {
+                    setRound(nextRound);
+                    setTimeout(spawnLetters, 800);
+                  }
+                }
+                return newCollected;
+              });
+            }
+            return { ...l, caught: true };
+          }
+          // Miss if too low
+          if (newY > 100) return { ...l, caught: true };
+          return { ...l, y: newY };
+        });
+        return updated;
+      });
+      animFrameRef.current = requestAnimationFrame(animate);
+    };
+
+    animFrameRef.current = requestAnimationFrame(animate);
+    return () => cancelAnimationFrame(animFrameRef.current);
+  }, [phase, basketX, round, score]);
 
   const handleMove = (clientX: number) => {
-    if (!isDragging || phase !== "playing") return;
     const pct = (clientX / window.innerWidth) * 100;
-    setHeartX(Math.max(5, Math.min(95, pct)));
-  };
-
-  const checkGoal = () => {
-    if (Math.abs(heartX - goalX) < 10) {
-      // Success!
-      setScore(s => s + 1);
-    }
-    const nextRound = round + 1;
-    if (nextRound >= totalRounds) {
-      setPhase("done");
-      setTimeout(() => onComplete(score + (Math.abs(heartX - goalX) < 10 ? 1 : 0)), 1500);
-    } else {
-      setRound(nextRound);
-      newRound();
-    }
+    setBasketX(Math.max(10, Math.min(90, pct)));
   };
 
   // Tutorial
   if (phase === "tutorial") {
     return (
-      <div className="fixed inset-0 bg-gradient-to-b from-amber-400 to-orange-500 flex flex-col items-center justify-center p-6">
+      <div className="fixed inset-0 bg-gradient-to-b from-pink-400 to-purple-500 flex flex-col items-center justify-center p-6">
         <div className="bg-white/95 rounded-3xl p-8 max-w-sm text-center shadow-2xl">
-          <div className="text-6xl mb-4">👆</div>
-          <h2 className="text-2xl font-bold text-amber-800 mb-3">Slide to Love!</h2>
-          <p className="text-amber-600 mb-4">
-            Drag the heart 💖 to the goal 🎯
+          <div className="text-6xl mb-4">💌</div>
+          <h2 className="text-2xl font-bold text-pink-800 mb-3">Love Letter!</h2>
+          <p className="text-pink-600 mb-4">
+            Catch the letters to spell <span className="font-bold text-red-500">LOVE</span>!
           </p>
-          <div className="bg-amber-100 rounded-xl p-4 mb-4">
-            <div className="flex items-center justify-between">
-              <span className="text-3xl">💖</span>
-              <span className="text-amber-400">→ → →</span>
-              <span className="text-3xl">🎯</span>
-            </div>
+          <div className="flex justify-center gap-2 my-4 text-3xl">
+            <span className="bg-pink-200 rounded-lg px-3 py-1">L</span>
+            <span className="bg-pink-200 rounded-lg px-3 py-1">O</span>
+            <span className="bg-pink-200 rounded-lg px-3 py-1">V</span>
+            <span className="bg-pink-200 rounded-lg px-3 py-1">E</span>
           </div>
-          <p className="text-amber-500 text-sm mb-6">
-            Release when you're close!<br/>5 rounds total.
+          <p className="text-pink-500 text-sm mb-6">
+            Move the basket to catch letters!<br/>Avoid wrong letters!
           </p>
           <button
             onClick={startGame}
-            className="w-full py-4 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-2xl font-bold text-xl shadow-lg active:scale-95 transition-transform"
+            className="w-full py-4 bg-gradient-to-r from-pink-500 to-purple-500 text-white rounded-2xl font-bold text-xl shadow-lg active:scale-95 transition-transform"
           >
-            Start! 🎮
+            Start Catching! 💕
           </button>
         </div>
       </div>
@@ -754,12 +687,12 @@ function SliderGame({ onComplete }: { onComplete: (score: number) => void }) {
   // Done
   if (phase === "done") {
     return (
-      <div className="fixed inset-0 bg-gradient-to-b from-amber-400 to-orange-500 flex flex-col items-center justify-center p-6">
+      <div className="fixed inset-0 bg-gradient-to-b from-pink-400 to-purple-500 flex flex-col items-center justify-center p-6">
         <div className="bg-white/95 rounded-3xl p-8 max-w-sm text-center shadow-2xl">
-          <div className="text-6xl mb-4">⭐</div>
-          <h2 className="text-3xl font-bold text-amber-800 mb-2">Nice!</h2>
-          <p className="text-5xl font-bold text-amber-600 mb-4">{score}/{totalRounds}</p>
-          <p className="text-amber-500">Moving on...</p>
+          <div className="text-6xl mb-4">💌</div>
+          <h2 className="text-3xl font-bold text-pink-800 mb-2">Love Letter Complete!</h2>
+          <p className="text-5xl font-bold text-pink-600 mb-4">{score}/{totalRounds} 💕</p>
+          <p className="text-pink-500">Moving to next challenge...</p>
         </div>
       </div>
     );
@@ -768,71 +701,764 @@ function SliderGame({ onComplete }: { onComplete: (score: number) => void }) {
   // Playing
   return (
     <div
-      className="fixed inset-0 bg-gradient-to-b from-amber-400 to-orange-500 flex flex-col items-center justify-center select-none"
+      className="fixed inset-0 bg-gradient-to-b from-pink-400 to-purple-500 overflow-hidden select-none"
       onMouseMove={(e) => handleMove(e.clientX)}
-      onMouseUp={checkGoal}
       onTouchMove={(e) => handleMove(e.touches[0].clientX)}
-      onTouchEnd={checkGoal}
       style={{ touchAction: "none" }}
     >
       {/* Header */}
-      <div className="absolute top-4 left-0 right-0 flex justify-center gap-6 z-10">
-        <div className="bg-white/90 rounded-full px-5 py-2 shadow-lg">
-          <span className="text-lg font-bold text-amber-600">Round {round + 1}/{totalRounds}</span>
+      <div className="absolute top-4 left-0 right-0 flex justify-center gap-4 z-10">
+        <div className="bg-white/90 rounded-full px-4 py-2 shadow-lg">
+          <span className="text-lg font-bold text-pink-600">Round {round + 1}/{totalRounds}</span>
         </div>
-        <div className="bg-white/90 rounded-full px-5 py-2 shadow-lg">
-          <span className="text-lg font-bold text-amber-600">Score: {score}</span>
+        <div className="bg-white/90 rounded-full px-4 py-2 shadow-lg flex gap-1">
+          {targetWord.split("").map((l, i) => (
+            <span key={i} className={cn(
+              "w-8 h-8 rounded flex items-center justify-center font-bold text-lg",
+              collected.includes(l) && collected.indexOf(l) <= i ? "bg-green-400 text-white" : "bg-pink-200 text-pink-400"
+            )}>
+              {collected[i] || "?"}
+            </span>
+          ))}
         </div>
       </div>
 
       {/* Skip */}
       <button
-        onClick={() => onComplete(score)}
-        className="absolute top-4 right-4 bg-white/50 rounded-full px-3 py-1 text-amber-700 text-sm z-10"
+        onClick={() => {
+          if (!gameEndedRef.current) {
+            gameEndedRef.current = true;
+            onComplete(score);
+          }
+        }}
+        className="absolute top-4 right-4 bg-white/50 rounded-full px-3 py-1 text-pink-700 text-sm z-10"
       >
         Skip →
       </button>
 
-      {/* Game area */}
-      <div className="w-full px-8">
-        {/* Track */}
-        <div className="relative h-24 bg-white/30 rounded-full">
-          {/* Goal */}
-          <div
-            className="absolute top-1/2 -translate-y-1/2 text-5xl"
-            style={{ left: `${goalX}%`, transform: `translate(-50%, -50%)` }}
-          >
-            🎯
-          </div>
-
-          {/* Heart (draggable) */}
-          <button
-            className={cn(
-              "absolute top-1/2 -translate-y-1/2 text-5xl transition-transform",
-              isDragging && "scale-125"
-            )}
-            style={{ left: `${heartX}%`, transform: `translate(-50%, -50%)` }}
-            onMouseDown={() => setIsDragging(true)}
-            onTouchStart={() => setIsDragging(true)}
-          >
-            💖
-          </button>
+      {/* Falling letters */}
+      {letters.filter(l => !l.caught).map(l => (
+        <div
+          key={l.id}
+          className={cn(
+            "absolute text-4xl font-bold w-12 h-12 rounded-xl flex items-center justify-center shadow-lg transition-transform",
+            targetWord.includes(l.letter) ? "bg-white text-pink-600" : "bg-gray-300 text-gray-500"
+          )}
+          style={{ left: `${l.x}%`, top: `${l.y}%`, transform: "translate(-50%, -50%)" }}
+        >
+          {l.letter}
         </div>
+      ))}
+
+      {/* Basket */}
+      <div
+        className="absolute bottom-20 text-6xl transition-all"
+        style={{ left: `${basketX}%`, transform: "translateX(-50%)" }}
+      >
+        🧺
       </div>
 
       {/* Instructions */}
-      <p className="mt-8 text-white text-lg font-medium text-center">
-        {isDragging ? "Release near the goal! 🎯" : "👆 Drag the heart!"}
-      </p>
+      <div className="absolute bottom-8 left-0 right-0 text-center">
+        <p className="text-white/80 text-lg font-medium">👆 Move to catch L-O-V-E!</p>
+      </div>
+    </div>
+  );
+}
 
-      {/* Distance indicator */}
-      <div className="mt-4 bg-white/80 rounded-full px-4 py-2">
-        <span className={cn(
-          "font-bold",
-          Math.abs(heartX - goalX) < 10 ? "text-green-600" : "text-amber-600"
-        )}>
-          {Math.abs(heartX - goalX) < 10 ? "Perfect! ✓" : `Distance: ${Math.abs(Math.round(heartX - goalX))}`}
-        </span>
+// ============================================================================
+// CUPID'S ARROW GAME - Aim and shoot hearts at targets!
+// ============================================================================
+function CupidArrowGame({ onComplete }: { onComplete: (score: number) => void }) {
+  const [phase, setPhase] = useState<"tutorial" | "playing" | "done">("tutorial");
+  const [score, setScore] = useState(0);
+  const [arrows, setArrows] = useState(5);
+  const [angle, setAngle] = useState(45);
+  const [power, setPower] = useState(50);
+  const [isAiming, setIsAiming] = useState(true);
+  const [arrowPos, setArrowPos] = useState<{ x: number; y: number } | null>(null);
+  const [targets, setTargets] = useState<Array<{ id: number; x: number; y: number; hit: boolean; emoji: string }>>([]);
+
+  const onCompleteRef = useRef(onComplete);
+  const gameEndedRef = useRef(false);
+  const animRef = useRef<number>(0);
+
+  useEffect(() => { onCompleteRef.current = onComplete; }, [onComplete]);
+
+  const spawnTargets = () => {
+    const emojis = ["💖", "💕", "💗", "😻", "💘"];
+    setTargets([
+      { id: 1, x: 60 + Math.random() * 20, y: 20 + Math.random() * 20, hit: false, emoji: emojis[0] },
+      { id: 2, x: 50 + Math.random() * 30, y: 40 + Math.random() * 15, hit: false, emoji: emojis[1] },
+      { id: 3, x: 70 + Math.random() * 20, y: 55 + Math.random() * 15, hit: false, emoji: emojis[2] },
+    ]);
+  };
+
+  const startGame = () => {
+    gameEndedRef.current = false;
+    setPhase("playing");
+    spawnTargets();
+  };
+
+  const shoot = () => {
+    if (!isAiming || arrows <= 0) return;
+    setIsAiming(false);
+    setArrows(a => a - 1);
+
+    // Animate arrow
+    const radians = (angle * Math.PI) / 180;
+    const velocity = power * 0.15;
+    let x = 10;
+    let y = 80;
+    let vx = Math.cos(radians) * velocity;
+    let vy = -Math.sin(radians) * velocity;
+
+    const animate = () => {
+      x += vx;
+      vy += 0.3; // gravity
+      y += vy;
+
+      setArrowPos({ x, y });
+
+      // Check hits
+      setTargets(prev => {
+        const updated = prev.map(t => {
+          if (!t.hit && Math.abs(x - t.x) < 8 && Math.abs(y - t.y) < 8) {
+            setScore(s => s + 1);
+            return { ...t, hit: true };
+          }
+          return t;
+        });
+        return updated;
+      });
+
+      // Continue or stop
+      if (x < 100 && y < 100 && y > 0) {
+        animRef.current = requestAnimationFrame(animate);
+      } else {
+        // Arrow done
+        setArrowPos(null);
+        setIsAiming(true);
+
+        // Check end conditions
+        setTimeout(() => {
+          setTargets(current => {
+            const allHit = current.every(t => t.hit);
+            const arrowsLeft = arrows - 1;
+
+            if ((allHit || arrowsLeft <= 0) && !gameEndedRef.current) {
+              gameEndedRef.current = true;
+              setPhase("done");
+              const finalScore = current.filter(t => t.hit).length;
+              setTimeout(() => onCompleteRef.current(finalScore), 1500);
+            }
+            return current;
+          });
+        }, 100);
+      }
+    };
+
+    animRef.current = requestAnimationFrame(animate);
+  };
+
+  useEffect(() => {
+    return () => cancelAnimationFrame(animRef.current);
+  }, []);
+
+  // Tutorial
+  if (phase === "tutorial") {
+    return (
+      <div className="fixed inset-0 bg-gradient-to-b from-red-400 to-pink-500 flex flex-col items-center justify-center p-6">
+        <div className="bg-white/95 rounded-3xl p-8 max-w-sm text-center shadow-2xl">
+          <div className="text-6xl mb-4">🏹</div>
+          <h2 className="text-2xl font-bold text-red-800 mb-3">Cupid's Arrow!</h2>
+          <p className="text-red-600 mb-4">
+            Shoot arrows at the hearts!
+          </p>
+          <div className="bg-red-100 rounded-xl p-4 mb-4">
+            <p className="text-sm text-red-700">
+              1. Adjust <strong>angle</strong> (up/down)<br/>
+              2. Set <strong>power</strong> (strength)<br/>
+              3. Tap <strong>SHOOT!</strong> 🏹
+            </p>
+          </div>
+          <button
+            onClick={startGame}
+            className="w-full py-4 bg-gradient-to-r from-red-500 to-pink-500 text-white rounded-2xl font-bold text-xl shadow-lg active:scale-95 transition-transform"
+          >
+            Let's Go! 💘
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Done
+  if (phase === "done") {
+    return (
+      <div className="fixed inset-0 bg-gradient-to-b from-red-400 to-pink-500 flex flex-col items-center justify-center p-6">
+        <div className="bg-white/95 rounded-3xl p-8 max-w-sm text-center shadow-2xl">
+          <div className="text-6xl mb-4">🎯</div>
+          <h2 className="text-3xl font-bold text-red-800 mb-2">Nice Shooting!</h2>
+          <p className="text-5xl font-bold text-red-600 mb-4">{score}/3 💘</p>
+          <p className="text-red-500">Moving to next challenge...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Playing
+  return (
+    <div className="fixed inset-0 bg-gradient-to-b from-sky-300 to-sky-500 overflow-hidden select-none">
+      {/* Header */}
+      <div className="absolute top-4 left-0 right-0 flex justify-center gap-4 z-10">
+        <div className="bg-white/90 rounded-full px-4 py-2 shadow-lg">
+          <span className="text-lg font-bold text-red-600">🏹 {arrows}</span>
+        </div>
+        <div className="bg-white/90 rounded-full px-4 py-2 shadow-lg">
+          <span className="text-lg font-bold text-red-600">💘 {score}/3</span>
+        </div>
+      </div>
+
+      {/* Skip */}
+      <button
+        onClick={() => {
+          if (!gameEndedRef.current) {
+            gameEndedRef.current = true;
+            onComplete(score);
+          }
+        }}
+        className="absolute top-4 right-4 bg-white/50 rounded-full px-3 py-1 text-red-700 text-sm z-10"
+      >
+        Skip →
+      </button>
+
+      {/* Targets */}
+      {targets.map(t => (
+        <div
+          key={t.id}
+          className={cn(
+            "absolute text-5xl transition-all",
+            t.hit && "opacity-30 scale-75"
+          )}
+          style={{ left: `${t.x}%`, top: `${t.y}%`, transform: "translate(-50%, -50%)" }}
+        >
+          {t.hit ? "✨" : t.emoji}
+        </div>
+      ))}
+
+      {/* Arrow in flight */}
+      {arrowPos && (
+        <div
+          className="absolute text-3xl"
+          style={{ left: `${arrowPos.x}%`, top: `${arrowPos.y}%`, transform: "translate(-50%, -50%) rotate(45deg)" }}
+        >
+          ➳
+        </div>
+      )}
+
+      {/* Bow & controls */}
+      <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-green-600 to-transparent pt-20">
+        {/* Bow */}
+        <div
+          className="absolute left-8 bottom-32 text-6xl origin-center"
+          style={{ transform: `rotate(-${angle}deg)` }}
+        >
+          🏹
+        </div>
+
+        {/* Controls */}
+        <div className="flex flex-col gap-3 max-w-xs mx-auto">
+          <div className="flex items-center gap-3">
+            <span className="text-white text-sm w-16">Angle:</span>
+            <input
+              type="range"
+              min="10"
+              max="80"
+              value={angle}
+              onChange={(e) => setAngle(Number(e.target.value))}
+              className="flex-1 h-2 rounded-full appearance-none bg-white/50"
+              disabled={!isAiming}
+            />
+            <span className="text-white text-sm w-10">{angle}°</span>
+          </div>
+          <div className="flex items-center gap-3">
+            <span className="text-white text-sm w-16">Power:</span>
+            <input
+              type="range"
+              min="20"
+              max="100"
+              value={power}
+              onChange={(e) => setPower(Number(e.target.value))}
+              className="flex-1 h-2 rounded-full appearance-none bg-white/50"
+              disabled={!isAiming}
+            />
+            <span className="text-white text-sm w-10">{power}%</span>
+          </div>
+          <button
+            onClick={shoot}
+            disabled={!isAiming || arrows <= 0}
+            className="w-full py-3 bg-red-500 text-white rounded-xl font-bold text-lg shadow-lg active:scale-95 transition-transform disabled:opacity-50"
+          >
+            SHOOT! 🏹
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================================
+// SIMON SAYS LOVE - Repeat the heart pattern!
+// ============================================================================
+function SimonLoveGame({ onComplete }: { onComplete: (score: number) => void }) {
+  const [phase, setPhase] = useState<"tutorial" | "showing" | "input" | "done">("tutorial");
+  const [pattern, setPattern] = useState<number[]>([]);
+  const [playerInput, setPlayerInput] = useState<number[]>([]);
+  const [activeButton, setActiveButton] = useState<number | null>(null);
+  const [round, setRound] = useState(0);
+  const [score, setScore] = useState(0);
+  const maxRounds = 4;
+
+  const hearts = ["💖", "💕", "💗", "💘"];
+  const colors = ["bg-pink-500", "bg-red-500", "bg-rose-500", "bg-fuchsia-500"];
+
+  const onCompleteRef = useRef(onComplete);
+  const gameEndedRef = useRef(false);
+
+  useEffect(() => { onCompleteRef.current = onComplete; }, [onComplete]);
+
+  const startGame = () => {
+    gameEndedRef.current = false;
+    nextRound([]);
+  };
+
+  const nextRound = (currentPattern: number[]) => {
+    const newPattern = [...currentPattern, Math.floor(Math.random() * 4)];
+    setPattern(newPattern);
+    setPlayerInput([]);
+    setRound(r => r + 1);
+    showPattern(newPattern);
+  };
+
+  const showPattern = async (pat: number[]) => {
+    setPhase("showing");
+    for (let i = 0; i < pat.length; i++) {
+      await new Promise(r => setTimeout(r, 400));
+      setActiveButton(pat[i]);
+      await new Promise(r => setTimeout(r, 500));
+      setActiveButton(null);
+    }
+    await new Promise(r => setTimeout(r, 300));
+    setPhase("input");
+  };
+
+  const handleInput = (index: number) => {
+    if (phase !== "input") return;
+
+    setActiveButton(index);
+    setTimeout(() => setActiveButton(null), 200);
+
+    const newInput = [...playerInput, index];
+    setPlayerInput(newInput);
+
+    // Check if correct so far
+    if (pattern[newInput.length - 1] !== index) {
+      // Wrong! Game over
+      if (!gameEndedRef.current) {
+        gameEndedRef.current = true;
+        setPhase("done");
+        setTimeout(() => onCompleteRef.current(score), 1500);
+      }
+      return;
+    }
+
+    // Completed this round?
+    if (newInput.length === pattern.length) {
+      setScore(s => s + 1);
+
+      if (round >= maxRounds) {
+        // Won!
+        if (!gameEndedRef.current) {
+          gameEndedRef.current = true;
+          setPhase("done");
+          setTimeout(() => onCompleteRef.current(score + 1), 1500);
+        }
+      } else {
+        // Next round
+        setTimeout(() => nextRound(pattern), 800);
+      }
+    }
+  };
+
+  // Tutorial
+  if (phase === "tutorial") {
+    return (
+      <div className="fixed inset-0 bg-gradient-to-b from-purple-500 to-indigo-600 flex flex-col items-center justify-center p-6">
+        <div className="bg-white/95 rounded-3xl p-8 max-w-sm text-center shadow-2xl">
+          <div className="text-6xl mb-4">🎵</div>
+          <h2 className="text-2xl font-bold text-purple-800 mb-3">Love Melody!</h2>
+          <p className="text-purple-600 mb-4">
+            Watch the hearts light up, then<br/>repeat the pattern!
+          </p>
+          <div className="grid grid-cols-2 gap-2 my-4">
+            {hearts.map((h, i) => (
+              <div key={i} className={cn("p-4 rounded-xl text-3xl", colors[i], "opacity-70")}>
+                {h}
+              </div>
+            ))}
+          </div>
+          <p className="text-purple-500 text-sm mb-6">
+            The pattern gets longer each round!<br/>How far can you go?
+          </p>
+          <button
+            onClick={startGame}
+            className="w-full py-4 bg-gradient-to-r from-purple-500 to-indigo-500 text-white rounded-2xl font-bold text-xl shadow-lg active:scale-95 transition-transform"
+          >
+            I'm Ready! 🎵
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Done
+  if (phase === "done") {
+    return (
+      <div className="fixed inset-0 bg-gradient-to-b from-purple-500 to-indigo-600 flex flex-col items-center justify-center p-6">
+        <div className="bg-white/95 rounded-3xl p-8 max-w-sm text-center shadow-2xl">
+          <div className="text-6xl mb-4">{score >= maxRounds ? "🏆" : "💫"}</div>
+          <h2 className="text-3xl font-bold text-purple-800 mb-2">
+            {score >= maxRounds ? "Perfect Memory!" : "Nice Try!"}
+          </h2>
+          <p className="text-5xl font-bold text-purple-600 mb-4">{score}/{maxRounds} 🎵</p>
+          <p className="text-purple-500">Moving to next challenge...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Showing / Input
+  return (
+    <div className="fixed inset-0 bg-gradient-to-b from-purple-500 to-indigo-600 flex flex-col items-center justify-center p-6">
+      {/* Header */}
+      <div className="absolute top-4 left-0 right-0 flex justify-center gap-4 z-10">
+        <div className="bg-white/90 rounded-full px-4 py-2 shadow-lg">
+          <span className="text-lg font-bold text-purple-600">Round {round}/{maxRounds}</span>
+        </div>
+        <div className="bg-white/90 rounded-full px-4 py-2 shadow-lg">
+          <span className="text-lg font-bold text-purple-600">Score: {score} 🎵</span>
+        </div>
+      </div>
+
+      {/* Skip */}
+      <button
+        onClick={() => {
+          if (!gameEndedRef.current) {
+            gameEndedRef.current = true;
+            onComplete(score);
+          }
+        }}
+        className="absolute top-4 right-4 bg-white/50 rounded-full px-3 py-1 text-purple-700 text-sm z-10"
+      >
+        Skip →
+      </button>
+
+      {/* Status */}
+      <div className="mb-8">
+        <div className="bg-white/90 rounded-full px-6 py-2 shadow-lg">
+          <span className="text-lg font-bold text-purple-600">
+            {phase === "showing" ? "Watch... 👀" : "Your turn! 👆"}
+          </span>
+        </div>
+      </div>
+
+      {/* Heart buttons */}
+      <div className="grid grid-cols-2 gap-4">
+        {hearts.map((heart, i) => (
+          <button
+            key={i}
+            onClick={() => handleInput(i)}
+            disabled={phase !== "input"}
+            className={cn(
+              "w-24 h-24 rounded-2xl text-5xl flex items-center justify-center transition-all shadow-xl",
+              colors[i],
+              activeButton === i && "scale-110 brightness-125 ring-4 ring-white",
+              phase !== "input" && "cursor-not-allowed"
+            )}
+          >
+            {heart}
+          </button>
+        ))}
+      </div>
+
+      {/* Progress dots */}
+      <div className="mt-8 flex gap-2">
+        {pattern.map((_, i) => (
+          <div
+            key={i}
+            className={cn(
+              "w-3 h-3 rounded-full transition-all",
+              i < playerInput.length ? "bg-green-400" : "bg-white/50"
+            )}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ============================================================================
+// BOSS BATTLE - Defeat the dramatic cat with love!
+// ============================================================================
+function BossBattleGame({ onComplete }: { onComplete: (won: boolean) => void }) {
+  const [phase, setPhase] = useState<"intro" | "battle" | "victory" | "defeat">("intro");
+  const [bossHP, setBossHP] = useState(100);
+  const [playerLove, setPlayerLove] = useState(100);
+  const [bossAttacking, setBossAttacking] = useState(false);
+  const [hearts, setHearts] = useState<Array<{ id: number; x: number; y: number }>>([]);
+  const [shieldActive, setShieldActive] = useState(false);
+  const [comboCount, setComboCount] = useState(0);
+
+  const onCompleteRef = useRef(onComplete);
+  const gameEndedRef = useRef(false);
+
+  useEffect(() => { onCompleteRef.current = onComplete; }, [onComplete]);
+
+  const startBattle = () => {
+    setPhase("battle");
+    // Start boss attack pattern
+    startBossAttacks();
+  };
+
+  const startBossAttacks = () => {
+    const attack = () => {
+      if (gameEndedRef.current) return;
+
+      setBossAttacking(true);
+      setTimeout(() => {
+        setBossAttacking(false);
+        // Damage player if not shielded
+        setShieldActive(current => {
+          if (!current) {
+            setPlayerLove(hp => {
+              const newHP = Math.max(0, hp - 15);
+              if (newHP <= 0 && !gameEndedRef.current) {
+                gameEndedRef.current = true;
+                setPhase("defeat");
+                setTimeout(() => onCompleteRef.current(false), 2000);
+              }
+              return newHP;
+            });
+          }
+          return false;
+        });
+      }, 1000);
+
+      // Schedule next attack
+      if (!gameEndedRef.current) {
+        setTimeout(attack, 2500 + Math.random() * 1500);
+      }
+    };
+    setTimeout(attack, 2000);
+  };
+
+  // Spawn clickable hearts
+  useEffect(() => {
+    if (phase !== "battle") return;
+
+    const spawn = setInterval(() => {
+      if (gameEndedRef.current) return;
+      setHearts(prev => [...prev.slice(-5), {
+        id: Date.now(),
+        x: 20 + Math.random() * 60,
+        y: 30 + Math.random() * 40,
+      }]);
+    }, 800);
+
+    return () => clearInterval(spawn);
+  }, [phase]);
+
+  const collectHeart = (id: number) => {
+    setHearts(prev => prev.filter(h => h.id !== id));
+    setComboCount(c => c + 1);
+
+    // Damage boss
+    const damage = 8 + Math.min(comboCount, 5) * 2; // Combo bonus
+    setBossHP(hp => {
+      const newHP = Math.max(0, hp - damage);
+      if (newHP <= 0 && !gameEndedRef.current) {
+        gameEndedRef.current = true;
+        setPhase("victory");
+        setTimeout(() => onCompleteRef.current(true), 2000);
+      }
+      return newHP;
+    });
+
+    // Reset combo after delay
+    setTimeout(() => setComboCount(0), 1500);
+  };
+
+  const activateShield = () => {
+    if (shieldActive) return;
+    setShieldActive(true);
+    setTimeout(() => setShieldActive(false), 1500);
+  };
+
+  // Intro
+  if (phase === "intro") {
+    return (
+      <div className="fixed inset-0 bg-gradient-to-b from-slate-900 to-purple-900 flex flex-col items-center justify-center p-6">
+        <motion.div
+          initial={{ scale: 0 }}
+          animate={{ scale: 1 }}
+          className="text-center"
+        >
+          <div className="text-8xl mb-6">😼</div>
+          <h1 className="text-3xl font-bold text-white mb-4">BOSS BATTLE</h1>
+          <p className="text-purple-300 mb-2 text-lg">The Dramatic Cat appears!</p>
+          <p className="text-purple-400 mb-8 text-sm">
+            "You think you can just say YES?<br/>PROVE YOUR LOVE FIRST!" 😾
+          </p>
+          <button
+            onClick={startBattle}
+            className="px-8 py-4 bg-gradient-to-r from-red-500 to-pink-500 text-white rounded-2xl font-bold text-xl shadow-lg active:scale-95 transition-transform"
+          >
+            FIGHT WITH LOVE! 💖
+          </button>
+        </motion.div>
+      </div>
+    );
+  }
+
+  // Victory
+  if (phase === "victory") {
+    return (
+      <div className="fixed inset-0 bg-gradient-to-b from-pink-400 to-rose-500 flex flex-col items-center justify-center p-6">
+        <motion.div
+          initial={{ scale: 0 }}
+          animate={{ scale: 1, rotate: [0, 10, -10, 0] }}
+          className="text-center"
+        >
+          <div className="text-8xl mb-6">😻</div>
+          <h1 className="text-3xl font-bold text-white mb-4">VICTORY!</h1>
+          <p className="text-pink-100 mb-2 text-lg">The cat is overwhelmed by your love!</p>
+          <p className="text-pink-200 text-sm">"Fine... you win... 💕"</p>
+        </motion.div>
+      </div>
+    );
+  }
+
+  // Defeat
+  if (phase === "defeat") {
+    return (
+      <div className="fixed inset-0 bg-gradient-to-b from-slate-800 to-slate-900 flex flex-col items-center justify-center p-6">
+        <div className="text-center">
+          <div className="text-8xl mb-6">😾</div>
+          <h1 className="text-3xl font-bold text-white mb-4">DEFEATED!</h1>
+          <p className="text-slate-300 mb-2 text-lg">The cat's drama was too strong!</p>
+          <p className="text-slate-400 text-sm">"Hehe, try again!" 😼</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Battle
+  return (
+    <div className="fixed inset-0 bg-gradient-to-b from-slate-900 to-purple-900 overflow-hidden select-none">
+      {/* HP Bars */}
+      <div className="absolute top-4 left-4 right-4 flex flex-col gap-2 z-20">
+        {/* Boss HP */}
+        <div className="flex items-center gap-2">
+          <span className="text-2xl">😼</span>
+          <div className="flex-1 h-6 bg-slate-700 rounded-full overflow-hidden">
+            <div
+              className="h-full bg-gradient-to-r from-red-500 to-orange-500 transition-all"
+              style={{ width: `${bossHP}%` }}
+            />
+          </div>
+          <span className="text-white text-sm w-12">{bossHP}%</span>
+        </div>
+        {/* Player Love */}
+        <div className="flex items-center gap-2">
+          <span className="text-2xl">💖</span>
+          <div className="flex-1 h-6 bg-slate-700 rounded-full overflow-hidden">
+            <div
+              className="h-full bg-gradient-to-r from-pink-500 to-rose-500 transition-all"
+              style={{ width: `${playerLove}%` }}
+            />
+          </div>
+          <span className="text-white text-sm w-12">{playerLove}%</span>
+        </div>
+      </div>
+
+      {/* Boss */}
+      <div className="absolute top-32 left-1/2 -translate-x-1/2">
+        <motion.div
+          animate={bossAttacking ? { scale: [1, 1.3, 1], rotate: [0, -10, 10, 0] } : {}}
+          className="text-8xl"
+        >
+          {bossAttacking ? "😾" : "😼"}
+        </motion.div>
+        {bossAttacking && (
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="absolute -top-8 left-1/2 -translate-x-1/2 bg-red-500 text-white px-3 py-1 rounded-full text-sm font-bold"
+          >
+            DRAMATIC ATTACK!
+          </motion.div>
+        )}
+      </div>
+
+      {/* Collectible hearts */}
+      {hearts.map(h => (
+        <button
+          key={h.id}
+          onClick={() => collectHeart(h.id)}
+          className="absolute text-4xl animate-pulse active:scale-75 transition-transform"
+          style={{ left: `${h.x}%`, top: `${h.y}%`, transform: "translate(-50%, -50%)" }}
+        >
+          💖
+        </button>
+      ))}
+
+      {/* Combo indicator */}
+      {comboCount > 1 && (
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none">
+          <motion.div
+            key={comboCount}
+            initial={{ scale: 0.5, opacity: 0 }}
+            animate={{ scale: 1.5, opacity: [1, 0] }}
+            transition={{ duration: 0.5 }}
+            className="text-4xl font-bold text-yellow-400"
+          >
+            {comboCount}x COMBO!
+          </motion.div>
+        </div>
+      )}
+
+      {/* Shield button */}
+      <div className="absolute bottom-8 left-0 right-0 flex justify-center">
+        <button
+          onClick={activateShield}
+          disabled={shieldActive}
+          className={cn(
+            "px-8 py-4 rounded-2xl font-bold text-xl shadow-lg transition-all",
+            shieldActive
+              ? "bg-blue-400 text-white scale-110"
+              : "bg-white/20 text-white active:scale-95"
+          )}
+        >
+          {shieldActive ? "🛡️ PROTECTED!" : "🛡️ SHIELD"}
+        </button>
+      </div>
+
+      {/* Instructions */}
+      <div className="absolute bottom-24 left-0 right-0 text-center">
+        <p className="text-white/60 text-sm">
+          Tap 💖 to attack! Use 🛡️ when cat attacks!
+        </p>
       </div>
     </div>
   );
@@ -1225,38 +1851,68 @@ export default function ValentineCat() {
     );
   }
 
-  // Chapter 1 Boss: Tap Game (user-friendly!)
+  // Chapter 1 Boss: Tap Game (warm-up!)
   if (scene === "chapter1_boss") {
     return (
       <TapGame
         onComplete={(score) => {
           setStats(s => ({ ...s, totalScore: s.totalScore + score }));
-          nextScene("chapter2_puzzle");
+          nextScene("chapter2_love_letter");
         }}
       />
     );
   }
 
-  // Chapter 2: Memory Match Game (user-friendly!)
-  if (scene === "chapter2_puzzle") {
+  // Chapter 2: Love Letter - Catch falling letters to spell LOVE!
+  if (scene === "chapter2_love_letter") {
     return (
-      <MatchGame
-        onComplete={() => {
-          unlockAchievement("puzzle_solver");
-          nextScene("chapter2_rhythm");
+      <LoveLetterGame
+        onComplete={(score) => {
+          setStats(s => ({ ...s, totalScore: s.totalScore + score }));
+          nextScene("chapter2_cupid");
         }}
       />
     );
   }
 
-  // Chapter 2: Slider Game (user-friendly!)
-  if (scene === "chapter2_rhythm") {
+  // Chapter 2: Cupid's Arrow - Aim and shoot!
+  if (scene === "chapter2_cupid") {
     return (
-      <SliderGame
+      <CupidArrowGame
+        onComplete={(score) => {
+          setStats(s => ({ ...s, totalScore: s.totalScore + score }));
+          nextScene("chapter2_simon");
+        }}
+      />
+    );
+  }
+
+  // Chapter 2: Simon Says Love - Memory pattern game!
+  if (scene === "chapter2_simon") {
+    return (
+      <SimonLoveGame
         onComplete={(score) => {
           setStats(s => ({ ...s, totalScore: s.totalScore + score }));
           if (score >= 4) unlockAchievement("rhythm_master");
-          nextScene("chapter3_final");
+          nextScene("chapter3_boss_battle");
+        }}
+      />
+    );
+  }
+
+  // Chapter 3: Boss Battle!
+  if (scene === "chapter3_boss_battle") {
+    return (
+      <BossBattleGame
+        onComplete={(won) => {
+          if (won) {
+            unlockAchievement("puzzle_solver");
+            nextScene("chapter3_final");
+          } else {
+            // Lost - go back to simon game
+            setCatMessage("Hehe, not strong enough! Try again! 😼");
+            setScene("chapter2_simon");
+          }
         }}
       />
     );
