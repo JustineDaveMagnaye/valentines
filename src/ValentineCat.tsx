@@ -4319,53 +4319,168 @@ const RejectLettersGame = memo(function RejectLettersGame({ onComplete }: { onCo
             <span className="font-bold text-rose-600">Open them, read them, then DESTROY them!</span>
           </motion.p>
 
-          {/* Destruction methods with animation */}
+          {/* All Destruction Methods - Scrollable */}
           <motion.div
-            className="bg-gradient-to-r from-rose-50 to-amber-50 rounded-2xl p-4 mb-4 border border-rose-200"
+            className="bg-gradient-to-r from-rose-50 to-amber-50 rounded-2xl p-3 mb-3 border border-rose-200"
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.4 }}
           >
-            <p className="text-slate-700 text-sm font-medium mb-3">Choose how to reject:</p>
-            <div className="flex justify-center gap-6">
-              <motion.div
-                className="text-center"
-                whileHover={{ scale: 1.1, y: -3 }}
-                animate={{ y: [0, -3, 0] }}
-                transition={{ duration: 2, repeat: Infinity }}
-              >
+            <p className="text-slate-700 text-xs font-medium mb-2">7 ways to destroy love letters:</p>
+
+            {/* Scrollable destruction methods */}
+            <div className="overflow-x-auto -mx-2 px-2 pb-1 scrollbar-hide">
+              <div className="flex gap-2 min-w-max">
+                {/* BURN */}
                 <motion.div
-                  className="w-14 h-14 bg-gradient-to-br from-orange-400 to-red-500 rounded-xl flex items-center justify-center shadow-lg shadow-orange-500/30 mb-1 border border-orange-300"
-                  animate={{ scale: [1, 1.1, 1] }}
-                  transition={{ duration: 1.5, repeat: Infinity }}
+                  className="text-center flex-shrink-0"
+                  whileHover={{ scale: 1.1 }}
+                  animate={{ y: [0, -2, 0] }}
+                  transition={{ duration: 2, repeat: Infinity }}
                 >
-                  <span className="text-2xl">🔥</span>
+                  <motion.div
+                    className="w-11 h-11 bg-gradient-to-br from-orange-400 to-red-500 rounded-lg flex items-center justify-center shadow-md mb-0.5 border border-orange-300"
+                    animate={{ scale: [1, 1.08, 1] }}
+                    transition={{ duration: 1.5, repeat: Infinity }}
+                  >
+                    <span className="text-lg">🔥</span>
+                  </motion.div>
+                  <div className="text-[9px] font-bold text-orange-600">BURN</div>
+                  <div className="text-[8px] text-orange-500 font-semibold">+25</div>
                 </motion.div>
-                <div className="text-xs font-bold text-orange-600">BURN IT</div>
-                <div className="text-[10px] text-orange-500 font-medium">+25 pts</div>
-              </motion.div>
-              <motion.div
-                className="text-center"
-                whileHover={{ scale: 1.1, y: -3 }}
-                animate={{ y: [0, -3, 0] }}
-                transition={{ duration: 2, repeat: Infinity, delay: 0.3 }}
-              >
+
+                {/* TEAR */}
                 <motion.div
-                  className="w-14 h-14 bg-gradient-to-br from-slate-400 to-slate-600 rounded-xl flex items-center justify-center shadow-lg shadow-slate-500/30 mb-1 border border-slate-300"
-                  animate={{ rotate: [-5, 5, -5] }}
-                  transition={{ duration: 0.5, repeat: Infinity }}
+                  className="text-center flex-shrink-0"
+                  whileHover={{ scale: 1.1 }}
+                  animate={{ y: [0, -2, 0] }}
+                  transition={{ duration: 2, repeat: Infinity, delay: 0.1 }}
                 >
-                  <span className="text-2xl">✂️</span>
+                  <motion.div
+                    className="w-11 h-11 bg-gradient-to-br from-slate-400 to-slate-600 rounded-lg flex items-center justify-center shadow-md mb-0.5 border border-slate-300"
+                    animate={{ rotate: [-4, 4, -4] }}
+                    transition={{ duration: 0.5, repeat: Infinity }}
+                  >
+                    <span className="text-lg">✂️</span>
+                  </motion.div>
+                  <div className="text-[9px] font-bold text-slate-600">TEAR</div>
+                  <div className="text-[8px] text-slate-500 font-semibold">+12</div>
                 </motion.div>
-                <div className="text-xs font-bold text-slate-600">RIP IT</div>
-                <div className="text-[10px] text-slate-500 font-medium">+10 pts</div>
-              </motion.div>
+
+                {/* SHRED */}
+                <motion.div
+                  className="text-center flex-shrink-0"
+                  whileHover={{ scale: 1.1 }}
+                  animate={{ y: [0, -2, 0] }}
+                  transition={{ duration: 2, repeat: Infinity, delay: 0.2 }}
+                >
+                  <motion.div
+                    className="w-11 h-11 bg-gradient-to-br from-emerald-400 to-teal-500 rounded-lg flex items-center justify-center shadow-md mb-0.5 border border-emerald-300"
+                    animate={{ y: [0, -2, 0] }}
+                    transition={{ duration: 0.3, repeat: Infinity }}
+                  >
+                    <span className="text-lg">📄</span>
+                  </motion.div>
+                  <div className="text-[9px] font-bold text-emerald-600">SHRED</div>
+                  <div className="text-[8px] text-emerald-500 font-semibold">+35</div>
+                </motion.div>
+
+                {/* CRUMPLE */}
+                <motion.div
+                  className="text-center flex-shrink-0"
+                  whileHover={{ scale: 1.1 }}
+                  animate={{ y: [0, -2, 0] }}
+                  transition={{ duration: 2, repeat: Infinity, delay: 0.3 }}
+                >
+                  <motion.div
+                    className="w-11 h-11 bg-gradient-to-br from-amber-400 to-yellow-500 rounded-lg flex items-center justify-center shadow-md mb-0.5 border border-amber-300"
+                    animate={{ scale: [1, 0.9, 1], rotate: [0, 5, 0] }}
+                    transition={{ duration: 0.6, repeat: Infinity }}
+                  >
+                    <span className="text-lg">🗑️</span>
+                  </motion.div>
+                  <div className="text-[9px] font-bold text-amber-600">CRUMPLE</div>
+                  <div className="text-[8px] text-amber-500 font-semibold">+18</div>
+                </motion.div>
+
+                {/* DISSOLVE */}
+                <motion.div
+                  className="text-center flex-shrink-0"
+                  whileHover={{ scale: 1.1 }}
+                  animate={{ y: [0, -2, 0] }}
+                  transition={{ duration: 2, repeat: Infinity, delay: 0.4 }}
+                >
+                  <motion.div
+                    className="w-11 h-11 bg-gradient-to-br from-purple-400 to-violet-500 rounded-lg flex items-center justify-center shadow-md mb-0.5 border border-purple-300"
+                    animate={{ opacity: [1, 0.7, 1], scale: [1, 1.05, 1] }}
+                    transition={{ duration: 0.8, repeat: Infinity }}
+                  >
+                    <span className="text-lg">🧪</span>
+                  </motion.div>
+                  <div className="text-[9px] font-bold text-purple-600">DISSOLVE</div>
+                  <div className="text-[8px] text-purple-500 font-semibold">+45</div>
+                </motion.div>
+
+                {/* FREEZE */}
+                <motion.div
+                  className="text-center flex-shrink-0"
+                  whileHover={{ scale: 1.1 }}
+                  animate={{ y: [0, -2, 0] }}
+                  transition={{ duration: 2, repeat: Infinity, delay: 0.5 }}
+                >
+                  <motion.div
+                    className="w-11 h-11 bg-gradient-to-br from-cyan-300 to-blue-400 rounded-lg flex items-center justify-center shadow-md mb-0.5 border border-cyan-200"
+                    animate={{ rotate: [0, 10, -10, 0] }}
+                    transition={{ duration: 1, repeat: Infinity }}
+                  >
+                    <span className="text-lg">❄️</span>
+                  </motion.div>
+                  <div className="text-[9px] font-bold text-cyan-600">FREEZE</div>
+                  <div className="text-[8px] text-cyan-500 font-semibold">+53</div>
+                </motion.div>
+
+                {/* VOID */}
+                <motion.div
+                  className="text-center flex-shrink-0"
+                  whileHover={{ scale: 1.1 }}
+                  animate={{ y: [0, -2, 0] }}
+                  transition={{ duration: 2, repeat: Infinity, delay: 0.6 }}
+                >
+                  <motion.div
+                    className="w-11 h-11 bg-gradient-to-br from-indigo-500 to-purple-800 rounded-lg flex items-center justify-center shadow-md mb-0.5 border border-indigo-400 relative overflow-hidden"
+                  >
+                    <motion.div
+                      className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent"
+                      animate={{ x: ["-100%", "200%"] }}
+                      transition={{ duration: 2, repeat: Infinity, repeatDelay: 0.5 }}
+                    />
+                    <motion.span
+                      className="text-lg relative"
+                      animate={{ rotate: [0, 180, 360] }}
+                      transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
+                    >
+                      🕳️
+                    </motion.span>
+                  </motion.div>
+                  <div className="text-[9px] font-bold text-indigo-600">VOID</div>
+                  <div className="text-[8px] text-indigo-500 font-semibold">+60</div>
+                </motion.div>
+              </div>
             </div>
+
+            {/* Scroll hint */}
+            <motion.p
+              className="text-center text-rose-400/60 text-[8px] mt-1"
+              animate={{ opacity: [0.4, 0.8, 0.4] }}
+              transition={{ duration: 1.5, repeat: Infinity }}
+            >
+              ← swipe to see all →
+            </motion.p>
           </motion.div>
 
           {/* Bonus info */}
           <motion.div
-            className="flex gap-2 mb-4"
+            className="flex gap-2 mb-3"
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.5 }}
@@ -4375,26 +4490,26 @@ const RejectLettersGame = memo(function RejectLettersGame({ onComplete }: { onCo
               whileHover={{ scale: 1.05 }}
             >
               <motion.div
-                className="text-xl"
+                className="text-lg"
                 animate={{ rotate: [0, 5, -5, 0] }}
                 transition={{ duration: 2, repeat: Infinity }}
               >
                 ✨💌
               </motion.div>
-              <div className="text-[9px] text-amber-700 font-bold">Gold = 2x pts!</div>
+              <div className="text-[8px] text-amber-700 font-bold">Gold letters = bonus pts!</div>
             </motion.div>
             <motion.div
-              className="flex-1 bg-gradient-to-br from-rose-50 to-rose-100 rounded-xl p-2 border-2 border-rose-300 shadow-sm"
+              className="flex-1 bg-gradient-to-br from-indigo-50 to-indigo-100 rounded-xl p-2 border-2 border-indigo-300 shadow-sm"
               whileHover={{ scale: 1.05 }}
             >
               <motion.div
-                className="text-xl"
-                animate={{ scale: [1, 1.2, 1] }}
-                transition={{ duration: 0.5, repeat: Infinity }}
+                className="text-lg"
+                animate={{ scale: [1, 1.15, 1] }}
+                transition={{ duration: 0.8, repeat: Infinity }}
               >
-                🔥
+                🕳️❄️
               </motion.div>
-              <div className="text-[9px] text-rose-700 font-bold">Burn = +10 bonus!</div>
+              <div className="text-[8px] text-indigo-700 font-bold">Premium = max points!</div>
             </motion.div>
           </motion.div>
 
