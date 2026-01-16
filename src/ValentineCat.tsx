@@ -1536,25 +1536,40 @@ const SmashTheHeartsGame = memo(function SmashTheHeartsGame({ onComplete }: { on
   );
 });
 
-// Game 3: DODGE THE LOVE - Dodge the cat's love projectiles!
+// Attack pattern types for Dodge the Love
+type AttackPattern = "rain" | "spiral" | "wave" | "aimed" | "burst" | "walls" | "rest";
+
+// Game 3: DODGE THE LOVE - Complete redesign with attack patterns and better UX
 const DodgeTheLoveGame = memo(function DodgeTheLoveGame({ onComplete }: { onComplete: (score: number) => void }) {
   const [phase, setPhase] = useState<"tutorial" | "countdown" | "playing" | "done">("tutorial");
   const [playerX, setPlayerX] = useState(50);
-  const [playerY, setPlayerY] = useState(75);
-  const [health, setHealth] = useState(3);
+  const [playerY, setPlayerY] = useState(70);
+  const [health, setHealth] = useState(5);
   const [score, setScore] = useState(0);
-  const [timeLeft, setTimeLeft] = useState(20);
+  const [timeLeft, setTimeLeft] = useState(25);
   const [countdownNum, setCountdownNum] = useState(3);
 
-  // Projectiles from cat
+  // Projectiles
   const [projectiles, setProjectiles] = useState<Array<{
     id: number;
     x: number;
     y: number;
-    type: "heart" | "kiss" | "love_letter" | "rose";
+    type: "heart" | "kiss" | "sparkle" | "big_heart";
     speed: number;
     angle: number;
     size: number;
+    rotation: number;
+    glow?: boolean;
+  }>>([]);
+
+  // Warning indicators for attacks
+  const [warnings, setWarnings] = useState<Array<{
+    id: number;
+    x: number;
+    y: number;
+    type: "line" | "area" | "target";
+    angle?: number;
+    duration: number;
   }>>([]);
 
   // Power-ups
@@ -1562,34 +1577,43 @@ const DodgeTheLoveGame = memo(function DodgeTheLoveGame({ onComplete }: { onComp
     id: number;
     x: number;
     y: number;
-    type: "shield" | "shrink" | "slow";
+    type: "shield" | "heal" | "slow";
   }>>([]);
+
+  // Current attack pattern
+  const [currentPattern, setCurrentPattern] = useState<AttackPattern>("rest");
+  const [patternName, setPatternName] = useState("");
 
   // Effects
   const [shield, setShield] = useState(false);
-  const [shrink, setShrink] = useState(false);
   const [slowMo, setSlowMo] = useState(false);
   const [hitFlash, setHitFlash] = useState(false);
+  const [invincible, setInvincible] = useState(false);
   const [catMessage, setCatMessage] = useState("");
-  const [catEmotion, setCatEmotion] = useState<"love" | "angry" | "determined">("love");
-  const [dodgeStreak, setDodgeStreak] = useState(0);
+  const [catEmotion, setCatEmotion] = useState<"love" | "charging" | "attacking" | "frustrated">("love");
+  const [combo, setCombo] = useState(0);
+  const [maxCombo, setMaxCombo] = useState(0);
+  const [playerFacing, setPlayerFacing] = useState<"left" | "right">("right");
+
+  // Dodge trail effect
+  const [trail, setTrail] = useState<Array<{ id: number; x: number; y: number }>>([]);
 
   // Refs
   const onCompleteRef = useRef(onComplete);
   const gameEndedRef = useRef(false);
   const scoreRef = useRef(0);
   const playerXRef = useRef(50);
-  const playerYRef = useRef(75);
+  const playerYRef = useRef(70);
   const targetXRef = useRef(50);
-  const targetYRef = useRef(75);
-  const healthRef = useRef(3);
+  const targetYRef = useRef(70);
+  const healthRef = useRef(5);
   const shieldRef = useRef(false);
-  const shrinkRef = useRef(false);
   const slowMoRef = useRef(false);
-  const lastSpawnRef = useRef(0);
-  const lastPowerUpRef = useRef(0);
+  const invincibleRef = useRef(false);
+  const patternIndexRef = useRef(0);
+  const patternTimeRef = useRef(0);
+  const lastTrailRef = useRef(0);
   const rafRef = useRef<number>(0);
-  const difficultyRef = useRef(1);
 
   useEffect(() => { onCompleteRef.current = onComplete; }, [onComplete]);
   useEffect(() => { scoreRef.current = score; }, [score]);
@@ -1597,8 +1621,14 @@ const DodgeTheLoveGame = memo(function DodgeTheLoveGame({ onComplete }: { onComp
   useEffect(() => { playerYRef.current = playerY; }, [playerY]);
   useEffect(() => { healthRef.current = health; }, [health]);
   useEffect(() => { shieldRef.current = shield; }, [shield]);
-  useEffect(() => { shrinkRef.current = shrink; }, [shrink]);
   useEffect(() => { slowMoRef.current = slowMo; }, [slowMo]);
+  useEffect(() => { invincibleRef.current = invincible; }, [invincible]);
+
+  // Attack pattern sequences
+  const patterns: AttackPattern[] = useMemo(() => [
+    "rest", "rain", "rest", "aimed", "rest", "wave", "rest", "spiral",
+    "rest", "burst", "rest", "walls", "rest", "aimed", "rain"
+  ], []);
 
   const startCountdown = useCallback(() => {
     setPhase("countdown");
@@ -1611,39 +1641,40 @@ const DodgeTheLoveGame = memo(function DodgeTheLoveGame({ onComplete }: { onComp
     if (countdownNum === 0) {
       gameEndedRef.current = false;
       setPlayerX(50);
-      setPlayerY(75);
+      setPlayerY(70);
       playerXRef.current = 50;
-      playerYRef.current = 75;
+      playerYRef.current = 70;
       targetXRef.current = 50;
-      targetYRef.current = 75;
-      setHealth(3);
-      healthRef.current = 3;
+      targetYRef.current = 70;
+      setHealth(5);
+      healthRef.current = 5;
       setScore(0);
       scoreRef.current = 0;
-      setTimeLeft(20);
+      setTimeLeft(25);
       setProjectiles([]);
       setPowerUps([]);
+      setWarnings([]);
+      setTrail([]);
       setShield(false);
-      setShrink(false);
       setSlowMo(false);
-      setDodgeStreak(0);
-      difficultyRef.current = 1;
-      lastSpawnRef.current = performance.now();
-      lastPowerUpRef.current = performance.now();
+      setInvincible(false);
+      setCombo(0);
+      setMaxCombo(0);
+      setCurrentPattern("rest");
+      patternIndexRef.current = 0;
+      patternTimeRef.current = performance.now();
       setPhase("playing");
       return;
     }
-    const timer = setTimeout(() => setCountdownNum(c => c - 1), 800);
+    const timer = setTimeout(() => setCountdownNum(c => c - 1), 700);
     return () => clearTimeout(timer);
   }, [phase, countdownNum]);
 
-  // Timer
+  // Timer and pattern switching
   useEffect(() => {
     if (phase !== "playing") return;
     const timer = setInterval(() => {
       setTimeLeft(t => {
-        difficultyRef.current = 1 + (20 - t) * 0.05;
-
         if (t <= 1) {
           clearInterval(timer);
           if (!gameEndedRef.current) {
@@ -1659,285 +1690,422 @@ const DodgeTheLoveGame = memo(function DodgeTheLoveGame({ onComplete }: { onComp
     return () => clearInterval(timer);
   }, [phase]);
 
-  // Update cat emotion
-  useEffect(() => {
-    if (health <= 1) setCatEmotion("determined");
-    else if (score >= 50) setCatEmotion("angry");
-    else setCatEmotion("love");
-  }, [health, score]);
+  // Execute attack pattern
+  const executePattern = useCallback((pattern: AttackPattern, time: number) => {
+    const baseId = time + Math.random() * 1000;
+
+    switch (pattern) {
+      case "rain": {
+        // Gentle rain of hearts from top
+        if (Math.random() < 0.15) {
+          const x = 5 + Math.random() * 90;
+          setProjectiles(prev => [...prev.slice(-25), {
+            id: baseId,
+            x, y: -5,
+            type: "heart",
+            speed: 0.8 + Math.random() * 0.4,
+            angle: Math.PI / 2 + (Math.random() - 0.5) * 0.3,
+            size: 0.9 + Math.random() * 0.2,
+            rotation: Math.random() * 360,
+          }]);
+        }
+        break;
+      }
+      case "spiral": {
+        // Spiral pattern from center
+        const spiralAngle = (time / 100) % (Math.PI * 2);
+        if (Math.random() < 0.08) {
+          setProjectiles(prev => [...prev.slice(-25), {
+            id: baseId,
+            x: 50, y: 15,
+            type: "sparkle",
+            speed: 1.2,
+            angle: spiralAngle,
+            size: 1,
+            rotation: 0,
+            glow: true,
+          }]);
+        }
+        break;
+      }
+      case "wave": {
+        // Wave pattern - sine wave of projectiles
+        if (Math.random() < 0.12) {
+          const waveX = 50 + Math.sin(time / 200) * 40;
+          setProjectiles(prev => [...prev.slice(-25), {
+            id: baseId,
+            x: waveX, y: -5,
+            type: "kiss",
+            speed: 1,
+            angle: Math.PI / 2,
+            size: 1,
+            rotation: 0,
+          }]);
+        }
+        break;
+      }
+      case "aimed": {
+        // Aimed shots at player with warning
+        if (Math.random() < 0.04) {
+          const startX = 10 + Math.random() * 80;
+          // Show warning first
+          setWarnings(prev => [...prev, {
+            id: baseId,
+            x: startX, y: 10,
+            type: "target",
+            duration: 800,
+          }]);
+          // Then fire after delay
+          setTimeout(() => {
+            if (gameEndedRef.current) return;
+            const dx = playerXRef.current - startX;
+            const dy = playerYRef.current - 10;
+            const angle = Math.atan2(dy, dx);
+            setProjectiles(prev => [...prev.slice(-25), {
+              id: baseId + 0.1,
+              x: startX, y: 10,
+              type: "big_heart",
+              speed: 1.8,
+              angle,
+              size: 1.3,
+              rotation: 0,
+              glow: true,
+            }]);
+          }, 800);
+        }
+        break;
+      }
+      case "burst": {
+        // Burst of projectiles in all directions
+        if (Math.random() < 0.02) {
+          const burstCount = 8;
+          for (let i = 0; i < burstCount; i++) {
+            const angle = (i / burstCount) * Math.PI * 2;
+            setProjectiles(prev => [...prev.slice(-30), {
+              id: baseId + i,
+              x: 50, y: 20,
+              type: "sparkle",
+              speed: 1.1,
+              angle,
+              size: 0.9,
+              rotation: 0,
+              glow: true,
+            }]);
+          }
+        }
+        break;
+      }
+      case "walls": {
+        // Vertical walls with gaps
+        if (Math.random() < 0.025) {
+          const gapY = 35 + Math.random() * 35;
+          const gapSize = 18;
+          const fromLeft = Math.random() < 0.5;
+          for (let y = 25; y < 95; y += 8) {
+            if (Math.abs(y - gapY) > gapSize / 2) {
+              setProjectiles(prev => [...prev.slice(-30), {
+                id: baseId + y,
+                x: fromLeft ? -5 : 105,
+                y,
+                type: "heart",
+                speed: 0.9,
+                angle: fromLeft ? 0 : Math.PI,
+                size: 0.85,
+                rotation: 0,
+              }]);
+            }
+          }
+        }
+        break;
+      }
+      case "rest":
+      default:
+        // Brief rest period - maybe spawn a power-up
+        if (Math.random() < 0.008) {
+          const types: Array<"shield" | "heal" | "slow"> = ["shield", "heal", "slow"];
+          setPowerUps(prev => [...prev.slice(-2), {
+            id: baseId,
+            x: 15 + Math.random() * 70,
+            y: 30 + Math.random() * 35,
+            type: types[Math.floor(Math.random() * types.length)],
+          }]);
+        }
+        break;
+    }
+  }, []);
 
   // Main game loop
   useEffect(() => {
     if (phase !== "playing") return;
 
     let lastTime = performance.now();
+    const patternDuration = 2500; // Each pattern lasts 2.5 seconds
 
     const gameLoop = (currentTime: number) => {
       if (gameEndedRef.current) return;
 
-      const deltaTime = (currentTime - lastTime) / 1000;
+      const deltaTime = Math.min((currentTime - lastTime) / 1000, 0.05); // Cap delta
       lastTime = currentTime;
-      const speedMult = slowMoRef.current ? 0.4 : 1;
+      const speedMult = slowMoRef.current ? 0.35 : 1;
 
-      // Spawn projectiles
-      const spawnRate = Math.max(400, 800 - difficultyRef.current * 80);
-      if (currentTime - lastSpawnRef.current > spawnRate) {
-        lastSpawnRef.current = currentTime;
+      // Switch patterns
+      if (currentTime - patternTimeRef.current > patternDuration) {
+        patternTimeRef.current = currentTime;
+        patternIndexRef.current = (patternIndexRef.current + 1) % patterns.length;
+        const newPattern = patterns[patternIndexRef.current];
+        setCurrentPattern(newPattern);
 
-        const types: Array<"heart" | "kiss" | "love_letter" | "rose"> = ["heart", "kiss", "love_letter", "rose"];
-        const type = types[Math.floor(Math.random() * types.length)];
-
-        // Different spawn patterns
-        const pattern = Math.floor(Math.random() * 4);
-        let x, y, angle;
-
-        if (pattern === 0) {
-          // From top
-          x = 10 + Math.random() * 80;
-          y = -5;
-          angle = Math.PI / 2 + (Math.random() - 0.5) * 0.5;
-        } else if (pattern === 1) {
-          // From sides
-          x = Math.random() < 0.5 ? -5 : 105;
-          y = 20 + Math.random() * 40;
-          angle = x < 0 ? 0 : Math.PI;
-          angle += (Math.random() - 0.5) * 0.8;
-        } else if (pattern === 2) {
-          // Aimed at player
-          x = 10 + Math.random() * 80;
-          y = -5;
-          const dx = playerXRef.current - x;
-          const dy = playerYRef.current - y;
-          angle = Math.atan2(dy, dx);
+        // Update cat emotion and show pattern name
+        if (newPattern === "rest") {
+          setCatEmotion("love");
+          setPatternName("");
         } else {
-          // Spread pattern
-          x = 50;
-          y = -5;
-          angle = Math.PI / 2 + (Math.random() - 0.5) * 1.2;
+          setCatEmotion("charging");
+          const names: Record<AttackPattern, string> = {
+            rain: "💕 Love Rain!",
+            spiral: "🌀 Spiral of Love!",
+            wave: "🌊 Love Wave!",
+            aimed: "🎯 Targeted Love!",
+            burst: "💥 Love Burst!",
+            walls: "🧱 Wall of Hearts!",
+            rest: "",
+          };
+          setPatternName(names[newPattern]);
+          setTimeout(() => setPatternName(""), 1500);
+          setTimeout(() => setCatEmotion("attacking"), 500);
         }
-
-        setProjectiles(prev => [...prev.slice(-15), {
-          id: currentTime + Math.random(),
-          x, y, type,
-          speed: (1.5 + Math.random() * 1) * difficultyRef.current,
-          angle,
-          size: type === "love_letter" ? 1.3 : type === "rose" ? 1.1 : 1,
-        }]);
       }
 
-      // Spawn power-ups occasionally
-      if (currentTime - lastPowerUpRef.current > 5000 && Math.random() < 0.3) {
-        lastPowerUpRef.current = currentTime;
-        const types: Array<"shield" | "shrink" | "slow"> = ["shield", "shrink", "slow"];
-        setPowerUps(prev => [...prev.slice(-2), {
-          id: currentTime,
-          x: 15 + Math.random() * 70,
-          y: 20 + Math.random() * 40,
-          type: types[Math.floor(Math.random() * types.length)],
-        }]);
-      }
+      // Execute current pattern
+      executePattern(currentPattern, currentTime);
 
-      // Smooth player movement
+      // Update warnings
+      setWarnings(prev => prev.filter(w => currentTime - w.id < w.duration));
+
+      // Smooth player movement with easing
+      const movePlayer = (prev: number, target: number) => {
+        const diff = target - prev;
+        if (Math.abs(diff) < 0.3) return target;
+        return prev + diff * 0.18;
+      };
+
       setPlayerX(prev => {
-        const diff = targetXRef.current - prev;
-        if (Math.abs(diff) < 0.5) return targetXRef.current;
-        return prev + diff * 0.2;
+        const newX = movePlayer(prev, targetXRef.current);
+        if (newX > prev + 0.5) setPlayerFacing("right");
+        else if (newX < prev - 0.5) setPlayerFacing("left");
+        return newX;
       });
-      setPlayerY(prev => {
-        const diff = targetYRef.current - prev;
-        if (Math.abs(diff) < 0.5) return targetYRef.current;
-        return prev + diff * 0.2;
-      });
+      setPlayerY(prev => movePlayer(prev, targetYRef.current));
+
+      // Update trail
+      if (currentTime - lastTrailRef.current > 50) {
+        lastTrailRef.current = currentTime;
+        setTrail(prev => [...prev.slice(-8), { id: currentTime, x: playerXRef.current, y: playerYRef.current }]);
+      }
 
       // Move projectiles
       setProjectiles(prev => {
         const updated = prev.map(p => ({
           ...p,
-          x: p.x + Math.cos(p.angle) * p.speed * deltaTime * 50 * speedMult,
-          y: p.y + Math.sin(p.angle) * p.speed * deltaTime * 50 * speedMult,
+          x: p.x + Math.cos(p.angle) * p.speed * deltaTime * 55 * speedMult,
+          y: p.y + Math.sin(p.angle) * p.speed * deltaTime * 55 * speedMult,
+          rotation: p.rotation + deltaTime * 180,
         }));
 
         // Collision detection
-        const playerSize = shrinkRef.current ? 4 : 7;
-        updated.forEach(p => {
-          if (p.y > 100 || p.x < -10 || p.x > 110) return;
+        if (!invincibleRef.current) {
+          const playerSize = 5;
+          updated.forEach(p => {
+            if (p.y > 100 || p.x < -10 || p.x > 110) return;
 
-          const dx = p.x - playerXRef.current;
-          const dy = p.y - playerYRef.current;
-          const dist = Math.sqrt(dx * dx + dy * dy);
+            const dx = p.x - playerXRef.current;
+            const dy = p.y - playerYRef.current;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            const projectileSize = p.size * 4;
 
-          if (dist < playerSize) {
-            if (shieldRef.current) {
-              // Shield absorbs hit
-              setShield(false);
-              shieldRef.current = false;
-              p.y = 200; // Remove projectile
-              setCatMessage("Your shield! 😾");
-              setTimeout(() => setCatMessage(""), 800);
-            } else {
-              // Take damage
-              setHealth(h => {
-                const newHealth = h - 1;
-                healthRef.current = newHealth;
-                if (newHealth <= 0 && !gameEndedRef.current) {
-                  gameEndedRef.current = true;
-                  setPhase("done");
-                  setTimeout(() => onCompleteRef.current(scoreRef.current), 2000);
-                }
-                return newHealth;
-              });
-              setHitFlash(true);
-              setTimeout(() => setHitFlash(false), 200);
-              setDodgeStreak(0);
-              p.y = 200;
-              setCatMessage(["Got you! 😻", "Feel the love! 💕", "Can't escape! 😼"][Math.floor(Math.random() * 3)]);
-              setTimeout(() => setCatMessage(""), 800);
+            if (dist < playerSize + projectileSize - 5) {
+              if (shieldRef.current) {
+                setShield(false);
+                shieldRef.current = false;
+                p.y = 200;
+                setCatMessage("Shield blocked! 😾");
+                setTimeout(() => setCatMessage(""), 800);
+                setScore(s => s + 15);
+              } else {
+                setHealth(h => {
+                  const newHealth = h - 1;
+                  healthRef.current = newHealth;
+                  if (newHealth <= 0 && !gameEndedRef.current) {
+                    gameEndedRef.current = true;
+                    setPhase("done");
+                    setTimeout(() => onCompleteRef.current(scoreRef.current), 2000);
+                  }
+                  return newHealth;
+                });
+                setHitFlash(true);
+                setInvincible(true);
+                invincibleRef.current = true;
+                setTimeout(() => setHitFlash(false), 150);
+                setTimeout(() => { setInvincible(false); invincibleRef.current = false; }, 1500);
+                setCombo(0);
+                p.y = 200;
+                setCatMessage(["Got you! 😻", "Feel the love! 💕", "Can't dodge forever! 😼"][Math.floor(Math.random() * 3)]);
+                setTimeout(() => setCatMessage(""), 1000);
+              }
             }
-          }
-        });
-
-        // Score for dodged projectiles
-        const dodged = updated.filter(p => p.y > 95 && p.y < 105);
-        if (dodged.length > 0) {
-          setScore(s => s + dodged.length * 5);
-          setDodgeStreak(d => d + dodged.length);
+          });
         }
 
-        return updated.filter(p => p.y < 105 && p.x > -10 && p.x < 110);
+        // Score for dodged projectiles
+        const dodged = updated.filter(p => p.y > 98 && p.y < 102);
+        if (dodged.length > 0) {
+          setScore(s => s + dodged.length * 3);
+          setCombo(c => {
+            const newCombo = c + dodged.length;
+            setMaxCombo(m => Math.max(m, newCombo));
+            return newCombo;
+          });
+        }
+
+        return updated.filter(p => p.y < 105 && p.y > -15 && p.x > -15 && p.x < 115);
       });
 
       // Check power-up collection
       setPowerUps(prev => {
-        const playerSize = shrinkRef.current ? 5 : 8;
         return prev.filter(pu => {
           const dx = pu.x - playerXRef.current;
           const dy = pu.y - playerYRef.current;
           const dist = Math.sqrt(dx * dx + dy * dy);
 
-          if (dist < playerSize) {
+          if (dist < 10) {
             if (pu.type === "shield") {
               setShield(true);
               shieldRef.current = true;
-              setCatMessage("A shield?! 😾");
-            } else if (pu.type === "shrink") {
-              setShrink(true);
-              shrinkRef.current = true;
-              setTimeout(() => { setShrink(false); shrinkRef.current = false; }, 5000);
-              setCatMessage("You're tiny! 🙀");
+              setCatMessage("A shield?! No fair! 😾");
+            } else if (pu.type === "heal") {
+              setHealth(h => Math.min(h + 1, 5));
+              healthRef.current = Math.min(healthRef.current + 1, 5);
+              setCatMessage("Healing?! 🙀");
             } else if (pu.type === "slow") {
               setSlowMo(true);
               slowMoRef.current = true;
               setTimeout(() => { setSlowMo(false); slowMoRef.current = false; }, 4000);
-              setCatMessage("Slow motion?! 😾");
+              setCatMessage("Time slow?! 😾");
             }
             setTimeout(() => setCatMessage(""), 1000);
-            setScore(s => s + 20);
+            setScore(s => s + 25);
             return false;
           }
           return true;
         });
       });
 
+      // Clean old trail
+      setTrail(prev => prev.filter(t => currentTime - t.id < 400));
+
       rafRef.current = requestAnimationFrame(gameLoop);
     };
 
     rafRef.current = requestAnimationFrame(gameLoop);
     return () => cancelAnimationFrame(rafRef.current);
-  }, [phase]);
+  }, [phase, currentPattern, executePattern, patterns]);
 
   const handleMove = useCallback((clientX: number, clientY: number, rect: DOMRect) => {
     const x = ((clientX - rect.left) / rect.width) * 100;
     const y = ((clientY - rect.top) / rect.height) * 100;
     targetXRef.current = Math.max(5, Math.min(95, x));
-    targetYRef.current = Math.max(25, Math.min(90, y));
+    targetYRef.current = Math.max(28, Math.min(92, y));
   }, []);
 
   // Tutorial
   if (phase === "tutorial") {
     return (
-      <div className="fixed inset-0 bg-gradient-to-b from-violet-600 via-purple-600 to-fuchsia-700 flex flex-col items-center justify-center p-4 overflow-hidden">
-        {/* Background projectiles */}
-        <div className="absolute inset-0 overflow-hidden pointer-events-none opacity-20">
-          {Array.from({ length: 12 }).map((_, i) => (
+      <div className="fixed inset-0 bg-gradient-to-b from-slate-900 via-purple-900 to-violet-900 flex flex-col items-center justify-center p-4 overflow-hidden">
+        {/* Animated stars background */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          {Array.from({ length: 30 }).map((_, i) => (
             <motion.div
               key={i}
-              className="absolute text-3xl"
-              initial={{ y: -50, x: `${10 + (i % 6) * 15}%`, rotate: 0 }}
-              animate={{ y: "120vh", rotate: 360 }}
-              transition={{ duration: 4 + Math.random() * 2, repeat: Infinity, delay: i * 0.4 }}
-            >
-              {["💕", "💋", "💌", "🌹"][i % 4]}
-            </motion.div>
+              className="absolute w-1 h-1 bg-white rounded-full"
+              style={{ left: `${Math.random() * 100}%`, top: `${Math.random() * 100}%` }}
+              animate={{ opacity: [0.2, 1, 0.2], scale: [0.5, 1, 0.5] }}
+              transition={{ duration: 2 + Math.random() * 2, repeat: Infinity, delay: Math.random() * 2 }}
+            />
           ))}
         </div>
 
         <motion.div
-          initial={{ scale: 0.8, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          className="bg-white/95 backdrop-blur-xl rounded-3xl p-6 max-w-sm text-center shadow-2xl relative z-10"
+          initial={{ scale: 0.8, opacity: 0, y: 30 }}
+          animate={{ scale: 1, opacity: 1, y: 0 }}
+          transition={{ type: "spring", stiffness: 200 }}
+          className="bg-white/95 backdrop-blur-xl rounded-3xl p-6 max-w-sm text-center shadow-2xl relative z-10 border border-purple-200"
         >
           <motion.div
-            className="text-7xl mb-3"
-            animate={{ x: [0, -10, 10, 0], rotate: [0, -5, 5, 0] }}
-            transition={{ duration: 2, repeat: Infinity }}
+            className="text-7xl mb-2"
+            animate={{ y: [0, -8, 0] }}
+            transition={{ duration: 1.5, repeat: Infinity }}
           >
-            🙀
+            😻
           </motion.div>
-          <h2 className="text-3xl font-bold bg-gradient-to-r from-violet-600 to-fuchsia-600 bg-clip-text text-transparent mb-3">
+          <h2 className="text-3xl font-black bg-gradient-to-r from-purple-600 via-pink-500 to-rose-500 bg-clip-text text-transparent mb-2">
             Dodge the Love!
           </h2>
-          <p className="text-slate-600 mb-4">
-            The cat is throwing love at you!<br/>
-            <span className="font-bold text-purple-600">Move to dodge!</span>
+          <p className="text-slate-600 mb-4 text-sm">
+            The cat won't stop throwing love at you!<br/>
+            <span className="font-bold text-purple-600">Survive the attack patterns!</span>
           </p>
 
-          <div className="grid grid-cols-4 gap-2 my-4">
-            <div className="bg-pink-50 rounded-xl p-2 text-center">
-              <div className="text-2xl">💕</div>
-              <div className="text-[9px] text-pink-600">Dodge!</div>
+          <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-2xl p-3 mb-4">
+            <div className="grid grid-cols-4 gap-2 mb-2">
+              <div className="text-center">
+                <div className="text-xl">💕</div>
+              </div>
+              <div className="text-center">
+                <div className="text-xl">💋</div>
+              </div>
+              <div className="text-center">
+                <div className="text-xl">✨</div>
+              </div>
+              <div className="text-center">
+                <div className="text-xl">💗</div>
+              </div>
             </div>
-            <div className="bg-red-50 rounded-xl p-2 text-center">
-              <div className="text-2xl">💋</div>
-              <div className="text-[9px] text-red-600">Dodge!</div>
-            </div>
-            <div className="bg-rose-50 rounded-xl p-2 text-center">
-              <div className="text-2xl">💌</div>
-              <div className="text-[9px] text-rose-600">Dodge!</div>
-            </div>
-            <div className="bg-pink-50 rounded-xl p-2 text-center">
-              <div className="text-2xl">🌹</div>
-              <div className="text-[9px] text-pink-600">Dodge!</div>
-            </div>
+            <p className="text-purple-600 text-xs">Dodge all the love projectiles!</p>
           </div>
 
           <div className="grid grid-cols-3 gap-2 mb-4">
-            <div className="bg-blue-50 rounded-xl p-2 text-center">
+            <div className="bg-blue-50 rounded-xl p-2 text-center border border-blue-100">
               <div className="text-xl">🛡️</div>
-              <div className="text-[9px] text-blue-600">Shield</div>
+              <div className="text-[9px] text-blue-600 font-medium">Block 1 hit</div>
             </div>
-            <div className="bg-green-50 rounded-xl p-2 text-center">
-              <div className="text-xl">🔮</div>
-              <div className="text-[9px] text-green-600">Shrink</div>
+            <div className="bg-green-50 rounded-xl p-2 text-center border border-green-100">
+              <div className="text-xl">💚</div>
+              <div className="text-[9px] text-green-600 font-medium">+1 Health</div>
             </div>
-            <div className="bg-amber-50 rounded-xl p-2 text-center">
+            <div className="bg-amber-50 rounded-xl p-2 text-center border border-amber-100">
               <div className="text-xl">⏰</div>
-              <div className="text-[9px] text-amber-600">Slow-Mo</div>
+              <div className="text-[9px] text-amber-600 font-medium">Slow time</div>
             </div>
           </div>
 
-          <div className="bg-purple-50 rounded-xl p-3 mb-4">
-            <p className="text-purple-600 text-sm">
-              👆 <span className="font-semibold">Drag anywhere</span> to move!
+          <div className="bg-slate-100 rounded-xl p-3 mb-4">
+            <p className="text-slate-700 text-sm font-medium">
+              👆 Drag to move your character!
             </p>
           </div>
 
           <motion.button
             onClick={startCountdown}
-            className="w-full py-4 bg-gradient-to-r from-violet-500 via-purple-500 to-fuchsia-500 text-white rounded-2xl font-bold text-xl shadow-xl"
+            className="w-full py-4 bg-gradient-to-r from-purple-500 via-pink-500 to-rose-500 text-white rounded-2xl font-bold text-lg shadow-xl"
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
           >
-            Start Dodging! 🏃
+            <motion.span
+              animate={{ scale: [1, 1.05, 1] }}
+              transition={{ duration: 1, repeat: Infinity }}
+            >
+              Ready to Dodge! ⚡
+            </motion.span>
           </motion.button>
         </motion.div>
       </div>
@@ -1947,15 +2115,16 @@ const DodgeTheLoveGame = memo(function DodgeTheLoveGame({ onComplete }: { onComp
   // Countdown
   if (phase === "countdown") {
     return (
-      <div className="fixed inset-0 bg-gradient-to-b from-violet-600 via-purple-600 to-fuchsia-700 flex items-center justify-center">
+      <div className="fixed inset-0 bg-gradient-to-b from-slate-900 via-purple-900 to-violet-900 flex items-center justify-center">
         <motion.div
           key={countdownNum}
-          initial={{ scale: 0, rotate: -180 }}
-          animate={{ scale: 1, rotate: 0 }}
-          transition={{ type: "spring", stiffness: 300 }}
-          className="text-[150px] font-black text-white drop-shadow-2xl"
+          initial={{ scale: 3, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          exit={{ scale: 0, opacity: 0 }}
+          transition={{ type: "spring", stiffness: 300, damping: 20 }}
+          className="text-[140px] font-black text-white drop-shadow-[0_0_30px_rgba(168,85,247,0.8)]"
         >
-          {countdownNum || "DODGE!"}
+          {countdownNum || "GO!"}
         </motion.div>
       </div>
     );
@@ -1965,50 +2134,62 @@ const DodgeTheLoveGame = memo(function DodgeTheLoveGame({ onComplete }: { onComp
   if (phase === "done") {
     const survived = health > 0;
     return (
-      <div className="fixed inset-0 bg-gradient-to-b from-violet-600 via-purple-600 to-fuchsia-700 flex flex-col items-center justify-center p-4">
+      <div className="fixed inset-0 bg-gradient-to-b from-slate-900 via-purple-900 to-violet-900 flex flex-col items-center justify-center p-4">
         <motion.div
-          initial={{ scale: 0, rotate: -20 }}
-          animate={{ scale: 1, rotate: 0 }}
-          className="bg-white/95 backdrop-blur-xl rounded-3xl p-8 max-w-sm text-center shadow-2xl"
+          initial={{ scale: 0, y: 50 }}
+          animate={{ scale: 1, y: 0 }}
+          transition={{ type: "spring", stiffness: 200 }}
+          className="bg-white/95 backdrop-blur-xl rounded-3xl p-8 max-w-sm text-center shadow-2xl border border-purple-200"
         >
           <motion.div
             className="text-8xl mb-4"
-            animate={survived ? { y: [0, -10, 0] } : { rotate: [0, -10, 10, 0] }}
-            transition={{ duration: 1, repeat: Infinity }}
+            animate={survived ? { y: [0, -15, 0], rotate: [0, 5, -5, 0] } : { scale: [1, 1.1, 1] }}
+            transition={{ duration: 1.5, repeat: Infinity }}
           >
-            {survived ? "🏃" : "😻"}
+            {survived ? "🎉" : "😻"}
           </motion.div>
-          <h2 className="text-3xl font-bold bg-gradient-to-r from-violet-600 to-fuchsia-600 bg-clip-text text-transparent mb-3">
+          <h2 className="text-3xl font-black bg-gradient-to-r from-purple-600 to-pink-500 bg-clip-text text-transparent mb-3">
             {survived ? "You Survived!" : "Caught by Love!"}
           </h2>
 
-          <div className="grid grid-cols-2 gap-3 mb-4">
-            <div className="bg-purple-50 rounded-2xl p-3">
-              <p className="text-3xl font-black text-purple-600">{score}</p>
-              <p className="text-purple-400 text-xs">points</p>
+          <div className="grid grid-cols-3 gap-2 mb-4">
+            <div className="bg-purple-50 rounded-2xl p-3 border border-purple-100">
+              <p className="text-2xl font-black text-purple-600">{score}</p>
+              <p className="text-purple-400 text-[10px]">POINTS</p>
             </div>
-            <div className="bg-pink-50 rounded-2xl p-3">
-              <p className="text-3xl font-black text-pink-600">{dodgeStreak}</p>
-              <p className="text-pink-400 text-xs">best streak</p>
+            <div className="bg-pink-50 rounded-2xl p-3 border border-pink-100">
+              <p className="text-2xl font-black text-pink-600">x{maxCombo}</p>
+              <p className="text-pink-400 text-[10px]">COMBO</p>
+            </div>
+            <div className="bg-rose-50 rounded-2xl p-3 border border-rose-100">
+              <p className="text-2xl font-black text-rose-600">{health}</p>
+              <p className="text-rose-400 text-[10px]">HP LEFT</p>
             </div>
           </div>
 
           <motion.p
-            className="text-slate-600 italic"
+            className="text-slate-500 italic"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.5 }}
           >
-            {survived ? '"You can\'t dodge FOREVER!" 😾' : '"Now you\'re MINE!" 😻'}
+            {survived ? '"You got lucky this time!" 😾' : '"You can\'t resist my love!" 😻'}
           </motion.p>
-          <motion.p
-            className="text-purple-400 mt-4 text-sm"
+          <motion.div
+            className="mt-4 flex justify-center gap-1"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 1 }}
           >
-            Loading next challenge...
-          </motion.p>
+            <span className="text-purple-300 text-sm">Next challenge</span>
+            <motion.span
+              animate={{ x: [0, 5, 0] }}
+              transition={{ duration: 1, repeat: Infinity }}
+              className="text-purple-300"
+            >
+              →
+            </motion.span>
+          </motion.div>
         </motion.div>
       </div>
     );
@@ -2018,75 +2199,132 @@ const DodgeTheLoveGame = memo(function DodgeTheLoveGame({ onComplete }: { onComp
   return (
     <motion.div
       className={cn(
-        "fixed inset-0 overflow-hidden select-none touch-none transition-colors duration-200",
-        slowMo ? "bg-gradient-to-b from-blue-900 via-indigo-900 to-purple-900" :
-        "bg-gradient-to-b from-violet-600 via-purple-600 to-fuchsia-700"
+        "fixed inset-0 overflow-hidden select-none touch-none",
+        slowMo
+          ? "bg-gradient-to-b from-blue-950 via-indigo-950 to-purple-950"
+          : "bg-gradient-to-b from-slate-900 via-purple-900 to-violet-900"
       )}
-      animate={hitFlash ? { backgroundColor: ["#ef4444", "transparent"] } : {}}
+      animate={hitFlash ? { backgroundColor: ["#dc2626", "transparent"] } : {}}
+      transition={{ duration: 0.15 }}
       onMouseMove={(e) => handleMove(e.clientX, e.clientY, e.currentTarget.getBoundingClientRect())}
       onTouchMove={(e) => {
         e.preventDefault();
         handleMove(e.touches[0].clientX, e.touches[0].clientY, e.currentTarget.getBoundingClientRect());
       }}
     >
-      {/* Slow-mo overlay */}
+      {/* Star field background */}
+      <div className="absolute inset-0 pointer-events-none overflow-hidden">
+        {Array.from({ length: 40 }).map((_, i) => (
+          <div
+            key={i}
+            className="absolute w-0.5 h-0.5 bg-white/40 rounded-full"
+            style={{ left: `${(i * 17) % 100}%`, top: `${(i * 23) % 100}%` }}
+          />
+        ))}
+      </div>
+
+      {/* Slow-mo effect */}
       {slowMo && (
-        <div className="absolute inset-0 bg-blue-500/10 pointer-events-none z-5">
-          <div className="absolute inset-0" style={{
-            backgroundImage: "radial-gradient(circle, rgba(255,255,255,0.1) 1px, transparent 1px)",
-            backgroundSize: "20px 20px",
-          }} />
-        </div>
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="absolute inset-0 pointer-events-none"
+        >
+          <div className="absolute inset-0 bg-blue-500/5" />
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[200%] h-[200%] border border-blue-400/10 rounded-full" />
+        </motion.div>
       )}
 
       {/* Header */}
-      <div className="absolute top-4 left-0 right-0 flex justify-center gap-3 z-20 px-4">
-        <motion.div className="bg-white/95 backdrop-blur rounded-2xl px-4 py-2 shadow-xl flex items-center gap-2">
-          <span className="text-xl">💜</span>
-          <span className="text-lg font-black text-purple-600">{score}</span>
+      <div className="absolute top-3 left-0 right-0 flex justify-center gap-2 z-30 px-3">
+        <motion.div
+          className="bg-black/40 backdrop-blur-md rounded-xl px-3 py-1.5 shadow-lg border border-white/10 flex items-center gap-1.5"
+          animate={score > 0 ? { scale: [1, 1.02, 1] } : {}}
+        >
+          <span className="text-lg">⭐</span>
+          <span className="text-base font-bold text-white">{score}</span>
         </motion.div>
         <motion.div
           className={cn(
-            "backdrop-blur rounded-2xl px-4 py-2 shadow-xl flex items-center gap-1",
-            timeLeft <= 5 ? "bg-red-100/95" : "bg-white/95"
+            "backdrop-blur-md rounded-xl px-3 py-1.5 shadow-lg border flex items-center gap-1.5",
+            timeLeft <= 5 ? "bg-red-500/30 border-red-400/30" : "bg-black/40 border-white/10"
           )}
           animate={timeLeft <= 5 ? { scale: [1, 1.05, 1] } : {}}
           transition={{ duration: 0.5, repeat: timeLeft <= 5 ? Infinity : 0 }}
         >
-          <span className="text-xl">⏱️</span>
-          <span className={cn("text-lg font-black", timeLeft <= 5 ? "text-red-600" : "text-purple-600")}>
+          <span className="text-lg">⏱️</span>
+          <span className={cn("text-base font-bold", timeLeft <= 5 ? "text-red-300" : "text-white")}>
             {timeLeft}s
           </span>
         </motion.div>
-        <div className="bg-white/95 backdrop-blur rounded-2xl px-4 py-2 shadow-xl flex items-center gap-1">
-          {[...Array(3)].map((_, i) => (
-            <motion.span
+        <div className="bg-black/40 backdrop-blur-md rounded-xl px-2 py-1.5 shadow-lg border border-white/10 flex items-center gap-0.5">
+          {[...Array(5)].map((_, i) => (
+            <motion.div
               key={i}
-              className="text-xl"
-              animate={i < health ? {} : { scale: 0, opacity: 0 }}
+              animate={i >= health ? { scale: 0, opacity: 0 } : { scale: 1, opacity: 1 }}
+              transition={{ type: "spring", stiffness: 500 }}
             >
-              {i < health ? "❤️" : "🖤"}
-            </motion.span>
+              <span className={cn("text-base", i < health ? "" : "grayscale opacity-30")}>
+                {i < health ? "❤️" : "🖤"}
+              </span>
+            </motion.div>
           ))}
         </div>
+        {combo >= 5 && (
+          <motion.div
+            initial={{ scale: 0, x: 20 }}
+            animate={{ scale: 1, x: 0 }}
+            className="bg-gradient-to-r from-orange-500/50 to-yellow-500/50 backdrop-blur-md rounded-xl px-3 py-1.5 shadow-lg border border-yellow-400/30"
+          >
+            <span className="text-base font-bold text-yellow-200">x{combo} 🔥</span>
+          </motion.div>
+        )}
       </div>
 
-      {/* Cat at top */}
+      {/* Pattern announcement */}
+      <AnimatePresence>
+        {patternName && (
+          <motion.div
+            initial={{ y: -50, opacity: 0, scale: 0.8 }}
+            animate={{ y: 0, opacity: 1, scale: 1 }}
+            exit={{ y: -30, opacity: 0 }}
+            className="absolute top-20 left-1/2 -translate-x-1/2 z-30"
+          >
+            <div className="bg-gradient-to-r from-pink-500/80 to-purple-500/80 backdrop-blur text-white px-6 py-2 rounded-full font-bold shadow-xl border border-white/20">
+              {patternName}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Cat */}
       <motion.div
-        className="absolute top-16 left-1/2 -translate-x-1/2 text-center z-10"
-        animate={{ y: [0, -5, 0], rotate: catEmotion === "determined" ? [0, -5, 5, 0] : 0 }}
-        transition={{ duration: 1.5, repeat: Infinity }}
+        className="absolute top-12 left-1/2 -translate-x-1/2 text-center z-20"
+        animate={{
+          y: catEmotion === "attacking" ? [0, -3, 0] : [0, -5, 0],
+          scale: catEmotion === "charging" ? [1, 1.1, 1] : 1,
+        }}
+        transition={{ duration: catEmotion === "attacking" ? 0.3 : 1.5, repeat: Infinity }}
       >
-        <div className="text-6xl mb-1">
-          {catEmotion === "love" ? "😻" : catEmotion === "angry" ? "😾" : "🙀"}
+        <div className="relative">
+          {catEmotion === "charging" && (
+            <motion.div
+              className="absolute inset-0 -m-4 rounded-full bg-pink-500/30"
+              animate={{ scale: [1, 1.5, 1], opacity: [0.5, 0, 0.5] }}
+              transition={{ duration: 0.5, repeat: Infinity }}
+            />
+          )}
+          <span className="text-5xl drop-shadow-lg">
+            {catEmotion === "love" ? "😻" : catEmotion === "charging" ? "😼" : catEmotion === "attacking" ? "😾" : "🙀"}
+          </span>
         </div>
         <AnimatePresence>
           {catMessage && (
             <motion.div
-              initial={{ scale: 0, y: 10 }}
+              initial={{ scale: 0, y: 5 }}
               animate={{ scale: 1, y: 0 }}
-              exit={{ scale: 0, y: -10 }}
-              className="bg-white/95 text-purple-600 px-4 py-2 rounded-full font-bold shadow-xl text-sm"
+              exit={{ scale: 0, y: -5 }}
+              className="absolute top-full left-1/2 -translate-x-1/2 mt-1 bg-white/95 text-purple-600 px-3 py-1 rounded-full font-bold shadow-xl text-xs whitespace-nowrap"
             >
               {catMessage}
             </motion.div>
@@ -2102,24 +2340,48 @@ const DodgeTheLoveGame = memo(function DodgeTheLoveGame({ onComplete }: { onComp
             onComplete(score);
           }
         }}
-        className="absolute top-4 right-4 bg-white/30 backdrop-blur rounded-full px-4 py-2 text-white/80 text-sm z-20"
+        className="absolute top-3 right-3 bg-white/10 backdrop-blur rounded-full px-3 py-1.5 text-white/60 text-xs z-30 hover:bg-white/20 transition-colors"
       >
         Skip →
       </button>
+
+      {/* Warning indicators */}
+      {warnings.map(w => (
+        <motion.div
+          key={w.id}
+          className="absolute pointer-events-none z-10"
+          style={{ left: `${w.x}%`, top: `${w.y}%`, transform: "translate(-50%, -50%)" }}
+          initial={{ scale: 0, opacity: 0 }}
+          animate={{ scale: [1, 1.3, 1], opacity: [0.8, 0.4, 0.8] }}
+          transition={{ duration: 0.3, repeat: Infinity }}
+        >
+          <div className="w-12 h-12 rounded-full border-2 border-red-400 bg-red-500/20 flex items-center justify-center">
+            <span className="text-red-400 text-xl">⚠️</span>
+          </div>
+        </motion.div>
+      ))}
 
       {/* Power-ups */}
       {powerUps.map(pu => (
         <motion.div
           key={pu.id}
-          className="absolute text-4xl"
+          className="absolute z-15"
           style={{ left: `${pu.x}%`, top: `${pu.y}%`, transform: "translate(-50%, -50%)" }}
-          animate={{ y: [0, -5, 0], scale: [1, 1.1, 1] }}
-          transition={{ duration: 1, repeat: Infinity }}
+          animate={{ y: [0, -8, 0], rotate: [0, 5, -5, 0] }}
+          transition={{ duration: 2, repeat: Infinity }}
         >
           <div className="relative">
-            <div className="absolute inset-0 bg-white/50 blur-xl rounded-full scale-150" />
-            <span className="relative">
-              {pu.type === "shield" ? "🛡️" : pu.type === "shrink" ? "🔮" : "⏰"}
+            <motion.div
+              className={cn(
+                "absolute inset-0 -m-3 rounded-full blur-md",
+                pu.type === "shield" ? "bg-blue-400/50" :
+                pu.type === "heal" ? "bg-green-400/50" : "bg-amber-400/50"
+              )}
+              animate={{ scale: [1, 1.3, 1], opacity: [0.6, 0.3, 0.6] }}
+              transition={{ duration: 1.5, repeat: Infinity }}
+            />
+            <span className="relative text-3xl drop-shadow-lg">
+              {pu.type === "shield" ? "🛡️" : pu.type === "heal" ? "💚" : "⏰"}
             </span>
           </div>
         </motion.div>
@@ -2127,95 +2389,140 @@ const DodgeTheLoveGame = memo(function DodgeTheLoveGame({ onComplete }: { onComp
 
       {/* Projectiles */}
       {projectiles.map(p => (
-        <motion.div
+        <div
           key={p.id}
           className="absolute pointer-events-none"
           style={{
             left: `${p.x}%`,
             top: `${p.y}%`,
-            transform: `translate(-50%, -50%) scale(${p.size})`,
-            fontSize: "2rem",
+            transform: `translate(-50%, -50%) scale(${p.size}) rotate(${p.rotation}deg)`,
+            willChange: "transform, left, top",
           }}
-          initial={{ scale: 0, rotate: 0 }}
-          animate={{ scale: p.size, rotate: p.type === "rose" ? 360 : 0 }}
-          transition={{ rotate: { duration: 2, repeat: Infinity, ease: "linear" } }}
         >
-          {p.type === "heart" && "💕"}
-          {p.type === "kiss" && "💋"}
-          {p.type === "love_letter" && "💌"}
-          {p.type === "rose" && "🌹"}
+          {p.glow && (
+            <div className="absolute inset-0 -m-2 bg-pink-400/30 rounded-full blur-md" />
+          )}
+          <span className={cn("text-2xl", p.glow && "drop-shadow-[0_0_8px_rgba(236,72,153,0.8)]")}>
+            {p.type === "heart" && "💕"}
+            {p.type === "kiss" && "💋"}
+            {p.type === "sparkle" && "✨"}
+            {p.type === "big_heart" && "💗"}
+          </span>
+        </div>
+      ))}
+
+      {/* Player trail */}
+      {trail.map((t) => (
+        <motion.div
+          key={t.id}
+          className="absolute pointer-events-none z-5"
+          style={{ left: `${t.x}%`, top: `${t.y}%`, transform: "translate(-50%, -50%)" }}
+          initial={{ opacity: 0.4, scale: 0.8 }}
+          animate={{ opacity: 0, scale: 0.3 }}
+          transition={{ duration: 0.4 }}
+        >
+          <div className="w-6 h-6 rounded-full bg-purple-400/30" />
         </motion.div>
       ))}
 
-      {/* Player */}
+      {/* Player character */}
       <motion.div
-        className="absolute z-10"
+        className="absolute z-20"
         style={{
           left: `${playerX}%`,
           top: `${playerY}%`,
           transform: "translate(-50%, -50%)",
+          willChange: "left, top",
         }}
       >
         <div className="relative">
           {/* Shield effect */}
           {shield && (
             <motion.div
-              className="absolute inset-0 -m-4 rounded-full border-4 border-blue-400 bg-blue-400/20"
-              animate={{ scale: [1, 1.1, 1], opacity: [0.8, 0.5, 0.8] }}
-              transition={{ duration: 1, repeat: Infinity }}
-              style={{ width: "80px", height: "80px", marginLeft: "-20px", marginTop: "-20px" }}
+              className="absolute inset-0 -m-5 rounded-full border-3 border-blue-400 bg-blue-400/15"
+              animate={{ scale: [1, 1.08, 1], opacity: [0.9, 0.5, 0.9] }}
+              transition={{ duration: 1.2, repeat: Infinity }}
+              style={{ width: "60px", height: "60px" }}
             />
           )}
+
+          {/* Invincibility flash */}
+          {invincible && (
+            <motion.div
+              className="absolute inset-0 -m-3 rounded-full bg-white/50"
+              animate={{ opacity: [0, 0.8, 0] }}
+              transition={{ duration: 0.2, repeat: Infinity }}
+            />
+          )}
+
           {/* Player glow */}
-          <div className={cn(
-            "absolute inset-0 blur-xl rounded-full",
-            shrink ? "bg-green-400/40 scale-75" : "bg-purple-400/40 scale-150"
-          )} />
-          <motion.span
-            className={cn("relative", shrink ? "text-4xl" : "text-5xl")}
-            animate={{ y: [0, -3, 0] }}
-            transition={{ duration: 0.5, repeat: Infinity }}
+          <div className="absolute inset-0 -m-4 bg-purple-500/20 rounded-full blur-lg" />
+
+          {/* Character - cute blob with face */}
+          <motion.div
+            className="relative"
+            animate={{ y: [0, -2, 0] }}
+            transition={{ duration: 0.6, repeat: Infinity }}
           >
-            🏃
-          </motion.span>
+            <div
+              className={cn(
+                "w-10 h-10 rounded-full bg-gradient-to-b from-purple-300 to-purple-500 border-2 border-purple-200 shadow-lg relative",
+                invincible && "animate-pulse"
+              )}
+              style={{ transform: playerFacing === "left" ? "scaleX(-1)" : "scaleX(1)" }}
+            >
+              {/* Eyes */}
+              <div className="absolute top-3 left-2 w-2 h-2.5 bg-white rounded-full">
+                <div className="absolute bottom-0.5 left-0.5 w-1 h-1 bg-slate-800 rounded-full" />
+              </div>
+              <div className="absolute top-3 right-2 w-2 h-2.5 bg-white rounded-full">
+                <div className="absolute bottom-0.5 left-0.5 w-1 h-1 bg-slate-800 rounded-full" />
+              </div>
+              {/* Blush */}
+              <div className="absolute top-5 left-0.5 w-2 h-1 bg-pink-300/60 rounded-full" />
+              <div className="absolute top-5 right-0.5 w-2 h-1 bg-pink-300/60 rounded-full" />
+              {/* Mouth */}
+              <div className="absolute bottom-2 left-1/2 -translate-x-1/2 w-2 h-1 border-b-2 border-slate-600 rounded-b-full" />
+            </div>
+          </motion.div>
         </div>
       </motion.div>
 
-      {/* Active effects indicator */}
-      <div className="absolute bottom-6 left-4 right-4 z-10">
-        <div className="bg-white/20 backdrop-blur rounded-2xl p-3 text-center">
-          <div className="flex justify-center gap-2 mb-2">
+      {/* Bottom info bar */}
+      <div className="absolute bottom-4 left-3 right-3 z-20">
+        <div className="bg-black/30 backdrop-blur-md rounded-2xl p-2.5 border border-white/10">
+          <div className="flex justify-center items-center gap-2 flex-wrap">
             {shield && (
               <motion.span
                 initial={{ scale: 0 }}
                 animate={{ scale: 1 }}
-                className="bg-blue-500/80 text-white px-3 py-1 rounded-full text-sm font-bold"
+                className="bg-blue-500/60 text-white px-2.5 py-1 rounded-full text-xs font-bold border border-blue-400/30"
               >
                 🛡️ Shield
-              </motion.span>
-            )}
-            {shrink && (
-              <motion.span
-                initial={{ scale: 0 }}
-                animate={{ scale: 1 }}
-                className="bg-green-500/80 text-white px-3 py-1 rounded-full text-sm font-bold"
-              >
-                🔮 Tiny
               </motion.span>
             )}
             {slowMo && (
               <motion.span
                 initial={{ scale: 0 }}
                 animate={{ scale: 1 }}
-                className="bg-amber-500/80 text-white px-3 py-1 rounded-full text-sm font-bold"
+                className="bg-amber-500/60 text-white px-2.5 py-1 rounded-full text-xs font-bold border border-amber-400/30"
               >
                 ⏰ Slow-Mo
               </motion.span>
             )}
+            {invincible && (
+              <motion.span
+                animate={{ opacity: [1, 0.5, 1] }}
+                transition={{ duration: 0.3, repeat: Infinity }}
+                className="bg-white/60 text-purple-700 px-2.5 py-1 rounded-full text-xs font-bold"
+              >
+                ✨ Invincible
+              </motion.span>
+            )}
+            {!shield && !slowMo && !invincible && (
+              <span className="text-white/50 text-xs">Drag to move!</span>
+            )}
           </div>
-          <p className="text-white/80 text-sm">
-            👆 Move to dodge the cat's love attacks!
-          </p>
         </div>
       </div>
     </motion.div>
