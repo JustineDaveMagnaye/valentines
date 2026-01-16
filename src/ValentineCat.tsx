@@ -1580,6 +1580,20 @@ const DodgeTheLoveGame = memo(function DodgeTheLoveGame({ onComplete }: { onComp
     type: "shield" | "heal" | "slow";
   }>>([]);
 
+  // Particles for effects
+  const [particles, setParticles] = useState<Array<{
+    id: number;
+    x: number;
+    y: number;
+    vx: number;
+    vy: number;
+    type: "sparkle" | "heart" | "star" | "heal" | "shield" | "dodge";
+    life: number;
+    maxLife: number;
+    size: number;
+    color: string;
+  }>>([]);
+
   // Current attack pattern
   const [currentPattern, setCurrentPattern] = useState<AttackPattern>("rest");
   const [patternName, setPatternName] = useState("");
@@ -1594,6 +1608,9 @@ const DodgeTheLoveGame = memo(function DodgeTheLoveGame({ onComplete }: { onComp
   const [combo, setCombo] = useState(0);
   const [maxCombo, setMaxCombo] = useState(0);
   const [playerFacing, setPlayerFacing] = useState<"left" | "right">("right");
+  const [playerEmotion, setPlayerEmotion] = useState<"normal" | "scared" | "happy" | "hurt">("normal");
+  const [screenShake, setScreenShake] = useState(0);
+  const [scorePopups, setScorePopups] = useState<Array<{ id: number; x: number; y: number; value: number; type: "dodge" | "powerup" | "combo" }>>([]);
 
   // Dodge trail effect
   const [trail, setTrail] = useState<Array<{ id: number; x: number; y: number }>>([]);
@@ -1630,6 +1647,36 @@ const DodgeTheLoveGame = memo(function DodgeTheLoveGame({ onComplete }: { onComp
     "rest", "burst", "rest", "walls", "rest", "aimed", "rain"
   ], []);
 
+  // Spawn particles helper
+  const spawnParticles = useCallback((x: number, y: number, type: "sparkle" | "heart" | "star" | "heal" | "shield" | "dodge", count: number) => {
+    const colors: Record<string, string[]> = {
+      sparkle: ["#fcd34d", "#fbbf24", "#f59e0b"],
+      heart: ["#f472b6", "#ec4899", "#db2777"],
+      star: ["#c084fc", "#a855f7", "#9333ea"],
+      heal: ["#4ade80", "#22c55e", "#16a34a"],
+      shield: ["#60a5fa", "#3b82f6", "#2563eb"],
+      dodge: ["#818cf8", "#6366f1", "#4f46e5"],
+    };
+    const newParticles = Array.from({ length: count }, (_, i) => ({
+      id: performance.now() + i + Math.random() * 1000,
+      x, y,
+      vx: (Math.random() - 0.5) * 8,
+      vy: (Math.random() - 0.5) * 8 - 2,
+      type,
+      life: 1,
+      maxLife: 0.6 + Math.random() * 0.4,
+      size: 0.5 + Math.random() * 0.5,
+      color: colors[type][Math.floor(Math.random() * colors[type].length)],
+    }));
+    setParticles(prev => [...prev.slice(-40), ...newParticles]);
+  }, []);
+
+  // Spawn score popup helper
+  const spawnScorePopup = useCallback((x: number, y: number, value: number, type: "dodge" | "powerup" | "combo") => {
+    setScorePopups(prev => [...prev.slice(-5), { id: performance.now(), x, y, value, type }]);
+    setTimeout(() => setScorePopups(prev => prev.slice(1)), 1000);
+  }, []);
+
   const startCountdown = useCallback(() => {
     setPhase("countdown");
     setCountdownNum(3);
@@ -1661,6 +1708,10 @@ const DodgeTheLoveGame = memo(function DodgeTheLoveGame({ onComplete }: { onComp
       setCombo(0);
       setMaxCombo(0);
       setCurrentPattern("rest");
+      setParticles([]);
+      setScorePopups([]);
+      setPlayerEmotion("normal");
+      setScreenShake(0);
       patternIndexRef.current = 0;
       patternTimeRef.current = performance.now();
       setPhase("playing");
@@ -1931,6 +1982,8 @@ const DodgeTheLoveGame = memo(function DodgeTheLoveGame({ onComplete }: { onComp
                 setCatMessage("Shield blocked! 😾");
                 setTimeout(() => setCatMessage(""), 800);
                 setScore(s => s + 15);
+                spawnParticles(playerXRef.current, playerYRef.current, "shield", 12);
+                spawnScorePopup(playerXRef.current, playerYRef.current - 5, 15, "powerup");
               } else {
                 setHealth(h => {
                   const newHealth = h - 1;
@@ -1945,10 +1998,14 @@ const DodgeTheLoveGame = memo(function DodgeTheLoveGame({ onComplete }: { onComp
                 setHitFlash(true);
                 setInvincible(true);
                 invincibleRef.current = true;
+                setScreenShake(8);
+                setPlayerEmotion("hurt");
                 setTimeout(() => setHitFlash(false), 150);
-                setTimeout(() => { setInvincible(false); invincibleRef.current = false; }, 1500);
+                setTimeout(() => setScreenShake(0), 200);
+                setTimeout(() => { setInvincible(false); invincibleRef.current = false; setPlayerEmotion("normal"); }, 1500);
                 setCombo(0);
                 p.y = 200;
+                spawnParticles(playerXRef.current, playerYRef.current, "heart", 8);
                 setCatMessage(["Got you! 😻", "Feel the love! 💕", "Can't dodge forever! 😼"][Math.floor(Math.random() * 3)]);
                 setTimeout(() => setCatMessage(""), 1000);
               }
@@ -1959,12 +2016,20 @@ const DodgeTheLoveGame = memo(function DodgeTheLoveGame({ onComplete }: { onComp
         // Score for dodged projectiles
         const dodged = updated.filter(p => p.y > 98 && p.y < 102);
         if (dodged.length > 0) {
-          setScore(s => s + dodged.length * 3);
+          const points = dodged.length * 3;
+          setScore(s => s + points);
           setCombo(c => {
             const newCombo = c + dodged.length;
             setMaxCombo(m => Math.max(m, newCombo));
+            if (newCombo % 10 === 0 && newCombo > 0) {
+              spawnScorePopup(playerXRef.current, playerYRef.current - 8, newCombo * 2, "combo");
+              setScore(s => s + newCombo * 2);
+              setPlayerEmotion("happy");
+              setTimeout(() => setPlayerEmotion("normal"), 500);
+            }
             return newCombo;
           });
+          spawnParticles(50, 95, "dodge", Math.min(dodged.length * 2, 6));
         }
 
         return updated.filter(p => p.y < 105 && p.y > -15 && p.x > -15 && p.x < 115);
@@ -1982,23 +2047,38 @@ const DodgeTheLoveGame = memo(function DodgeTheLoveGame({ onComplete }: { onComp
               setShield(true);
               shieldRef.current = true;
               setCatMessage("A shield?! No fair! 😾");
+              spawnParticles(pu.x, pu.y, "shield", 10);
             } else if (pu.type === "heal") {
               setHealth(h => Math.min(h + 1, 5));
               healthRef.current = Math.min(healthRef.current + 1, 5);
               setCatMessage("Healing?! 🙀");
+              spawnParticles(pu.x, pu.y, "heal", 10);
+              setPlayerEmotion("happy");
+              setTimeout(() => setPlayerEmotion("normal"), 800);
             } else if (pu.type === "slow") {
               setSlowMo(true);
               slowMoRef.current = true;
               setTimeout(() => { setSlowMo(false); slowMoRef.current = false; }, 4000);
               setCatMessage("Time slow?! 😾");
+              spawnParticles(pu.x, pu.y, "star", 10);
             }
             setTimeout(() => setCatMessage(""), 1000);
             setScore(s => s + 25);
+            spawnScorePopup(pu.x, pu.y - 5, 25, "powerup");
             return false;
           }
           return true;
         });
       });
+
+      // Update particles
+      setParticles(prev => prev.map(p => ({
+        ...p,
+        x: p.x + p.vx * deltaTime * 60,
+        y: p.y + p.vy * deltaTime * 60,
+        vy: p.vy + deltaTime * 15,
+        life: p.life - deltaTime / p.maxLife,
+      })).filter(p => p.life > 0));
 
       // Clean old trail
       setTrail(prev => prev.filter(t => currentTime - t.id < 400));
@@ -2008,7 +2088,7 @@ const DodgeTheLoveGame = memo(function DodgeTheLoveGame({ onComplete }: { onComp
 
     rafRef.current = requestAnimationFrame(gameLoop);
     return () => cancelAnimationFrame(rafRef.current);
-  }, [phase, currentPattern, executePattern, patterns]);
+  }, [phase, currentPattern, executePattern, patterns, spawnParticles, spawnScorePopup]);
 
   const handleMove = useCallback((clientX: number, clientY: number, rect: DOMRect) => {
     const x = ((clientX - rect.left) / rect.width) * 100;
@@ -2204,21 +2284,58 @@ const DodgeTheLoveGame = memo(function DodgeTheLoveGame({ onComplete }: { onComp
           ? "bg-gradient-to-b from-blue-950 via-indigo-950 to-purple-950"
           : "bg-gradient-to-b from-slate-900 via-purple-900 to-violet-900"
       )}
-      animate={hitFlash ? { backgroundColor: ["#dc2626", "transparent"] } : {}}
-      transition={{ duration: 0.15 }}
+      animate={hitFlash
+        ? { backgroundColor: ["#dc2626", "transparent"] }
+        : screenShake > 0
+          ? { x: [0, -screenShake, screenShake, -screenShake/2, 0], y: [0, screenShake/2, -screenShake/2, screenShake/3, 0] }
+          : {}
+      }
+      transition={{ duration: screenShake > 0 ? 0.2 : 0.15 }}
       onMouseMove={(e) => handleMove(e.clientX, e.clientY, e.currentTarget.getBoundingClientRect())}
       onTouchMove={(e) => {
         e.preventDefault();
         handleMove(e.touches[0].clientX, e.touches[0].clientY, e.currentTarget.getBoundingClientRect());
       }}
     >
-      {/* Star field background */}
+      {/* Animated star field background */}
       <div className="absolute inset-0 pointer-events-none overflow-hidden">
-        {Array.from({ length: 40 }).map((_, i) => (
-          <div
+        {Array.from({ length: 50 }).map((_, i) => (
+          <motion.div
             key={i}
-            className="absolute w-0.5 h-0.5 bg-white/40 rounded-full"
-            style={{ left: `${(i * 17) % 100}%`, top: `${(i * 23) % 100}%` }}
+            className="absolute rounded-full bg-white"
+            style={{
+              left: `${(i * 17 + 3) % 100}%`,
+              top: `${(i * 23 + 7) % 100}%`,
+              width: i % 3 === 0 ? "3px" : i % 2 === 0 ? "2px" : "1px",
+              height: i % 3 === 0 ? "3px" : i % 2 === 0 ? "2px" : "1px",
+            }}
+            animate={{
+              opacity: [0.2, 0.8, 0.2],
+              scale: i % 5 === 0 ? [1, 1.5, 1] : [1, 1.2, 1],
+            }}
+            transition={{
+              duration: 2 + (i % 3),
+              repeat: Infinity,
+              delay: (i * 0.1) % 2,
+              ease: "easeInOut"
+            }}
+          />
+        ))}
+      </div>
+
+      {/* Ambient floating particles */}
+      <div className="absolute inset-0 pointer-events-none overflow-hidden">
+        {Array.from({ length: 8 }).map((_, i) => (
+          <motion.div
+            key={`ambient-${i}`}
+            className="absolute w-2 h-2 rounded-full bg-pink-400/20 blur-sm"
+            style={{ left: `${10 + i * 12}%`, top: `${20 + (i % 3) * 25}%` }}
+            animate={{
+              y: [0, -30, 0],
+              x: [0, 10 * (i % 2 === 0 ? 1 : -1), 0],
+              opacity: [0.3, 0.6, 0.3],
+            }}
+            transition={{ duration: 4 + i, repeat: Infinity, delay: i * 0.5 }}
           />
         ))}
       </div>
@@ -2230,8 +2347,17 @@ const DodgeTheLoveGame = memo(function DodgeTheLoveGame({ onComplete }: { onComp
           animate={{ opacity: 1 }}
           className="absolute inset-0 pointer-events-none"
         >
-          <div className="absolute inset-0 bg-blue-500/5" />
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[200%] h-[200%] border border-blue-400/10 rounded-full" />
+          <div className="absolute inset-0 bg-blue-500/10" />
+          <motion.div
+            className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[150%] h-[150%] border-2 border-blue-400/20 rounded-full"
+            animate={{ scale: [1, 1.1, 1], opacity: [0.3, 0.1, 0.3] }}
+            transition={{ duration: 2, repeat: Infinity }}
+          />
+          <motion.div
+            className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[100%] h-[100%] border border-cyan-400/15 rounded-full"
+            animate={{ scale: [1.1, 1, 1.1], opacity: [0.2, 0.4, 0.2] }}
+            transition={{ duration: 1.5, repeat: Infinity }}
+          />
         </motion.div>
       )}
 
@@ -2412,18 +2538,74 @@ const DodgeTheLoveGame = memo(function DodgeTheLoveGame({ onComplete }: { onComp
       ))}
 
       {/* Player trail */}
-      {trail.map((t) => (
+      {trail.map((t, index) => (
         <motion.div
           key={t.id}
           className="absolute pointer-events-none z-5"
           style={{ left: `${t.x}%`, top: `${t.y}%`, transform: "translate(-50%, -50%)" }}
-          initial={{ opacity: 0.4, scale: 0.8 }}
-          animate={{ opacity: 0, scale: 0.3 }}
-          transition={{ duration: 0.4 }}
+          initial={{ opacity: 0.5, scale: 0.9 }}
+          animate={{ opacity: 0, scale: 0.2 }}
+          transition={{ duration: 0.5 }}
         >
-          <div className="w-6 h-6 rounded-full bg-purple-400/30" />
+          <div
+            className="rounded-full"
+            style={{
+              width: `${24 - index * 2}px`,
+              height: `${24 - index * 2}px`,
+              background: `linear-gradient(135deg, rgba(168, 85, 247, ${0.4 - index * 0.04}), rgba(236, 72, 153, ${0.3 - index * 0.03}))`,
+            }}
+          />
         </motion.div>
       ))}
+
+      {/* Particles */}
+      {particles.map(p => (
+        <div
+          key={p.id}
+          className="absolute pointer-events-none z-25"
+          style={{
+            left: `${p.x}%`,
+            top: `${p.y}%`,
+            transform: "translate(-50%, -50%)",
+            opacity: p.life,
+          }}
+        >
+          <div
+            className="rounded-full"
+            style={{
+              width: `${p.size * 8}px`,
+              height: `${p.size * 8}px`,
+              backgroundColor: p.color,
+              boxShadow: `0 0 ${p.size * 4}px ${p.color}`,
+            }}
+          />
+        </div>
+      ))}
+
+      {/* Score popups */}
+      <AnimatePresence>
+        {scorePopups.map(popup => (
+          <motion.div
+            key={popup.id}
+            className="absolute pointer-events-none z-30"
+            style={{ left: `${popup.x}%`, top: `${popup.y}%` }}
+            initial={{ opacity: 1, y: 0, scale: 0.5 }}
+            animate={{ opacity: 0, y: -30, scale: 1.2 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.8, ease: "easeOut" }}
+          >
+            <span className={cn(
+              "font-black text-lg drop-shadow-lg",
+              popup.type === "dodge" && "text-indigo-300",
+              popup.type === "powerup" && "text-emerald-300",
+              popup.type === "combo" && "text-yellow-300"
+            )}>
+              +{popup.value}
+              {popup.type === "combo" && " COMBO!"}
+            </span>
+          </motion.div>
+        ))}
+      </AnimatePresence>
 
       {/* Player character */}
       <motion.div
@@ -2436,54 +2618,210 @@ const DodgeTheLoveGame = memo(function DodgeTheLoveGame({ onComplete }: { onComp
         }}
       >
         <div className="relative">
+          {/* Outer glow ring */}
+          <motion.div
+            className={cn(
+              "absolute rounded-full blur-md",
+              playerEmotion === "hurt" ? "bg-red-400/40" :
+              playerEmotion === "happy" ? "bg-yellow-400/40" :
+              "bg-purple-400/30"
+            )}
+            style={{ width: "56px", height: "56px", left: "-8px", top: "-8px" }}
+            animate={{
+              scale: [1, 1.15, 1],
+              opacity: playerEmotion === "hurt" ? [0.6, 0.3, 0.6] : [0.4, 0.6, 0.4],
+            }}
+            transition={{ duration: playerEmotion === "hurt" ? 0.3 : 1.5, repeat: Infinity }}
+          />
+
           {/* Shield effect */}
           {shield && (
-            <motion.div
-              className="absolute inset-0 -m-5 rounded-full border-3 border-blue-400 bg-blue-400/15"
-              animate={{ scale: [1, 1.08, 1], opacity: [0.9, 0.5, 0.9] }}
-              transition={{ duration: 1.2, repeat: Infinity }}
-              style={{ width: "60px", height: "60px" }}
-            />
+            <>
+              <motion.div
+                className="absolute rounded-full border-2 border-blue-400/80"
+                style={{ width: "64px", height: "64px", left: "-12px", top: "-12px" }}
+                animate={{ scale: [1, 1.1, 1], opacity: [0.8, 0.4, 0.8] }}
+                transition={{ duration: 1, repeat: Infinity }}
+              />
+              <motion.div
+                className="absolute rounded-full bg-blue-400/20"
+                style={{ width: "60px", height: "60px", left: "-10px", top: "-10px" }}
+                animate={{ scale: [1.05, 1, 1.05] }}
+                transition={{ duration: 0.8, repeat: Infinity }}
+              />
+              {/* Shield sparkles */}
+              {[0, 1, 2, 3].map(i => (
+                <motion.div
+                  key={i}
+                  className="absolute w-1.5 h-1.5 bg-blue-300 rounded-full"
+                  style={{
+                    left: `${20 + Math.cos(i * Math.PI / 2) * 28}px`,
+                    top: `${20 + Math.sin(i * Math.PI / 2) * 28}px`,
+                  }}
+                  animate={{
+                    opacity: [0, 1, 0],
+                    scale: [0.5, 1, 0.5],
+                  }}
+                  transition={{ duration: 1.5, repeat: Infinity, delay: i * 0.3 }}
+                />
+              ))}
+            </>
           )}
 
-          {/* Invincibility flash */}
+          {/* Invincibility effect */}
           {invincible && (
-            <motion.div
-              className="absolute inset-0 -m-3 rounded-full bg-white/50"
-              animate={{ opacity: [0, 0.8, 0] }}
-              transition={{ duration: 0.2, repeat: Infinity }}
-            />
+            <>
+              <motion.div
+                className="absolute rounded-full bg-white/40"
+                style={{ width: "52px", height: "52px", left: "-6px", top: "-6px" }}
+                animate={{ opacity: [0.2, 0.6, 0.2], scale: [1, 1.1, 1] }}
+                transition={{ duration: 0.3, repeat: Infinity }}
+              />
+              {[0, 1, 2, 3, 4, 5].map(i => (
+                <motion.div
+                  key={i}
+                  className="absolute w-1 h-1 bg-white rounded-full"
+                  style={{
+                    left: `${20 + Math.cos(i * Math.PI / 3) * 24}px`,
+                    top: `${20 + Math.sin(i * Math.PI / 3) * 24}px`,
+                  }}
+                  animate={{
+                    opacity: [1, 0],
+                    y: [-5, -15],
+                  }}
+                  transition={{ duration: 0.5, repeat: Infinity, delay: i * 0.1 }}
+                />
+              ))}
+            </>
           )}
 
-          {/* Player glow */}
-          <div className="absolute inset-0 -m-4 bg-purple-500/20 rounded-full blur-lg" />
-
-          {/* Character - cute blob with face */}
+          {/* Character body */}
           <motion.div
             className="relative"
-            animate={{ y: [0, -2, 0] }}
-            transition={{ duration: 0.6, repeat: Infinity }}
+            animate={
+              playerEmotion === "hurt"
+                ? { rotate: [-5, 5, -5, 5, 0], y: [0, -3, 0] }
+                : playerEmotion === "happy"
+                  ? { y: [0, -4, 0], scale: [1, 1.05, 1] }
+                  : { y: [0, -3, 0] }
+            }
+            transition={{
+              duration: playerEmotion === "hurt" ? 0.3 : playerEmotion === "happy" ? 0.4 : 0.8,
+              repeat: Infinity,
+              ease: "easeInOut"
+            }}
           >
+            {/* Main body */}
             <div
               className={cn(
-                "w-10 h-10 rounded-full bg-gradient-to-b from-purple-300 to-purple-500 border-2 border-purple-200 shadow-lg relative",
-                invincible && "animate-pulse"
+                "w-10 h-10 rounded-full border-2 shadow-xl relative overflow-hidden",
+                playerEmotion === "hurt"
+                  ? "bg-gradient-to-b from-red-300 to-red-400 border-red-200"
+                  : playerEmotion === "happy"
+                    ? "bg-gradient-to-b from-yellow-200 to-amber-300 border-yellow-100"
+                    : "bg-gradient-to-b from-violet-300 to-purple-400 border-violet-200"
               )}
               style={{ transform: playerFacing === "left" ? "scaleX(-1)" : "scaleX(1)" }}
             >
+              {/* Body shine */}
+              <div className="absolute top-1 left-1 w-3 h-3 bg-white/40 rounded-full blur-sm" />
+              <div className="absolute top-2 left-2 w-1.5 h-1.5 bg-white/60 rounded-full" />
+
               {/* Eyes */}
-              <div className="absolute top-3 left-2 w-2 h-2.5 bg-white rounded-full">
-                <div className="absolute bottom-0.5 left-0.5 w-1 h-1 bg-slate-800 rounded-full" />
-              </div>
-              <div className="absolute top-3 right-2 w-2 h-2.5 bg-white rounded-full">
-                <div className="absolute bottom-0.5 left-0.5 w-1 h-1 bg-slate-800 rounded-full" />
-              </div>
-              {/* Blush */}
-              <div className="absolute top-5 left-0.5 w-2 h-1 bg-pink-300/60 rounded-full" />
-              <div className="absolute top-5 right-0.5 w-2 h-1 bg-pink-300/60 rounded-full" />
-              {/* Mouth */}
-              <div className="absolute bottom-2 left-1/2 -translate-x-1/2 w-2 h-1 border-b-2 border-slate-600 rounded-b-full" />
+              <motion.div
+                className="absolute top-2.5 left-1.5 w-2.5 h-3 bg-white rounded-full shadow-inner"
+                animate={playerEmotion === "scared" ? { scaleY: [1, 1.2, 1] } : {}}
+                transition={{ duration: 0.3, repeat: playerEmotion === "scared" ? Infinity : 0 }}
+              >
+                <motion.div
+                  className="absolute bg-slate-800 rounded-full"
+                  style={{
+                    width: playerEmotion === "hurt" ? "4px" : "5px",
+                    height: playerEmotion === "hurt" ? "4px" : "5px",
+                    bottom: playerEmotion === "hurt" ? "3px" : "2px",
+                    left: "3px",
+                  }}
+                  animate={playerEmotion === "happy" ? { y: [0, -1, 0] } : {}}
+                  transition={{ duration: 0.5, repeat: Infinity }}
+                />
+                {/* Eye shine */}
+                <div className="absolute top-1 right-0.5 w-1 h-1 bg-white rounded-full" />
+              </motion.div>
+              <motion.div
+                className="absolute top-2.5 right-1.5 w-2.5 h-3 bg-white rounded-full shadow-inner"
+                animate={playerEmotion === "scared" ? { scaleY: [1, 1.2, 1] } : {}}
+                transition={{ duration: 0.3, repeat: playerEmotion === "scared" ? Infinity : 0 }}
+              >
+                <motion.div
+                  className="absolute bg-slate-800 rounded-full"
+                  style={{
+                    width: playerEmotion === "hurt" ? "4px" : "5px",
+                    height: playerEmotion === "hurt" ? "4px" : "5px",
+                    bottom: playerEmotion === "hurt" ? "3px" : "2px",
+                    left: "3px",
+                  }}
+                  animate={playerEmotion === "happy" ? { y: [0, -1, 0] } : {}}
+                  transition={{ duration: 0.5, repeat: Infinity }}
+                />
+                {/* Eye shine */}
+                <div className="absolute top-1 right-0.5 w-1 h-1 bg-white rounded-full" />
+              </motion.div>
+
+              {/* Eyebrows for hurt */}
+              {playerEmotion === "hurt" && (
+                <>
+                  <div className="absolute top-1.5 left-1.5 w-2.5 h-0.5 bg-slate-700 rounded-full rotate-12" />
+                  <div className="absolute top-1.5 right-1.5 w-2.5 h-0.5 bg-slate-700 rounded-full -rotate-12" />
+                </>
+              )}
+
+              {/* Blush marks */}
+              <motion.div
+                className={cn(
+                  "absolute top-5 left-0 w-2 h-1.5 rounded-full",
+                  playerEmotion === "happy" ? "bg-orange-300/80" : "bg-pink-300/50"
+                )}
+                animate={playerEmotion === "happy" ? { opacity: [0.6, 0.9, 0.6] } : {}}
+                transition={{ duration: 0.8, repeat: Infinity }}
+              />
+              <motion.div
+                className={cn(
+                  "absolute top-5 right-0 w-2 h-1.5 rounded-full",
+                  playerEmotion === "happy" ? "bg-orange-300/80" : "bg-pink-300/50"
+                )}
+                animate={playerEmotion === "happy" ? { opacity: [0.6, 0.9, 0.6] } : {}}
+                transition={{ duration: 0.8, repeat: Infinity }}
+              />
+
+              {/* Mouth - changes with emotion */}
+              {playerEmotion === "happy" ? (
+                <motion.div
+                  className="absolute bottom-1.5 left-1/2 -translate-x-1/2 w-3 h-2 border-b-2 border-l-2 border-r-2 border-slate-700 rounded-b-full bg-pink-200/50"
+                  animate={{ scaleY: [1, 1.1, 1] }}
+                  transition={{ duration: 0.4, repeat: Infinity }}
+                />
+              ) : playerEmotion === "hurt" ? (
+                <motion.div
+                  className="absolute bottom-2 left-1/2 -translate-x-1/2 w-2.5 h-1.5 border-t-2 border-slate-700 rounded-t-full"
+                  animate={{ scaleX: [1, 0.9, 1] }}
+                  transition={{ duration: 0.2, repeat: Infinity }}
+                />
+              ) : (
+                <div className="absolute bottom-1.5 left-1/2 -translate-x-1/2 w-2 h-1.5 border-b-2 border-slate-600 rounded-b-full" />
+              )}
             </div>
+
+            {/* Little feet */}
+            <motion.div
+              className="absolute -bottom-1 left-1 w-2 h-1.5 bg-purple-400 rounded-full"
+              animate={{ rotate: [-5, 5, -5] }}
+              transition={{ duration: 0.4, repeat: Infinity }}
+            />
+            <motion.div
+              className="absolute -bottom-1 right-1 w-2 h-1.5 bg-purple-400 rounded-full"
+              animate={{ rotate: [5, -5, 5] }}
+              transition={{ duration: 0.4, repeat: Infinity, delay: 0.2 }}
+            />
           </motion.div>
         </div>
       </motion.div>
