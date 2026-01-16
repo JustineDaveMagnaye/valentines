@@ -73,7 +73,6 @@ const INTRO_DIALOG: DialogLine[] = [
 ];
 
 const CHAPTER_TITLES = {
-  chapter1_chase: { num: 1, title: "The Question", subtitle: "Will you say yes?" },
   chapter1_boss: { num: 1, title: "Bubble Pop Blitz", subtitle: "Pop the love bubbles!" },
   chapter2_love_potion: { num: 2, title: "Love Potion Lab", subtitle: "Mix the perfect potion!" },
   chapter2_fortune: { num: 2, title: "Wheel of Love", subtitle: "Spin for your destiny!" },
