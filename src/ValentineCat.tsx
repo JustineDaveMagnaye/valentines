@@ -4406,6 +4406,7 @@ const RejectLettersGame = memo(function RejectLettersGame({ onComplete }: { onCo
 
       if (progress >= 1) {
         clearInterval(burnInterval);
+        soundManager.success();
 
         // Calculate score
         const basePoints = openLetter.isGold ? 30 : 15;
@@ -4469,6 +4470,7 @@ const RejectLettersGame = memo(function RejectLettersGame({ onComplete }: { onCo
 
       if (progress >= 1) {
         clearInterval(ripInterval);
+        soundManager.pop();
 
         // Calculate score
         const basePoints = openLetter.isGold ? 25 : 12;
@@ -4534,6 +4536,7 @@ const RejectLettersGame = memo(function RejectLettersGame({ onComplete }: { onCo
 
       if (progress >= 1) {
         clearInterval(shredInterval);
+        soundManager.success();
 
         const basePoints = openLetter.isGold ? 35 : 20;
         const bonus = 15;
@@ -4591,6 +4594,7 @@ const RejectLettersGame = memo(function RejectLettersGame({ onComplete }: { onCo
       if (progress >= 1) {
         clearInterval(crumpleInterval);
 
+        soundManager.pop();
         const basePoints = openLetter.isGold ? 30 : 18;
         const total = basePoints;
 
@@ -4641,6 +4645,7 @@ const RejectLettersGame = memo(function RejectLettersGame({ onComplete }: { onCo
 
       if (progress >= 1) {
         clearInterval(dissolveInterval);
+        soundManager.powerUp();
 
         const basePoints = openLetter.isGold ? 40 : 25;
         const bonus = 20;
@@ -4713,6 +4718,7 @@ const RejectLettersGame = memo(function RejectLettersGame({ onComplete }: { onCo
 
         if (progress >= 1) {
           clearInterval(freezeInterval);
+          soundManager.levelUp();
 
           const basePoints = openLetter.isGold ? 45 : 28;
           const bonus = 25;
@@ -4767,6 +4773,7 @@ const RejectLettersGame = memo(function RejectLettersGame({ onComplete }: { onCo
 
       if (progress >= 1) {
         clearInterval(voidInterval);
+        soundManager.specialAttack();
 
         const basePoints = openLetter.isGold ? 50 : 30;
         const bonus = 30;
@@ -5608,8 +5615,8 @@ const RejectLettersGame = memo(function RejectLettersGame({ onComplete }: { onCo
             </motion.p>
 
             {/* Scrollable button container */}
-            <div className="overflow-x-auto pb-2 -mx-2 px-2 scrollbar-hide">
-              <div className="flex gap-2 min-w-max">
+            <div className="overflow-x-auto pb-2 -mx-2 px-2 scrollbar-hide" style={{ touchAction: "pan-x", WebkitOverflowScrolling: "touch" }}>
+              <div className="flex gap-2 min-w-max" style={{ touchAction: "pan-x" }}>
                 {/* BURN */}
                 <motion.button
                   onClick={handleBurn}
