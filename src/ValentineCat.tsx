@@ -110,8 +110,21 @@ const NO_REACTIONS = [
 // Static game data for mini-games
 const CAT_TAUNTS_CATCH = ["Nice try! 😼", "You can't spell NO! 😹", "BLOCKED! 💕", "Too slow! 😸", "Love conquers all! 😻"];
 const CAT_CRIES_SMASH = ["MY DECORATIONS! 😿", "STOP IT! 😾", "I worked so hard! 😿", "NOOOO! 🙀", "You're so MEAN! 😿", "Why are you like this?! 😾"];
-const LETTER_TEXTS = ["I love you! 💕", "Be mine! 💖", "XOXO 😘", "Forever yours 💗", "My heart is yours 💝", "You're purrfect! 😻"];
-const CAT_CRIES_LETTERS = ["MY LOVE LETTER! 😿", "I spent HOURS on that! 😾", "You're so COLD! 💔", "WHYYY?! 🙀", "*dramatic sobbing* 😿"];
+// Romantic letter messages - longer, more dramatic
+const ROMANTIC_LETTERS = [
+  { opening: "My Dearest Love,", body: "Every moment without you feels like an eternity. Your smile lights up my world like a thousand suns. Please be mine forever.", closing: "Eternally yours, 🐱" },
+  { opening: "To My One True Love,", body: "I've written this letter a hundred times, but words can never capture how much you mean to me. You are my everything.", closing: "With all my heart, 😻" },
+  { opening: "My Beloved,", body: "When I look into your eyes, I see the stars themselves. You make my heart purr with joy. Say you'll be my Valentine!", closing: "Forever devoted, 💕" },
+  { opening: "Sweetest Valentine,", body: "I dreamed of you last night. We were chasing butterflies in a field of flowers. Wake up and make my dreams come true!", closing: "Dreaming of you, 🌙" },
+  { opening: "My Precious One,", body: "They say love is blind, but with you, I see everything more clearly. You are the melody to my heart's song.", closing: "Meowing for you, 🎵" },
+  { opening: "Dearest Human,", body: "I knocked everything off your desk just to get your attention. Was it worth it? Absolutely. Because I love you THAT much.", closing: "Chaotically yours, 😼" },
+  { opening: "To The One I Adore,", body: "I would climb the highest cat tree and cross the scariest vacuum cleaner just to be with you. That's true love.", closing: "Bravely yours, 🦁" },
+  { opening: "My Sweetest Love,", body: "You had me at 'pspspsps'. Since that day, my heart has belonged to you and only you. Please never stop calling.", closing: "Always listening, 👂" },
+  { opening: "Light of My Life,", body: "I've composed a sonnet about your beauty, but I ate the paper. Just know it was REALLY good. Trust me.", closing: "Poetically yours, 📝" },
+  { opening: "My Heart's Desire,", body: "Some cats chase mice. Some chase birds. But I? I chase only your love. And maybe the occasional laser pointer.", closing: "Focused on you, 🔴" },
+  { opening: "Beloved Valentine,", body: "I've calculated that I spend 87% of my day thinking about you. The other 13% is naps. You're basically my whole life.", closing: "Mathematically yours, 🧮" },
+  { opening: "To My Soulmate,", body: "In a world of ordinary cats, you make me feel like a lion. Rawr. That means I love you in lion language.", closing: "Majestically yours, 👑" },
+];
 const DRAMATIC_LINES = ["Why don't you LOVE ME?! 😾", "*knocks your stuff off table* 😼", "I'm being IGNORED! 🙀", "This is my FINAL FORM! 😾", "*judges you silently* 😿", "You'll REGRET this! 😾"];
 const LOVE_COMPLIMENTS = ["You're purrfect! 💕", "So fluffy! ✨", "Best cat! 💖", "Love you! 😻", "Cutest! 🌟"];
 
@@ -2867,13 +2880,63 @@ const DodgeTheLoveGame = memo(function DodgeTheLoveGame({ onComplete }: { onComp
   );
 });
 
-// Game 4: REJECT THE LOVE LETTERS - Optimized
+// Game 4: REJECT THE LOVE LETTERS - Interactive letter opening with burn/rip mechanics
 const RejectLettersGame = memo(function RejectLettersGame({ onComplete }: { onComplete: (score: number) => void }) {
-  const [phase, setPhase] = useState<"tutorial" | "playing" | "done">("tutorial");
-  const [letters, setLetters] = useState<Array<{ id: number; x: number; y: number; torn: boolean; text: string }>>([]);
+  const [phase, setPhase] = useState<"tutorial" | "countdown" | "playing" | "reading" | "done">("tutorial");
+  const [countdownNum, setCountdownNum] = useState(3);
+
+  // Letter queue - letters waiting to be opened
+  const [letterQueue, setLetterQueue] = useState<Array<{
+    id: number;
+    message: typeof ROMANTIC_LETTERS[0];
+    isGold: boolean;
+    envelope: "pink" | "red" | "gold" | "purple";
+  }>>([]);
+
+  // Currently open letter
+  const [openLetter, setOpenLetter] = useState<{
+    id: number;
+    message: typeof ROMANTIC_LETTERS[0];
+    isGold: boolean;
+  } | null>(null);
+
   const [score, setScore] = useState(0);
-  const [timeLeft, setTimeLeft] = useState(12);
-  const [catReaction, setCatReaction] = useState("");
+  const [timeLeft, setTimeLeft] = useState(45);
+  const [lettersDestroyed, setLettersDestroyed] = useState(0);
+  const [burnCount, setBurnCount] = useState(0);
+  const [ripCount, setRipCount] = useState(0);
+  const [catEmotion, setCatEmotion] = useState<"hopeful" | "nervous" | "crying" | "devastated">("hopeful");
+  const [catMessage, setCatMessage] = useState("");
+  const [screenShake, setScreenShake] = useState(0);
+
+  // Destruction animation state
+  const [destruction, setDestruction] = useState<{
+    type: "burn" | "rip" | null;
+    progress: number;
+  }>({ type: null, progress: 0 });
+
+  // Particles
+  const [particles, setParticles] = useState<Array<{
+    id: number;
+    x: number;
+    y: number;
+    vx: number;
+    vy: number;
+    type: "fire" | "ash" | "paper" | "ember" | "sparkle";
+    life: number;
+    size: number;
+    color: string;
+    rotation: number;
+  }>>([]);
+
+  // Score popups
+  const [scorePopups, setScorePopups] = useState<Array<{
+    id: number;
+    x: number;
+    y: number;
+    value: number;
+    text: string;
+  }>>([]);
 
   const onCompleteRef = useRef(onComplete);
   const gameEndedRef = useRef(false);
@@ -2882,18 +2945,73 @@ const RejectLettersGame = memo(function RejectLettersGame({ onComplete }: { onCo
   useEffect(() => { onCompleteRef.current = onComplete; }, [onComplete]);
   useEffect(() => { scoreRef.current = score; }, [score]);
 
-  const startGame = useCallback(() => {
-    gameEndedRef.current = false;
-    setScore(0);
-    scoreRef.current = 0;
-    setTimeLeft(12);
-    setLetters([]);
-    setPhase("playing");
+  // Spawn particles helper
+  const spawnParticles = useCallback((
+    x: number,
+    y: number,
+    type: "fire" | "ash" | "paper" | "ember" | "sparkle",
+    count: number,
+    spread: number = 1
+  ) => {
+    const colors: Record<string, string[]> = {
+      fire: ["#ff4500", "#ff6b35", "#ffa500", "#ffcc00", "#ff0000"],
+      ash: ["#4a4a4a", "#6b6b6b", "#8b8b8b", "#2d2d2d"],
+      paper: ["#fff5f5", "#ffe4e6", "#fecdd3", "#fda4af", "#ffffff"],
+      ember: ["#ff4500", "#ff6b00", "#ffcc00"],
+      sparkle: ["#ffd700", "#ffec8b", "#fff8dc"],
+    };
+    const newParticles = Array.from({ length: count }, (_, i) => ({
+      id: performance.now() + i + Math.random() * 1000,
+      x, y,
+      vx: (Math.random() - 0.5) * 10 * spread,
+      vy: type === "fire" || type === "ember" ? -Math.random() * 8 - 2 : (Math.random() - 0.5) * 10 * spread,
+      type,
+      life: 1,
+      size: type === "fire" ? 8 + Math.random() * 8 : type === "paper" ? 6 + Math.random() * 10 : 4 + Math.random() * 4,
+      color: colors[type][Math.floor(Math.random() * colors[type].length)],
+      rotation: Math.random() * 360,
+    }));
+    setParticles(prev => [...prev.slice(-80), ...newParticles]);
   }, []);
+
+  // Spawn score popup
+  const spawnScorePopup = useCallback((x: number, y: number, value: number, text: string) => {
+    setScorePopups(prev => [...prev.slice(-5), { id: performance.now(), x, y, value, text }]);
+    setTimeout(() => setScorePopups(prev => prev.slice(1)), 1200);
+  }, []);
+
+  const startCountdown = useCallback(() => {
+    setPhase("countdown");
+    setCountdownNum(3);
+  }, []);
+
+  // Countdown
+  useEffect(() => {
+    if (phase !== "countdown") return;
+    if (countdownNum === 0) {
+      gameEndedRef.current = false;
+      setScore(0);
+      scoreRef.current = 0;
+      setTimeLeft(45);
+      setLetterQueue([]);
+      setOpenLetter(null);
+      setLettersDestroyed(0);
+      setBurnCount(0);
+      setRipCount(0);
+      setParticles([]);
+      setScorePopups([]);
+      setCatEmotion("hopeful");
+      setDestruction({ type: null, progress: 0 });
+      setPhase("playing");
+      return;
+    }
+    const timer = setTimeout(() => setCountdownNum(c => c - 1), 600);
+    return () => clearTimeout(timer);
+  }, [phase, countdownNum]);
 
   // Timer
   useEffect(() => {
-    if (phase !== "playing") return;
+    if (phase !== "playing" && phase !== "reading") return;
     const timer = setInterval(() => {
       setTimeLeft(t => {
         if (t <= 1) {
@@ -2901,7 +3019,7 @@ const RejectLettersGame = memo(function RejectLettersGame({ onComplete }: { onCo
           if (!gameEndedRef.current) {
             gameEndedRef.current = true;
             setPhase("done");
-            setTimeout(() => onCompleteRef.current(scoreRef.current), 1500);
+            setTimeout(() => onCompleteRef.current(scoreRef.current), 2500);
           }
           return 0;
         }
@@ -2911,107 +3029,833 @@ const RejectLettersGame = memo(function RejectLettersGame({ onComplete }: { onCo
     return () => clearInterval(timer);
   }, [phase]);
 
-  // Spawn letters
+  // Spawn new letters
   useEffect(() => {
     if (phase !== "playing") return;
-    const spawn = () => {
+
+    const spawnLetter = () => {
       if (gameEndedRef.current) return;
-      setLetters(prev => [...prev.slice(-6), {
-        id: Date.now() + Math.random(),
-        x: 10 + Math.random() * 80,
-        y: 20 + Math.random() * 50,
-        torn: false,
-        text: LETTER_TEXTS[Math.floor(Math.random() * LETTER_TEXTS.length)],
-      }]);
+
+      const envelopes: Array<"pink" | "red" | "gold" | "purple"> = ["pink", "red", "gold", "purple"];
+      const isGold = Math.random() < 0.15;
+
+      setLetterQueue(prev => {
+        if (prev.length >= 5) return prev; // Max 5 in queue
+        return [...prev, {
+          id: Date.now() + Math.random(),
+          message: ROMANTIC_LETTERS[Math.floor(Math.random() * ROMANTIC_LETTERS.length)],
+          isGold,
+          envelope: isGold ? "gold" : envelopes[Math.floor(Math.random() * envelopes.length)],
+        }];
+      });
     };
-    spawn();
-    const interval = setInterval(spawn, 800);
+
+    spawnLetter();
+    const interval = setInterval(spawnLetter, 2500);
     return () => clearInterval(interval);
   }, [phase]);
 
-  const tearLetter = useCallback((id: number) => {
-    setLetters(prev => prev.map(l => l.id === id ? { ...l, torn: true } : l));
-    setScore(s => {
-      scoreRef.current = s + 10;
-      return s + 10;
+  // Update particles
+  useEffect(() => {
+    if (particles.length === 0) return;
+    const interval = setInterval(() => {
+      setParticles(prev => prev.map(p => ({
+        ...p,
+        x: p.x + p.vx * 0.3,
+        y: p.y + p.vy * 0.3,
+        vy: p.type === "fire" || p.type === "ember" ? p.vy - 0.1 : p.vy + 0.2,
+        life: p.life - (p.type === "fire" ? 0.04 : 0.025),
+        rotation: p.rotation + p.vx,
+        size: p.type === "fire" ? p.size * 0.97 : p.size,
+      })).filter(p => p.life > 0));
+    }, 16);
+    return () => clearInterval(interval);
+  }, [particles.length]);
+
+  // Update cat emotion
+  useEffect(() => {
+    if (lettersDestroyed >= 10) setCatEmotion("devastated");
+    else if (lettersDestroyed >= 6) setCatEmotion("crying");
+    else if (lettersDestroyed >= 3) setCatEmotion("nervous");
+    else setCatEmotion("hopeful");
+  }, [lettersDestroyed]);
+
+  // Open a letter
+  const handleOpenLetter = useCallback((letter: typeof letterQueue[0]) => {
+    setLetterQueue(prev => prev.filter(l => l.id !== letter.id));
+    setOpenLetter({
+      id: letter.id,
+      message: letter.message,
+      isGold: letter.isGold,
     });
-    setCatReaction(CAT_CRIES_LETTERS[Math.floor(Math.random() * CAT_CRIES_LETTERS.length)]);
-    setTimeout(() => setCatReaction(""), 800);
-    setTimeout(() => setLetters(prev => prev.filter(l => l.id !== id)), 300);
+    setPhase("reading");
+    setCatMessage("They're reading it! 😻");
+    setTimeout(() => setCatMessage(""), 1500);
   }, []);
 
+  // Destroy letter with burn
+  const handleBurn = useCallback(() => {
+    if (!openLetter || destruction.type) return;
+
+    setDestruction({ type: "burn", progress: 0 });
+
+    // Animate burn progress
+    let progress = 0;
+    const burnInterval = setInterval(() => {
+      progress += 0.05;
+      setDestruction({ type: "burn", progress });
+
+      // Spawn fire particles during burn
+      if (progress < 1) {
+        spawnParticles(50, 50 + progress * 20, "fire", 3);
+        spawnParticles(50 + (Math.random() - 0.5) * 30, 40 + progress * 30, "ember", 2);
+        if (progress > 0.5) {
+          spawnParticles(50 + (Math.random() - 0.5) * 40, 50, "ash", 1);
+        }
+      }
+
+      if (progress >= 1) {
+        clearInterval(burnInterval);
+
+        // Calculate score
+        const basePoints = openLetter.isGold ? 30 : 15;
+        const bonus = 10; // Burn bonus
+        const total = basePoints + bonus;
+
+        setScore(s => s + total);
+        setLettersDestroyed(d => d + 1);
+        setBurnCount(b => b + 1);
+
+        // Big fire explosion
+        spawnParticles(50, 50, "fire", 20, 1.5);
+        spawnParticles(50, 50, "ember", 15, 2);
+        spawnParticles(50, 50, "ash", 10, 1.5);
+
+        spawnScorePopup(50, 40, total, "🔥 BURNED!");
+
+        setScreenShake(8);
+        setTimeout(() => setScreenShake(0), 300);
+
+        setCatMessage(pick(["MY WORDS ARE ASHES! 😭", "IT BURNS! 🔥😿", "All that poetry... gone! 😿", "You're so cruel! 😾"]));
+        setTimeout(() => setCatMessage(""), 1500);
+
+        // Reset
+        setTimeout(() => {
+          setOpenLetter(null);
+          setDestruction({ type: null, progress: 0 });
+          setPhase("playing");
+        }, 400);
+      }
+    }, 30);
+  }, [openLetter, destruction.type, spawnParticles, spawnScorePopup]);
+
+  // Destroy letter with rip
+  const handleRip = useCallback(() => {
+    if (!openLetter || destruction.type) return;
+
+    setDestruction({ type: "rip", progress: 0 });
+
+    // Animate rip progress
+    let progress = 0;
+    const ripInterval = setInterval(() => {
+      progress += 0.08;
+      setDestruction({ type: "rip", progress });
+
+      // Spawn paper particles during rip
+      if (progress < 1) {
+        spawnParticles(50, 50, "paper", 2, 0.8);
+      }
+
+      if (progress >= 1) {
+        clearInterval(ripInterval);
+
+        // Calculate score
+        const basePoints = openLetter.isGold ? 25 : 10;
+        const total = basePoints;
+
+        setScore(s => s + total);
+        setLettersDestroyed(d => d + 1);
+        setRipCount(r => r + 1);
+
+        // Paper explosion
+        spawnParticles(50, 50, "paper", 25, 2);
+        if (openLetter.isGold) {
+          spawnParticles(50, 50, "sparkle", 10, 1.5);
+        }
+
+        spawnScorePopup(50, 40, total, "📄 RIPPED!");
+
+        setScreenShake(5);
+        setTimeout(() => setScreenShake(0), 200);
+
+        setCatMessage(pick(["MY LETTER! 😿", "In PIECES! 💔", "You tore it up! 😭", "How could you?! 🙀"]));
+        setTimeout(() => setCatMessage(""), 1500);
+
+        // Reset
+        setTimeout(() => {
+          setOpenLetter(null);
+          setDestruction({ type: null, progress: 0 });
+          setPhase("playing");
+        }, 300);
+      }
+    }, 25);
+  }, [openLetter, destruction.type, spawnParticles, spawnScorePopup]);
+
+  // Tutorial screen
   if (phase === "tutorial") {
     return (
-      <div className="fixed inset-0 bg-gradient-to-b from-rose-400 to-pink-600 flex flex-col items-center justify-center p-6">
-        <div className="bg-white/95 rounded-3xl p-8 max-w-sm text-center shadow-2xl">
-          <div className="text-6xl mb-4">💌</div>
-          <h2 className="text-2xl font-bold text-rose-800 mb-3">Reject the Love Letters!</h2>
-          <p className="text-rose-600 mb-4">
-            The cat keeps sending love letters!<br/>
-            <span className="font-bold">Tap to TEAR them up!</span>
+      <div className="fixed inset-0 bg-gradient-to-b from-amber-100 via-rose-100 to-pink-200 flex flex-col items-center justify-center p-4 overflow-hidden">
+        {/* Floating letters background */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          {Array.from({ length: 12 }).map((_, i) => (
+            <motion.div
+              key={i}
+              className="absolute"
+              style={{ left: `${(i * 15 + 5) % 100}%`, top: `${(i * 20 + 10) % 100}%` }}
+              animate={{
+                y: [0, -20, 0],
+                rotate: [-5, 5, -5],
+                scale: [1, 1.05, 1],
+              }}
+              transition={{ duration: 3 + i % 2, repeat: Infinity, delay: i * 0.3 }}
+            >
+              <div className="text-5xl opacity-30">💌</div>
+            </motion.div>
+          ))}
+        </div>
+
+        <motion.div
+          initial={{ scale: 0.8, opacity: 0, y: 30 }}
+          animate={{ scale: 1, opacity: 1, y: 0 }}
+          transition={{ type: "spring", stiffness: 200 }}
+          className="bg-white/95 backdrop-blur-xl rounded-3xl p-6 max-w-sm text-center shadow-2xl relative z-10 border-2 border-rose-200"
+        >
+          {/* Wax seal decoration */}
+          <motion.div
+            className="absolute -top-6 left-1/2 -translate-x-1/2 w-12 h-12 bg-gradient-to-br from-red-500 to-red-700 rounded-full shadow-lg flex items-center justify-center"
+            animate={{ rotate: [0, 5, -5, 0] }}
+            transition={{ duration: 2, repeat: Infinity }}
+          >
+            <span className="text-2xl">💕</span>
+          </motion.div>
+
+          <div className="mt-4 mb-3">
+            <motion.div
+              className="text-6xl mb-2"
+              animate={{ rotate: [-3, 3, -3], y: [0, -5, 0] }}
+              transition={{ duration: 2, repeat: Infinity }}
+            >
+              💌
+            </motion.div>
+          </div>
+
+          <h2 className="text-2xl font-black bg-gradient-to-r from-rose-600 via-pink-600 to-red-500 bg-clip-text text-transparent mb-2">
+            Reject Love Letters!
+          </h2>
+          <p className="text-slate-600 mb-4 text-sm">
+            The cat sent you love letters!<br/>
+            <span className="font-bold text-rose-600">Open them, read them, then DESTROY them!</span>
           </p>
-          <div className="flex justify-center gap-4 my-4">
-            <div className="text-center">
-              <div className="text-4xl">💌</div>
-              <div className="text-xs text-rose-600">Love Letter</div>
-            </div>
-            <div className="text-2xl">→</div>
-            <div className="text-center">
-              <div className="text-4xl">📄💔</div>
-              <div className="text-xs text-green-600">TORN!</div>
+
+          <div className="bg-gradient-to-r from-rose-50 to-amber-50 rounded-2xl p-4 mb-4">
+            <p className="text-slate-700 text-sm font-medium mb-3">Choose how to reject:</p>
+            <div className="flex justify-center gap-6">
+              <div className="text-center">
+                <motion.div
+                  className="w-14 h-14 bg-gradient-to-br from-orange-400 to-red-500 rounded-xl flex items-center justify-center shadow-lg mb-1"
+                  animate={{ scale: [1, 1.1, 1] }}
+                  transition={{ duration: 1.5, repeat: Infinity }}
+                >
+                  <span className="text-2xl">🔥</span>
+                </motion.div>
+                <div className="text-xs font-bold text-orange-600">BURN IT</div>
+                <div className="text-[10px] text-orange-500">+15 pts</div>
+              </div>
+              <div className="text-center">
+                <motion.div
+                  className="w-14 h-14 bg-gradient-to-br from-slate-400 to-slate-600 rounded-xl flex items-center justify-center shadow-lg mb-1"
+                  animate={{ rotate: [-5, 5, -5] }}
+                  transition={{ duration: 0.5, repeat: Infinity }}
+                >
+                  <span className="text-2xl">✂️</span>
+                </motion.div>
+                <div className="text-xs font-bold text-slate-600">RIP IT</div>
+                <div className="text-[10px] text-slate-500">+10 pts</div>
+              </div>
             </div>
           </div>
-          <p className="text-rose-500 text-sm mb-6">Break the cat's heart! 💔</p>
-          <button
-            onClick={startGame}
-            className="w-full py-4 bg-gradient-to-r from-rose-500 to-pink-500 text-white rounded-2xl font-bold text-xl shadow-lg active:scale-95 transition-transform"
+
+          <div className="flex gap-2 mb-4">
+            <div className="flex-1 bg-amber-100 rounded-xl p-2 border border-amber-200">
+              <div className="text-xl">✨💌</div>
+              <div className="text-[9px] text-amber-700 font-medium">Gold = More pts!</div>
+            </div>
+            <div className="flex-1 bg-rose-100 rounded-xl p-2 border border-rose-200">
+              <div className="text-xl">🔥</div>
+              <div className="text-[9px] text-rose-700 font-medium">Burn bonus!</div>
+            </div>
+          </div>
+
+          <motion.button
+            onClick={startCountdown}
+            className="w-full py-4 bg-gradient-to-r from-rose-500 via-red-500 to-orange-500 text-white rounded-2xl font-bold text-lg shadow-xl"
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
           >
-            Reject Everything! 💔
-          </button>
-        </div>
+            <motion.span
+              animate={{ scale: [1, 1.05, 1] }}
+              transition={{ duration: 1, repeat: Infinity }}
+            >
+              Open the Letters! 💔
+            </motion.span>
+          </motion.button>
+        </motion.div>
       </div>
     );
   }
 
-  if (phase === "done") {
-    const won = score >= 50;
+  // Countdown
+  if (phase === "countdown") {
     return (
-      <div className="fixed inset-0 bg-gradient-to-b from-rose-400 to-pink-600 flex flex-col items-center justify-center p-6">
-        <div className="bg-white/95 rounded-3xl p-8 max-w-sm text-center shadow-2xl">
-          <div className="text-6xl mb-4">{won ? "💔" : "💌"}</div>
-          <h2 className="text-3xl font-bold text-rose-800 mb-2">
-            {won ? "Letters Destroyed!" : "Too Many Letters!"}
-          </h2>
-          <p className="text-4xl font-bold text-rose-600 mb-2">{score} pts</p>
-          <p className="text-rose-500 italic mb-4">
-            {won ? '"All my beautiful words... 😿"' : '"You read them! Ha!" 😹'}
-          </p>
-          <p className="text-rose-400">Next challenge...</p>
-        </div>
+      <div className="fixed inset-0 bg-gradient-to-b from-amber-100 via-rose-100 to-pink-200 flex items-center justify-center">
+        <motion.div
+          key={countdownNum}
+          initial={{ scale: 3, opacity: 0, rotate: -20 }}
+          animate={{ scale: 1, opacity: 1, rotate: 0 }}
+          exit={{ scale: 0, opacity: 0 }}
+          transition={{ type: "spring", stiffness: 300, damping: 20 }}
+          className="text-[120px] font-black text-rose-600 drop-shadow-[0_0_30px_rgba(244,63,94,0.5)]"
+        >
+          {countdownNum || "💌"}
+        </motion.div>
       </div>
     );
   }
 
-  return (
-    <div className="fixed inset-0 bg-gradient-to-b from-rose-400 to-pink-600 overflow-hidden select-none">
-      {/* Header */}
-      <div className="absolute top-4 left-0 right-0 flex justify-center gap-4 z-10">
-        <div className="bg-white/90 rounded-full px-4 py-2 shadow-lg">
-          <span className="text-lg font-bold text-rose-600">{score} pts</span>
+  // Done screen
+  if (phase === "done") {
+    const rating = score >= 250 ? "S" : score >= 180 ? "A" : score >= 120 ? "B" : score >= 60 ? "C" : "D";
+    const ratingColors: Record<string, string> = {
+      S: "from-yellow-400 to-amber-500",
+      A: "from-green-400 to-emerald-500",
+      B: "from-blue-400 to-cyan-500",
+      C: "from-purple-400 to-violet-500",
+      D: "from-slate-400 to-gray-500",
+    };
+
+    return (
+      <div className="fixed inset-0 bg-gradient-to-b from-slate-800 via-slate-900 to-black flex flex-col items-center justify-center p-4">
+        {/* Floating ash particles */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          {Array.from({ length: 20 }).map((_, i) => (
+            <motion.div
+              key={i}
+              className="absolute w-2 h-2 bg-gray-400/30 rounded-full"
+              style={{ left: `${Math.random() * 100}%`, top: `${Math.random() * 100}%` }}
+              animate={{ y: [0, -30, 0], opacity: [0.2, 0.5, 0.2] }}
+              transition={{ duration: 4 + Math.random() * 2, repeat: Infinity, delay: Math.random() * 2 }}
+            />
+          ))}
         </div>
-        <div className="bg-white/90 rounded-full px-4 py-2 shadow-lg">
-          <span className="text-lg font-bold text-rose-600">{timeLeft}s</span>
+
+        <motion.div
+          initial={{ scale: 0, y: 50 }}
+          animate={{ scale: 1, y: 0 }}
+          transition={{ type: "spring", stiffness: 200 }}
+          className="bg-white/95 backdrop-blur-xl rounded-3xl p-6 max-w-sm text-center shadow-2xl border border-rose-200"
+        >
+          <motion.div
+            className="text-7xl mb-3"
+            animate={{
+              y: [0, -10, 0],
+              filter: ["brightness(1)", "brightness(1.2)", "brightness(1)"]
+            }}
+            transition={{ duration: 2, repeat: Infinity }}
+          >
+            {burnCount > ripCount ? "🔥" : "💔"}
+          </motion.div>
+
+          <h2 className="text-2xl font-black bg-gradient-to-r from-rose-600 to-orange-500 bg-clip-text text-transparent mb-2">
+            Letters Destroyed!
+          </h2>
+
+          {/* Rating badge */}
+          <motion.div
+            initial={{ scale: 0, rotate: -180 }}
+            animate={{ scale: 1, rotate: 0 }}
+            transition={{ delay: 0.3, type: "spring", stiffness: 200 }}
+            className={cn(
+              "inline-block px-5 py-2 rounded-full bg-gradient-to-r text-white font-black text-2xl mb-3 shadow-lg",
+              ratingColors[rating]
+            )}
+          >
+            {rating} Rank
+          </motion.div>
+
+          <div className="grid grid-cols-4 gap-1.5 mb-4">
+            <div className="bg-rose-50 rounded-xl p-2 border border-rose-100">
+              <p className="text-xl font-black text-rose-600">{score}</p>
+              <p className="text-rose-400 text-[8px]">POINTS</p>
+            </div>
+            <div className="bg-amber-50 rounded-xl p-2 border border-amber-100">
+              <p className="text-xl font-black text-amber-600">{lettersDestroyed}</p>
+              <p className="text-amber-400 text-[8px]">DESTROYED</p>
+            </div>
+            <div className="bg-orange-50 rounded-xl p-2 border border-orange-100">
+              <p className="text-xl font-black text-orange-600">{burnCount}</p>
+              <p className="text-orange-400 text-[8px]">BURNED 🔥</p>
+            </div>
+            <div className="bg-slate-50 rounded-xl p-2 border border-slate-200">
+              <p className="text-xl font-black text-slate-600">{ripCount}</p>
+              <p className="text-slate-400 text-[8px]">RIPPED ✂️</p>
+            </div>
+          </div>
+
+          <motion.div
+            className="flex items-center justify-center gap-2 mb-3"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.5 }}
+          >
+            <span className="text-4xl">😿</span>
+            <p className="text-slate-500 italic text-sm">
+              {burnCount > ripCount
+                ? '"You burned my heart along with those letters..."'
+                : '"All my beautiful words... in pieces..."'}
+            </p>
+          </motion.div>
+
+          <motion.div
+            className="mt-3 flex justify-center gap-1"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 1 }}
+          >
+            <span className="text-rose-400 text-sm">Final challenge</span>
+            <motion.span
+              animate={{ x: [0, 5, 0] }}
+              transition={{ duration: 1, repeat: Infinity }}
+              className="text-rose-400"
+            >
+              →
+            </motion.span>
+          </motion.div>
+        </motion.div>
+      </div>
+    );
+  }
+
+  // Reading letter screen
+  if (phase === "reading" && openLetter) {
+    return (
+      <motion.div
+        className="fixed inset-0 bg-gradient-to-b from-amber-100 via-rose-50 to-pink-100 flex flex-col items-center justify-center p-4 overflow-hidden"
+        animate={screenShake > 0 ? { x: [0, -screenShake, screenShake, 0] } : {}}
+      >
+        {/* Timer bar at top */}
+        <div className="absolute top-4 left-4 right-4 z-30">
+          <div className="bg-white/80 backdrop-blur rounded-full px-4 py-2 flex items-center justify-between shadow-lg">
+            <div className="flex items-center gap-2">
+              <span className="text-lg">💔</span>
+              <span className="font-bold text-rose-600">{score}</span>
+            </div>
+            <div className={cn(
+              "flex items-center gap-2 px-3 py-1 rounded-full",
+              timeLeft <= 10 ? "bg-red-100" : "bg-rose-50"
+            )}>
+              <span className="text-lg">⏱️</span>
+              <span className={cn("font-bold", timeLeft <= 10 ? "text-red-600" : "text-rose-600")}>
+                {timeLeft}s
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Cat reaction */}
+        <motion.div
+          className="absolute top-20 left-1/2 -translate-x-1/2 text-center z-20"
+          animate={{ y: [0, -5, 0] }}
+          transition={{ duration: 1, repeat: Infinity }}
+        >
+          <span className="text-5xl">
+            {catEmotion === "devastated" ? "😭" : catEmotion === "crying" ? "😿" : catEmotion === "nervous" ? "🙀" : "😻"}
+          </span>
+          <AnimatePresence>
+            {catMessage && (
+              <motion.div
+                initial={{ scale: 0, y: 5 }}
+                animate={{ scale: 1, y: 0 }}
+                exit={{ scale: 0, opacity: 0 }}
+                className="absolute top-full left-1/2 -translate-x-1/2 mt-2 bg-white text-rose-600 px-4 py-2 rounded-full font-bold shadow-xl text-sm whitespace-nowrap"
+              >
+                {catMessage}
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </motion.div>
+
+        {/* The letter */}
+        <motion.div
+          initial={{ scale: 0, rotateY: 180 }}
+          animate={{
+            scale: destruction.type ? 1 - destruction.progress * 0.3 : 1,
+            rotateY: 0,
+            opacity: destruction.type === "burn" ? 1 - destruction.progress : 1,
+          }}
+          className={cn(
+            "relative bg-white rounded-2xl shadow-2xl p-6 max-w-sm w-full border-2",
+            openLetter.isGold ? "border-yellow-400" : "border-rose-200",
+            destruction.type === "burn" && "bg-gradient-to-t from-orange-200 to-white"
+          )}
+          style={{
+            transform: destruction.type === "rip"
+              ? `translateX(${(destruction.progress * 20) - 10}px) rotate(${destruction.progress * 5}deg)`
+              : undefined,
+          }}
+        >
+          {/* Gold letter glow */}
+          {openLetter.isGold && !destruction.type && (
+            <motion.div
+              className="absolute inset-0 -m-2 rounded-3xl bg-yellow-400/20 -z-10"
+              animate={{ opacity: [0.3, 0.6, 0.3], scale: [1, 1.02, 1] }}
+              transition={{ duration: 1.5, repeat: Infinity }}
+            />
+          )}
+
+          {/* Burn effect overlay */}
+          {destruction.type === "burn" && (
+            <motion.div
+              className="absolute inset-0 rounded-2xl pointer-events-none overflow-hidden"
+              style={{
+                background: `linear-gradient(to top,
+                  rgba(0,0,0,${destruction.progress * 0.8}) ${destruction.progress * 100}%,
+                  rgba(255,100,0,${destruction.progress * 0.5}) ${destruction.progress * 100 + 10}%,
+                  transparent ${destruction.progress * 100 + 30}%
+                )`,
+              }}
+            />
+          )}
+
+          {/* Rip effect */}
+          {destruction.type === "rip" && (
+            <div
+              className="absolute inset-0 pointer-events-none"
+              style={{
+                clipPath: destruction.progress > 0.3
+                  ? `polygon(0 0, ${50 - destruction.progress * 30}% 0, ${50 - destruction.progress * 20}% 100%, 0 100%)`
+                  : undefined,
+              }}
+            />
+          )}
+
+          {/* Letter content */}
+          <div className={cn(
+            "transition-opacity duration-300",
+            destruction.progress > 0.5 && "opacity-30"
+          )}>
+            {/* Decorative header */}
+            <div className="flex justify-center mb-3">
+              <motion.div
+                className="text-3xl"
+                animate={!destruction.type ? { scale: [1, 1.1, 1] } : {}}
+                transition={{ duration: 1.5, repeat: Infinity }}
+              >
+                {openLetter.isGold ? "💝" : "💌"}
+              </motion.div>
+            </div>
+
+            {/* Opening */}
+            <p className="text-rose-700 font-bold text-lg mb-3 font-serif italic">
+              {openLetter.message.opening}
+            </p>
+
+            {/* Body */}
+            <p className="text-slate-700 text-sm leading-relaxed mb-4">
+              {openLetter.message.body}
+            </p>
+
+            {/* Closing */}
+            <p className="text-rose-600 font-medium text-right italic">
+              {openLetter.message.closing}
+            </p>
+
+            {/* Paw print signature */}
+            <div className="flex justify-end mt-2">
+              <span className="text-2xl opacity-50">🐾</span>
+            </div>
+          </div>
+        </motion.div>
+
+        {/* Destruction buttons */}
+        {!destruction.type && (
+          <motion.div
+            initial={{ y: 50, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            transition={{ delay: 0.3 }}
+            className="flex gap-4 mt-6"
+          >
+            <motion.button
+              onClick={handleBurn}
+              className="flex flex-col items-center gap-2 bg-gradient-to-br from-orange-500 to-red-600 text-white px-8 py-4 rounded-2xl shadow-xl"
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+            >
+              <motion.span
+                className="text-4xl"
+                animate={{ scale: [1, 1.2, 1], rotate: [0, 5, -5, 0] }}
+                transition={{ duration: 0.5, repeat: Infinity }}
+              >
+                🔥
+              </motion.span>
+              <span className="font-bold">BURN IT</span>
+              <span className="text-xs opacity-80">+{openLetter.isGold ? 40 : 25} pts</span>
+            </motion.button>
+
+            <motion.button
+              onClick={handleRip}
+              className="flex flex-col items-center gap-2 bg-gradient-to-br from-slate-500 to-slate-700 text-white px-8 py-4 rounded-2xl shadow-xl"
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+            >
+              <motion.span
+                className="text-4xl"
+                animate={{ rotate: [-10, 10, -10] }}
+                transition={{ duration: 0.3, repeat: Infinity }}
+              >
+                ✂️
+              </motion.span>
+              <span className="font-bold">RIP IT</span>
+              <span className="text-xs opacity-80">+{openLetter.isGold ? 25 : 10} pts</span>
+            </motion.button>
+          </motion.div>
+        )}
+
+        {/* Particles */}
+        {particles.map(p => (
+          <motion.div
+            key={p.id}
+            className="absolute pointer-events-none z-40"
+            style={{
+              left: `${p.x}%`,
+              top: `${p.y}%`,
+              width: p.size,
+              height: p.size,
+              backgroundColor: p.color,
+              borderRadius: p.type === "fire" || p.type === "ember" ? "50%" : "2px",
+              opacity: p.life,
+              transform: `rotate(${p.rotation}deg)`,
+              boxShadow: p.type === "fire" || p.type === "ember"
+                ? `0 0 ${p.size}px ${p.color}`
+                : undefined,
+            }}
+          />
+        ))}
+
+        {/* Score popups */}
+        <AnimatePresence>
+          {scorePopups.map(popup => (
+            <motion.div
+              key={popup.id}
+              className="absolute pointer-events-none z-50 left-1/2 top-1/3"
+              initial={{ opacity: 1, y: 0, scale: 0.5, x: "-50%" }}
+              animate={{ opacity: 0, y: -60, scale: 1.5, x: "-50%" }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 1, ease: "easeOut" }}
+            >
+              <div className="text-center">
+                <span className="font-black text-2xl text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.5)]">
+                  +{popup.value}
+                </span>
+                <div className="font-bold text-orange-300 text-sm">{popup.text}</div>
+              </div>
+            </motion.div>
+          ))}
+        </AnimatePresence>
+      </motion.div>
+    );
+  }
+
+  // Main game - letter queue view
+  return (
+    <motion.div
+      className="fixed inset-0 bg-gradient-to-b from-amber-100 via-rose-100 to-pink-200 overflow-hidden"
+      animate={screenShake > 0 ? { x: [0, -screenShake, screenShake, 0] } : {}}
+    >
+      {/* Background pattern */}
+      <div className="absolute inset-0 opacity-10 pointer-events-none">
+        <div className="absolute inset-0" style={{
+          backgroundImage: `repeating-linear-gradient(45deg, transparent, transparent 20px, rgba(244,63,94,0.1) 20px, rgba(244,63,94,0.1) 40px)`,
+        }} />
+      </div>
+
+      {/* Header */}
+      <div className="absolute top-3 left-3 right-3 flex justify-between items-center z-30">
+        <motion.div
+          className="bg-white/90 backdrop-blur-md rounded-xl px-4 py-2 shadow-lg border border-rose-200 flex items-center gap-2"
+          animate={score > 0 ? { scale: [1, 1.02, 1] } : {}}
+        >
+          <span className="text-xl">💔</span>
+          <span className="text-lg font-bold text-rose-600">{score}</span>
+        </motion.div>
+
+        <motion.div
+          className={cn(
+            "backdrop-blur-md rounded-xl px-4 py-2 shadow-lg border flex items-center gap-2",
+            timeLeft <= 10 ? "bg-red-100/90 border-red-300" : "bg-white/90 border-rose-200"
+          )}
+          animate={timeLeft <= 10 ? { scale: [1, 1.05, 1] } : {}}
+          transition={{ duration: 0.5, repeat: timeLeft <= 10 ? Infinity : 0 }}
+        >
+          <span className="text-xl">⏱️</span>
+          <span className={cn("text-lg font-bold", timeLeft <= 10 ? "text-red-600" : "text-rose-600")}>
+            {timeLeft}s
+          </span>
+        </motion.div>
+      </div>
+
+      {/* Cat with mailbag */}
+      <div className="absolute top-16 left-1/2 -translate-x-1/2 text-center z-20">
+        <motion.div
+          animate={{ y: [0, -8, 0], rotate: [-2, 2, -2] }}
+          transition={{ duration: 2, repeat: Infinity }}
+        >
+          <span className="text-6xl">
+            {catEmotion === "devastated" ? "😭" : catEmotion === "crying" ? "😿" : catEmotion === "nervous" ? "🙀" : "😸"}
+          </span>
+        </motion.div>
+        <motion.p
+          className="text-rose-600 font-medium text-sm mt-1"
+          animate={{ opacity: [0.7, 1, 0.7] }}
+          transition={{ duration: 2, repeat: Infinity }}
+        >
+          {letterQueue.length === 0 ? "Sending more letters..." : "Please read my letters! 💕"}
+        </motion.p>
+        <AnimatePresence>
+          {catMessage && (
+            <motion.div
+              initial={{ scale: 0, y: 5 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0, opacity: 0 }}
+              className="absolute top-full left-1/2 -translate-x-1/2 mt-2 bg-white text-rose-600 px-4 py-2 rounded-full font-bold shadow-xl text-sm whitespace-nowrap"
+            >
+              {catMessage}
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+
+      {/* Stats bar */}
+      <div className="absolute top-32 left-1/2 -translate-x-1/2 flex gap-3 z-20">
+        <div className="bg-white/80 backdrop-blur rounded-lg px-3 py-1 text-center shadow">
+          <div className="text-lg font-bold text-rose-600">{lettersDestroyed}</div>
+          <div className="text-[9px] text-rose-400">destroyed</div>
+        </div>
+        <div className="bg-orange-100/80 backdrop-blur rounded-lg px-3 py-1 text-center shadow">
+          <div className="text-lg font-bold text-orange-600">{burnCount} 🔥</div>
+          <div className="text-[9px] text-orange-400">burned</div>
+        </div>
+        <div className="bg-slate-100/80 backdrop-blur rounded-lg px-3 py-1 text-center shadow">
+          <div className="text-lg font-bold text-slate-600">{ripCount} ✂️</div>
+          <div className="text-[9px] text-slate-400">ripped</div>
         </div>
       </div>
 
-      {/* Cat reaction */}
-      {catReaction && (
-        <div className="absolute top-20 left-1/2 -translate-x-1/2 z-20">
-          <div className="bg-white text-rose-600 px-4 py-2 rounded-full font-bold shadow-lg">{catReaction}</div>
-        </div>
-      )}
+      {/* Letter queue */}
+      <div className="absolute top-48 left-0 right-0 bottom-24 flex items-center justify-center">
+        <div className="flex flex-wrap justify-center gap-4 p-4 max-w-md">
+          <AnimatePresence mode="popLayout">
+            {letterQueue.map((letter, index) => (
+              <motion.button
+                key={letter.id}
+                initial={{ scale: 0, rotate: -20, y: 50 }}
+                animate={{
+                  scale: 1,
+                  rotate: (index - 2) * 5,
+                  y: 0,
+                }}
+                exit={{ scale: 0, rotate: 20, y: -50 }}
+                transition={{ type: "spring", stiffness: 300, damping: 25 }}
+                onClick={() => handleOpenLetter(letter)}
+                className={cn(
+                  "relative p-4 rounded-xl shadow-xl border-2 touch-manipulation",
+                  letter.envelope === "pink" && "bg-gradient-to-br from-pink-100 to-rose-200 border-pink-300",
+                  letter.envelope === "red" && "bg-gradient-to-br from-red-100 to-rose-200 border-red-300",
+                  letter.envelope === "gold" && "bg-gradient-to-br from-yellow-100 to-amber-200 border-yellow-400",
+                  letter.envelope === "purple" && "bg-gradient-to-br from-purple-100 to-violet-200 border-purple-300",
+                )}
+                whileHover={{ scale: 1.1, rotate: 0 }}
+                whileTap={{ scale: 0.95 }}
+              >
+                {/* Envelope */}
+                <motion.div
+                  className="text-5xl"
+                  animate={{ y: [0, -3, 0] }}
+                  transition={{ duration: 1.5, repeat: Infinity, delay: index * 0.2 }}
+                >
+                  {letter.isGold ? "💛" : "💌"}
+                </motion.div>
 
-      {/* Skip */}
+                {/* Wax seal */}
+                <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-6 h-6 bg-gradient-to-br from-red-500 to-red-700 rounded-full shadow flex items-center justify-center">
+                  <span className="text-xs">💕</span>
+                </div>
+
+                {/* Gold glow */}
+                {letter.isGold && (
+                  <motion.div
+                    className="absolute inset-0 -m-1 rounded-xl bg-yellow-400/30 -z-10"
+                    animate={{ opacity: [0.3, 0.6, 0.3], scale: [1, 1.05, 1] }}
+                    transition={{ duration: 1, repeat: Infinity }}
+                  />
+                )}
+
+                {/* "New" badge */}
+                {index === letterQueue.length - 1 && (
+                  <motion.div
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    className="absolute -top-2 -right-2 bg-rose-500 text-white text-[8px] font-bold px-2 py-0.5 rounded-full"
+                  >
+                    NEW!
+                  </motion.div>
+                )}
+              </motion.button>
+            ))}
+          </AnimatePresence>
+
+          {letterQueue.length === 0 && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="text-center text-rose-400"
+            >
+              <motion.div
+                className="text-6xl mb-2"
+                animate={{ rotate: [0, 10, -10, 0] }}
+                transition={{ duration: 2, repeat: Infinity }}
+              >
+                📮
+              </motion.div>
+              <p className="font-medium">Waiting for letters...</p>
+            </motion.div>
+          )}
+        </div>
+      </div>
+
+      {/* Bottom instruction */}
+      <div className="absolute bottom-4 left-4 right-4 z-20">
+        <motion.div
+          className="bg-white/80 backdrop-blur-md rounded-2xl p-3 border border-rose-200 shadow-lg"
+          initial={{ y: 20, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+        >
+          <p className="text-rose-600 text-center text-sm font-medium">
+            👆 Tap a letter to open and read it!
+          </p>
+        </motion.div>
+      </div>
+
+      {/* Skip button */}
       <button
         onClick={() => {
           if (!gameEndedRef.current) {
@@ -3019,36 +3863,32 @@ const RejectLettersGame = memo(function RejectLettersGame({ onComplete }: { onCo
             onComplete(score);
           }
         }}
-        className="absolute top-4 right-4 bg-white/50 rounded-full px-3 py-1 text-rose-200 text-sm z-10"
+        className="absolute top-3 right-20 bg-white/50 backdrop-blur rounded-full px-3 py-1.5 text-rose-400 text-xs z-30"
       >
         Skip →
       </button>
 
-      {/* Letters */}
-      {letters.map(l => (
-        <button
-          key={l.id}
-          onClick={() => !l.torn && tearLetter(l.id)}
-          className={cn(
-            "absolute p-3 bg-white rounded-xl shadow-lg",
-            l.torn && "scale-0 rotate-45 opacity-0 transition-all duration-200"
-          )}
+      {/* Particles */}
+      {particles.map(p => (
+        <motion.div
+          key={p.id}
+          className="absolute pointer-events-none z-40"
           style={{
-            left: `${l.x}%`,
-            top: `${l.y}%`,
-            transform: "translate(-50%, -50%)",
+            left: `${p.x}%`,
+            top: `${p.y}%`,
+            width: p.size,
+            height: p.size,
+            backgroundColor: p.color,
+            borderRadius: p.type === "fire" || p.type === "ember" ? "50%" : "2px",
+            opacity: p.life,
+            transform: `rotate(${p.rotation}deg)`,
+            boxShadow: p.type === "fire" || p.type === "ember"
+              ? `0 0 ${p.size}px ${p.color}`
+              : undefined,
           }}
-        >
-          <div className="text-3xl mb-1">💌</div>
-          <div className="text-xs text-pink-500 max-w-[80px] truncate">{l.text}</div>
-        </button>
+        />
       ))}
-
-      {/* Instruction */}
-      <div className="absolute bottom-8 left-0 right-0 text-center">
-        <p className="text-white/80 text-lg font-medium">👆 Tap love letters to TEAR them up!</p>
-      </div>
-    </div>
+    </motion.div>
   );
 });
 
