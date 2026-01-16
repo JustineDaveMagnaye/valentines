@@ -1149,27 +1149,21 @@ const CatchTheNoGame = memo(function CatchTheNoGame({ onComplete }: { onComplete
   if (phase === "tutorial") {
     return (
       <div className="fixed inset-0 bg-gradient-to-b from-indigo-600 via-purple-600 to-fuchsia-700 flex flex-col items-center justify-center p-4 overflow-hidden">
-        {/* Enhanced animated background with falling letters */}
+        {/* Animated background with falling letters - optimized with CSS */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          {Array.from({ length: 24 }).map((_, i) => (
-            <motion.div
+          {Array.from({ length: 8 }).map((_, i) => (
+            <div
               key={i}
-              className="absolute text-3xl"
+              className="absolute text-2xl"
               style={{
-                left: `${(i % 8) * 12.5 + (i % 5)}%`,
-                opacity: 0.15 + (i % 3) * 0.05,
-              }}
-              initial={{ y: "-10%", rotate: 0 }}
-              animate={{ y: "110%", rotate: 360 }}
-              transition={{
-                duration: 6 + (i % 4),
-                repeat: Infinity,
-                delay: i * 0.3,
-                ease: "linear"
+                left: `${(i * 12) % 100}%`,
+                opacity: 0.15,
+                animation: `floatDown ${8 + (i % 3)}s linear infinite`,
+                animationDelay: `${i * 0.5}s`,
               }}
             >
-              {["N", "O", "💕", "⭐", "✨", "🧺"][i % 6]}
-            </motion.div>
+              {["N", "O", "💕", "🧺"][i % 4]}
+            </div>
           ))}
         </div>
 
@@ -1356,23 +1350,21 @@ const CatchTheNoGame = memo(function CatchTheNoGame({ onComplete }: { onComplete
           </motion.div>
         </AnimatePresence>
 
-        {/* Floating particles during countdown */}
+        {/* Floating particles during countdown - reduced */}
         <div className="absolute inset-0 pointer-events-none">
-          {Array.from({ length: 12 }).map((_, i) => (
-            <motion.div
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div
               key={i}
-              className="absolute text-4xl opacity-40"
-              style={{ left: `${10 + (i * 7)}%`, bottom: "-10%" }}
-              animate={{ y: "-120vh", rotate: 360 }}
-              transition={{
-                duration: 2 + (i % 3) * 0.5,
-                repeat: Infinity,
-                delay: i * 0.2,
-                ease: "linear"
+              className="absolute text-3xl opacity-30"
+              style={{
+                left: `${15 + (i * 14)}%`,
+                bottom: "-10%",
+                animation: `floatUp ${3 + (i % 2)}s linear infinite`,
+                animationDelay: `${i * 0.3}s`,
               }}
             >
-              {["N", "O", "⭐", "✨"][i % 4]}
-            </motion.div>
+              {["N", "O", "⭐"][i % 3]}
+            </div>
           ))}
         </div>
       </div>
@@ -2036,23 +2028,21 @@ const SmashTheHeartsGame = memo(function SmashTheHeartsGame({ onComplete }: { on
   if (phase === "tutorial") {
     return (
       <div className="fixed inset-0 bg-gradient-to-b from-rose-600 via-red-600 to-pink-700 flex flex-col items-center justify-center p-4 overflow-hidden">
-        {/* Animated background hearts floating up */}
+        {/* Animated background hearts - optimized with CSS */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          {Array.from({ length: 20 }).map((_, i) => (
-            <motion.div
+          {Array.from({ length: 8 }).map((_, i) => (
+            <div
               key={i}
-              className="absolute text-3xl opacity-20"
-              style={{ left: `${(i * 5) % 100}%`, bottom: "-10%" }}
-              animate={{ y: "-120vh", rotate: 360, scale: [1, 1.2, 1] }}
-              transition={{
-                duration: 6 + (i % 3),
-                repeat: Infinity,
-                delay: i * 0.3,
-                ease: "linear"
+              className="absolute text-2xl opacity-15"
+              style={{
+                left: `${(i * 12) % 100}%`,
+                bottom: "-10%",
+                animation: `floatUp ${8 + (i % 3)}s linear infinite`,
+                animationDelay: `${i * 0.5}s`,
               }}
             >
-              {["💕", "❤️", "💛", "💗", "💖"][i % 5]}
-            </motion.div>
+              {["💕", "❤️", "💛"][i % 3]}
+            </div>
           ))}
         </div>
 
@@ -2695,18 +2685,18 @@ const DodgeTheLoveGame = memo(function DodgeTheLoveGame({ onComplete }: { onComp
       shield: ["#60a5fa", "#3b82f6", "#2563eb"],
       dodge: ["#818cf8", "#6366f1", "#4f46e5"],
     };
-    const newParticles = Array.from({ length: count }, (_, i) => ({
+    const newParticles = Array.from({ length: Math.min(count, 6) }, (_, i) => ({
       id: performance.now() + i + Math.random() * 1000,
       x, y,
-      vx: (Math.random() - 0.5) * 8,
-      vy: (Math.random() - 0.5) * 8 - 2,
+      vx: (Math.random() - 0.5) * 6,
+      vy: (Math.random() - 0.5) * 6 - 2,
       type,
       life: 1,
-      maxLife: 0.6 + Math.random() * 0.4,
-      size: 0.5 + Math.random() * 0.5,
+      maxLife: 0.5 + Math.random() * 0.3,
+      size: 0.4 + Math.random() * 0.4,
       color: colors[type][Math.floor(Math.random() * colors[type].length)],
     }));
-    setParticles(prev => [...prev.slice(-40), ...newParticles]);
+    setParticles(prev => [...prev.slice(-25), ...newParticles]);
   }, []);
 
   // Spawn score popup helper
@@ -2796,7 +2786,7 @@ const DodgeTheLoveGame = memo(function DodgeTheLoveGame({ onComplete }: { onComp
         // Gentle rain of hearts from top
         if (Math.random() < 0.15) {
           const x = 5 + Math.random() * 90;
-          setProjectiles(prev => [...prev.slice(-25), {
+          setProjectiles(prev => [...prev.slice(-18), {
             id: baseId,
             x, y: -5,
             type: "heart",
@@ -2812,7 +2802,7 @@ const DodgeTheLoveGame = memo(function DodgeTheLoveGame({ onComplete }: { onComp
         // Spiral pattern from center
         const spiralAngle = (time / 100) % (Math.PI * 2);
         if (Math.random() < 0.08) {
-          setProjectiles(prev => [...prev.slice(-25), {
+          setProjectiles(prev => [...prev.slice(-18), {
             id: baseId,
             x: 50, y: 15,
             type: "sparkle",
@@ -2829,7 +2819,7 @@ const DodgeTheLoveGame = memo(function DodgeTheLoveGame({ onComplete }: { onComp
         // Wave pattern - sine wave of projectiles
         if (Math.random() < 0.12) {
           const waveX = 50 + Math.sin(time / 200) * 40;
-          setProjectiles(prev => [...prev.slice(-25), {
+          setProjectiles(prev => [...prev.slice(-18), {
             id: baseId,
             x: waveX, y: -5,
             type: "kiss",
@@ -2858,7 +2848,7 @@ const DodgeTheLoveGame = memo(function DodgeTheLoveGame({ onComplete }: { onComp
             const dx = playerXRef.current - startX;
             const dy = playerYRef.current - 10;
             const angle = Math.atan2(dy, dx);
-            setProjectiles(prev => [...prev.slice(-25), {
+            setProjectiles(prev => [...prev.slice(-18), {
               id: baseId + 0.1,
               x: startX, y: 10,
               type: "big_heart",
@@ -3155,44 +3145,39 @@ const DodgeTheLoveGame = memo(function DodgeTheLoveGame({ onComplete }: { onComp
   if (phase === "tutorial") {
     return (
       <div className="fixed inset-0 bg-gradient-to-b from-slate-900 via-purple-900 to-violet-900 flex flex-col items-center justify-center p-4 overflow-hidden">
-        {/* Enhanced animated stars background */}
+        {/* Animated stars background - optimized with CSS */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          {Array.from({ length: 40 }).map((_, i) => (
-            <motion.div
+          {Array.from({ length: 15 }).map((_, i) => (
+            <div
               key={i}
               className="absolute rounded-full bg-white"
               style={{
-                left: `${(i * 2.5) % 100}%`,
-                top: `${(i * 7 + 3) % 100}%`,
-                width: i % 4 === 0 ? "3px" : i % 2 === 0 ? "2px" : "1px",
-                height: i % 4 === 0 ? "3px" : i % 2 === 0 ? "2px" : "1px",
+                left: `${(i * 7) % 100}%`,
+                top: `${(i * 13 + 5) % 100}%`,
+                width: i % 3 === 0 ? "2px" : "1px",
+                height: i % 3 === 0 ? "2px" : "1px",
+                opacity: 0.5,
+                animation: `float ${3 + (i % 3)}s ease-in-out infinite`,
+                animationDelay: `${(i % 4) * 0.4}s`,
               }}
-              animate={{
-                opacity: [0.2, 0.9, 0.2],
-                scale: i % 5 === 0 ? [1, 1.8, 1] : [1, 1.3, 1]
-              }}
-              transition={{ duration: 2 + (i % 4) * 0.5, repeat: Infinity, delay: (i % 5) * 0.4 }}
             />
           ))}
         </div>
 
-        {/* Floating projectile preview */}
+        {/* Floating projectile preview - reduced */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          {Array.from({ length: 10 }).map((_, i) => (
-            <motion.div
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div
               key={`projectile-${i}`}
-              className="absolute text-2xl opacity-20"
-              style={{ left: `${10 + (i * 10)}%`, top: "-10%" }}
-              animate={{ y: "120vh", rotate: 360 }}
-              transition={{
-                duration: 5 + (i % 4) * 0.75,
-                repeat: Infinity,
-                delay: i * 0.5,
-                ease: "linear"
+              className="absolute text-xl opacity-15"
+              style={{
+                left: `${15 + (i * 18)}%`,
+                animation: `floatDown ${7 + (i % 3)}s linear infinite`,
+                animationDelay: `${i * 0.8}s`,
               }}
             >
-              {["💕", "💋", "✨", "💗"][i % 4]}
-            </motion.div>
+              {["💕", "💋", "✨"][i % 3]}
+            </div>
           ))}
         </div>
 
@@ -4270,7 +4255,7 @@ const RejectLettersGame = memo(function RejectLettersGame({ onComplete }: { onCo
         text: extras?.text,
       };
     });
-    setParticles(prev => [...prev.slice(-120), ...newParticles]);
+    setParticles(prev => [...prev.slice(-50), ...newParticles.slice(0, Math.min(count, 15))]);
   }, []);
 
   // Spawn score popup
@@ -4817,33 +4802,26 @@ const RejectLettersGame = memo(function RejectLettersGame({ onComplete }: { onCo
   if (phase === "tutorial") {
     return (
       <div className="fixed inset-0 bg-gradient-to-b from-amber-100 via-rose-100 to-pink-200 flex flex-col items-center justify-center p-4 overflow-hidden">
-        {/* Enhanced floating letters background */}
+        {/* Floating letters background - optimized with CSS */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          {Array.from({ length: 15 }).map((_, i) => (
-            <motion.div
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div
               key={i}
-              className="absolute text-4xl opacity-25"
-              style={{ left: `${(i * 7) % 100}%`, top: "-10%" }}
-              animate={{ y: "120vh", rotate: [-10, 10, -10], x: [0, 10, -10, 0] }}
-              transition={{
-                duration: 8 + (i % 5),
-                repeat: Infinity,
-                delay: i * 0.5,
-                ease: "linear"
+              className="absolute text-3xl opacity-20"
+              style={{
+                left: `${(i * 16) % 100}%`,
+                animation: `floatDown ${10 + (i % 3) * 2}s linear infinite`,
+                animationDelay: `${i * 0.8}s`,
               }}
             >
-              {["💌", "💕", "✉️", "📬", "💝"][i % 5]}
-            </motion.div>
+              {["💌", "💕", "✉️"][i % 3]}
+            </div>
           ))}
         </div>
 
-        {/* Radial glow */}
+        {/* Radial glow - static for better performance */}
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-          <motion.div
-            className="w-80 h-80 bg-rose-400/20 rounded-full blur-3xl"
-            animate={{ scale: [1, 1.2, 1], opacity: [0.3, 0.5, 0.3] }}
-            transition={{ duration: 3, repeat: Infinity }}
-          />
+          <div className="w-80 h-80 bg-rose-400/15 rounded-full blur-3xl" />
         </div>
 
         <motion.div
@@ -6316,30 +6294,30 @@ const DramaKingBattle = memo(function DramaKingBattle({ onComplete }: { onComple
       fire: ["#ff5722", "#ff9800", "#ffeb3b", "#f44336"],
       poison: ["#4caf50", "#8bc34a", "#cddc39", "#00e676"],
     };
-    const newParticles = Array.from({ length: Math.min(count, 8) }, (_, i) => ({
+    const newParticles = Array.from({ length: Math.min(count, 5) }, (_, i) => ({
       id: performance.now() + i + Math.random() * 1000,
       x, y,
-      vx: (Math.random() - 0.5) * 14 * spread,
-      vy: (Math.random() - 0.5) * 14 * spread - 4,
+      vx: (Math.random() - 0.5) * 12 * spread,
+      vy: (Math.random() - 0.5) * 12 * spread - 3,
       type,
       life: 1,
-      size: 6 + Math.random() * 10,
+      size: 5 + Math.random() * 8,
       color: colors[type][Math.floor(Math.random() * colors[type].length)],
       rotation: Math.random() * 360,
     }));
-    setParticles(prev => [...prev.slice(-40), ...newParticles]);
+    setParticles(prev => [...prev.slice(-20), ...newParticles]);
   }, []);
 
   // Spawn floating text - optimized
   const spawnFloatingText = useCallback((x: number, y: number, text: string, color: string, size: "sm" | "md" | "lg" | "xl" = "md") => {
-    setFloatingTexts(prev => [...prev.slice(-5), { id: performance.now() + Math.random(), x, y, text, color, size }]);
-    setTimeout(() => setFloatingTexts(prev => prev.slice(1)), 1200);
+    setFloatingTexts(prev => [...prev.slice(-3), { id: performance.now() + Math.random(), x, y, text, color, size }]);
+    setTimeout(() => setFloatingTexts(prev => prev.slice(1)), 900);
   }, []);
 
   // Spawn score popup - optimized
   const spawnScorePopup = useCallback((x: number, y: number, value: number, type: "damage" | "parry" | "combo" | "heal" | "crit") => {
-    setScorePopups(prev => [...prev.slice(-4), { id: performance.now() + Math.random(), x, y, value, type }]);
-    setTimeout(() => setScorePopups(prev => prev.slice(1)), 800);
+    setScorePopups(prev => [...prev.slice(-3), { id: performance.now() + Math.random(), x, y, value, type }]);
+    setTimeout(() => setScorePopups(prev => prev.slice(1)), 600);
   }, []);
 
   // Screen shake helper
@@ -8289,24 +8267,20 @@ export default function ValentineCat() {
     return (
       <div className="fixed inset-0 bg-gradient-to-b from-pink-200 via-rose-300 to-pink-400 flex flex-col items-center justify-center p-4 overflow-hidden">
         {SoundToggleButton}
-        {/* Animated background hearts */}
+        {/* Animated background hearts - optimized with CSS */}
         <div className="absolute inset-0 pointer-events-none overflow-hidden">
-          {Array.from({ length: 20 }).map((_, i) => (
-            <motion.div
+          {Array.from({ length: 10 }).map((_, i) => (
+            <div
               key={i}
-              className="absolute text-2xl md:text-3xl opacity-20"
-              style={{ left: `${(i * 11) % 100}%` }}
-              initial={{ y: "100vh" }}
-              animate={{ y: "-100vh", rotate: [0, 360] }}
-              transition={{
-                duration: 12 + (i % 5) * 3,
-                repeat: Infinity,
-                delay: i * 0.4,
-                ease: "linear"
+              className="absolute text-2xl opacity-15"
+              style={{
+                left: `${(i * 10) % 100}%`,
+                animation: `floatUp ${15 + (i % 3) * 3}s linear infinite`,
+                animationDelay: `${i * 0.8}s`,
               }}
             >
-              {["💖", "💕", "💗", "🌸", "✨"][i % 5]}
-            </motion.div>
+              {["💖", "💕", "💗"][i % 3]}
+            </div>
           ))}
         </div>
 
@@ -8472,47 +8446,37 @@ export default function ValentineCat() {
     return (
       <div className="fixed inset-0 bg-gradient-to-b from-indigo-950 via-purple-900 to-pink-900 flex items-center justify-center p-4 overflow-hidden">
         {SoundToggleButton}
-        {/* Starfield background */}
+        {/* Starfield background - optimized with CSS */}
         <div className="absolute inset-0 pointer-events-none">
-          {Array.from({ length: 30 }).map((_, i) => (
-            <motion.div
+          {Array.from({ length: 15 }).map((_, i) => (
+            <div
               key={i}
               className="absolute w-1 h-1 bg-white rounded-full"
               style={{
-                left: `${(i * 3.5) % 100}%`,
-                top: `${(i * 7 + 5) % 100}%`,
-              }}
-              animate={{
-                opacity: [0.2, 1, 0.2],
-                scale: [0.5, 1, 0.5],
-              }}
-              transition={{
-                duration: 2 + (i % 4) * 0.5,
-                repeat: Infinity,
-                delay: (i % 5) * 0.4,
+                left: `${(i * 7) % 100}%`,
+                top: `${(i * 13 + 5) % 100}%`,
+                opacity: 0.4 + (i % 3) * 0.2,
+                animation: `float ${3 + (i % 3)}s ease-in-out infinite`,
+                animationDelay: `${(i % 4) * 0.5}s`,
               }}
             />
           ))}
         </div>
 
-        {/* Floating sparkles */}
+        {/* Floating sparkles - reduced */}
         <div className="absolute inset-0 pointer-events-none overflow-hidden">
-          {Array.from({ length: 12 }).map((_, i) => (
-            <motion.div
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div
               key={`sparkle-${i}`}
-              className="absolute text-xl opacity-40"
-              style={{ left: `${(i * 17) % 100}%` }}
-              initial={{ y: "100vh" }}
-              animate={{ y: "-100vh" }}
-              transition={{
-                duration: 15 + (i % 4) * 3,
-                repeat: Infinity,
-                delay: i * 0.8,
-                ease: "linear"
+              className="absolute text-lg opacity-30"
+              style={{
+                left: `${(i * 16) % 100}%`,
+                animation: `floatUp ${18 + (i % 3) * 4}s linear infinite`,
+                animationDelay: `${i * 1.5}s`,
               }}
             >
-              {["✨", "⭐", "💫", "🌟"][i % 4]}
-            </motion.div>
+              {["✨", "⭐", "💫"][i % 3]}
+            </div>
           ))}
         </div>
 
@@ -8561,24 +8525,20 @@ export default function ValentineCat() {
     return (
       <div className="fixed inset-0 bg-gradient-to-br from-pink-100 via-rose-200 to-pink-300 overflow-hidden flex items-center justify-center p-4">
         {SoundToggleButton}
-        {/* Animated background */}
+        {/* Animated background - optimized with CSS */}
         <div className="absolute inset-0 pointer-events-none overflow-hidden">
-          {Array.from({ length: 15 }).map((_, i) => (
-            <motion.div
+          {Array.from({ length: 8 }).map((_, i) => (
+            <div
               key={i}
-              className="absolute text-2xl opacity-30"
-              style={{ left: `${(i * 13) % 100}%` }}
-              initial={{ y: "100vh" }}
-              animate={{ y: "-100vh" }}
-              transition={{
-                duration: 10 + (i % 4) * 2,
-                repeat: Infinity,
-                delay: i * 0.5,
-                ease: "linear"
+              className="absolute text-xl opacity-20"
+              style={{
+                left: `${(i * 12) % 100}%`,
+                animation: `floatUp ${12 + (i % 3) * 3}s linear infinite`,
+                animationDelay: `${i * 0.7}s`,
               }}
             >
-              {["💕", "🌸", "✨", "💗"][i % 4]}
-            </motion.div>
+              {["💕", "🌸", "✨"][i % 3]}
+            </div>
           ))}
         </div>
 
