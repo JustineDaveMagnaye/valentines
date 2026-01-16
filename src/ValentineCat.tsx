@@ -12,7 +12,6 @@ function cn(...xs: Array<string | undefined | false>) {
 
 type XY = { x: number; y: number };
 const rand = (a: number, b: number) => Math.random() * (b - a) + a;
-const randInt = (a: number, b: number) => Math.floor(rand(a, b));
 const pick = <T,>(arr: T[]): T => arr[Math.floor(rand(0, arr.length))];
 const now = () => performance.now();
 
@@ -157,75 +156,81 @@ function Button({
   );
 }
 
-function ProgressBar({ value, max, className, color = "pink" }: { value: number; max: number; className?: string; color?: string }) {
-  const colors = {
-    pink: "from-pink-400 to-rose-500",
-    green: "from-emerald-400 to-green-500",
-    blue: "from-blue-400 to-indigo-500",
-    gold: "from-amber-400 to-yellow-500",
-    red: "from-red-400 to-rose-600",
-  };
-  return (
-    <div className={cn("h-3 rounded-full bg-slate-200 overflow-hidden", className)}>
-      <motion.div
-        className={cn("h-full rounded-full bg-gradient-to-r", colors[color as keyof typeof colors] || colors.pink)}
-        initial={{ width: 0 }}
-        animate={{ width: `${(value / max) * 100}%` }}
-        transition={{ type: "spring", stiffness: 300, damping: 30 }}
-      />
-    </div>
-  );
-}
 
 function Particles({ emojis, count = 20 }: { emojis: string[]; count?: number }) {
+  // Use CSS animations instead of framer-motion for better performance
   const particles = useMemo(() =>
-    Array.from({ length: count }).map((_, i) => ({
+    Array.from({ length: Math.min(count, 12) }).map((_, i) => ({
       id: i,
-      emoji: pick(emojis),
-      x: rand(0, 100),
-      delay: rand(0, 5),
-      duration: rand(3, 7),
-      size: rand(0.8, 1.5),
+      emoji: emojis[i % emojis.length],
+      x: (i * 100 / Math.min(count, 12)) + rand(-5, 5),
+      delay: i * 0.3,
+      duration: rand(6, 10),
     })), [emojis, count]);
 
   return (
-    <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
-      {particles.map(p => (
-        <motion.div
-          key={p.id}
-          className="absolute text-2xl"
-          style={{ left: `${p.x}%`, fontSize: `${p.size}rem` }}
-          initial={{ y: "-10%", opacity: 0 }}
-          animate={{ y: "110%", opacity: [0, 1, 1, 0] }}
-          transition={{ duration: p.duration, delay: p.delay, repeat: Infinity, ease: "linear" }}
-        >
-          {p.emoji}
-        </motion.div>
-      ))}
-    </div>
+    <>
+      <style>{`
+        @keyframes particle-fall {
+          0% { transform: translateY(-5vh); opacity: 0; }
+          10% { opacity: 0.6; }
+          90% { opacity: 0.6; }
+          100% { transform: translateY(105vh); opacity: 0; }
+        }
+      `}</style>
+      <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
+        {particles.map(p => (
+          <div
+            key={p.id}
+            className="absolute text-xl opacity-60"
+            style={{
+              left: `${p.x}%`,
+              animation: `particle-fall ${p.duration}s linear ${p.delay}s infinite`,
+            }}
+          >
+            {p.emoji}
+          </div>
+        ))}
+      </div>
+    </>
   );
 }
 
 function TypeWriter({ text, speed = 50, onComplete }: { text: string; speed?: number; onComplete?: () => void }) {
   const [displayed, setDisplayed] = useState("");
   const [done, setDone] = useState(false);
+  const onCompleteRef = useRef(onComplete);
+
+  // Keep ref updated without triggering effect
+  useEffect(() => {
+    onCompleteRef.current = onComplete;
+  });
 
   useEffect(() => {
     setDisplayed("");
     setDone(false);
     let i = 0;
+    let cancelled = false;
+
     const interval = setInterval(() => {
+      if (cancelled) return;
       if (i < text.length) {
         setDisplayed(text.slice(0, i + 1));
         i++;
       } else {
         clearInterval(interval);
-        setDone(true);
-        onComplete?.();
+        if (!cancelled) {
+          setDone(true);
+          onCompleteRef.current?.();
+        }
       }
     }, speed);
-    return () => clearInterval(interval);
-  }, [text, speed, onComplete]);
+
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [text, speed]);
 
   return (
     <span>
@@ -237,6 +242,11 @@ function TypeWriter({ text, speed = 50, onComplete }: { text: string; speed?: nu
 
 function DialogBox({ line, onNext }: { line: DialogLine; onNext: () => void }) {
   const [ready, setReady] = useState(false);
+
+  // Reset ready state when line changes
+  useEffect(() => {
+    setReady(false);
+  }, [line.text]);
 
   const bgColors = {
     cat: "from-pink-100 to-rose-100 border-pink-300",
@@ -358,329 +368,471 @@ function AchievementPopup({ achievement, onClose }: { achievement: Achievement; 
   );
 }
 
-function CatSprite({ emotion = "happy", size = "md", className }: { emotion?: keyof typeof CAT_EMOTIONS; size?: "sm" | "md" | "lg" | "xl"; className?: string }) {
+function CatSprite({ emotion = "happy", size = "md", className, animate = false }: { emotion?: keyof typeof CAT_EMOTIONS; size?: "sm" | "md" | "lg" | "xl"; className?: string; animate?: boolean }) {
   const sizes = { sm: "text-4xl", md: "text-6xl", lg: "text-8xl", xl: "text-[120px]" };
-  return (
-    <motion.div
-      className={cn(sizes[size], className)}
-      animate={{ y: [0, -5, 0] }}
-      transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
-    >
-      {CAT_EMOTIONS[emotion]}
-    </motion.div>
-  );
+  // Only animate on title screen to save performance
+  if (animate) {
+    return (
+      <motion.div
+        className={cn(sizes[size], className)}
+        animate={{ y: [0, -8, 0] }}
+        transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+      >
+        {CAT_EMOTIONS[emotion]}
+      </motion.div>
+    );
+  }
+  return <div className={cn(sizes[size], className)}>{CAT_EMOTIONS[emotion]}</div>;
 }
 
 // ============================================================================
-// MINI-GAMES
+// MINI-GAMES - Super user-friendly with tutorials!
 // ============================================================================
 
-function RhythmGame({ onComplete, onFail }: { onComplete: (score: number) => void; onFail: () => void }) {
+// Simple tap game - just tap the hearts as they appear!
+function TapGame({ onComplete }: { onComplete: (score: number) => void }) {
+  const [phase, setPhase] = useState<"tutorial" | "playing" | "done">("tutorial");
   const [score, setScore] = useState(0);
-  const [combo, setCombo] = useState(0);
-  const [notes, setNotes] = useState<Array<{ id: number; lane: number; y: number; hit: boolean }>>([]);
-  const [gameTime, setGameTime] = useState(0);
-  const [misses, setMisses] = useState(0);
-  const noteIdRef = useRef(0);
-  const lanes = [0, 1, 2, 3];
-  const laneKeys = ["A", "S", "D", "F"];
-  const laneEmojis = ["💖", "💕", "💗", "💘"];
+  const [hearts, setHearts] = useState<Array<{ id: number; x: number; y: number; tapped: boolean }>>([]);
+  const [timeLeft, setTimeLeft] = useState(10);
 
-  // Spawn notes
+  // Start game after tutorial
+  const startGame = () => setPhase("playing");
+
+  // Timer
   useEffect(() => {
-    if (gameTime > 15000) {
-      // Game over
-      if (misses >= 5) onFail();
-      else onComplete(score);
+    if (phase !== "playing") return;
+    if (timeLeft <= 0) {
+      setPhase("done");
+      setTimeout(() => onComplete(score), 1500);
       return;
     }
+    const timer = setInterval(() => setTimeLeft(t => t - 1), 1000);
+    return () => clearInterval(timer);
+  }, [timeLeft, phase, score, onComplete]);
 
-    const interval = setInterval(() => {
-      setGameTime(t => t + 100);
-
-      // Random chance to spawn note
-      if (Math.random() < 0.15) {
-        const lane = randInt(0, 4);
-        setNotes(prev => [...prev, { id: noteIdRef.current++, lane, y: 0, hit: false }]);
-      }
-
-      // Move notes down
-      setNotes(prev => prev
-        .map(n => ({ ...n, y: n.y + 4 }))
-        .filter(n => {
-          if (n.y > 100 && !n.hit) {
-            setMisses(m => m + 1);
-            setCombo(0);
-            return false;
-          }
-          return n.y <= 110;
-        })
-      );
-    }, 100);
-
-    return () => clearInterval(interval);
-  }, [gameTime, misses, score, onComplete, onFail]);
-
-  // Handle key presses
+  // Spawn hearts in easy-to-reach positions
   useEffect(() => {
-    const handleKey = (e: KeyboardEvent) => {
-      const laneIndex = laneKeys.indexOf(e.key.toUpperCase());
-      if (laneIndex === -1) return;
-
-      // Find closest note in this lane near the hit zone (80-95% down)
-      const hitNote = notes.find(n => n.lane === laneIndex && n.y >= 75 && n.y <= 95 && !n.hit);
-
-      if (hitNote) {
-        setNotes(prev => prev.map(n => n.id === hitNote.id ? { ...n, hit: true } : n));
-        const newCombo = combo + 1;
-        setCombo(newCombo);
-        setScore(s => s + 100 * Math.min(newCombo, 10));
-      } else {
-        setCombo(0);
-      }
+    if (phase !== "playing") return;
+    const spawn = () => {
+      setHearts(prev => {
+        // Remove old hearts and add new one
+        const filtered = prev.filter(h => !h.tapped && Date.now() - h.id < 2000);
+        return [...filtered, {
+          id: Date.now(),
+          x: 15 + Math.random() * 70, // Keep away from edges
+          y: 20 + Math.random() * 50, // Keep in middle area
+          tapped: false,
+        }];
+      });
     };
+    spawn();
+    const interval = setInterval(spawn, 800);
+    return () => clearInterval(interval);
+  }, [phase]);
 
-    window.addEventListener("keydown", handleKey);
-    return () => window.removeEventListener("keydown", handleKey);
-  }, [notes, combo]);
+  const tapHeart = (id: number) => {
+    setHearts(prev => prev.map(h => h.id === id ? { ...h, tapped: true } : h));
+    setScore(s => s + 1);
+  };
 
+  // Tutorial screen
+  if (phase === "tutorial") {
+    return (
+      <div className="fixed inset-0 bg-gradient-to-b from-pink-400 to-rose-500 flex flex-col items-center justify-center p-6">
+        <div className="bg-white/95 rounded-3xl p-8 max-w-sm text-center shadow-2xl">
+          <div className="text-6xl mb-4">💖</div>
+          <h2 className="text-2xl font-bold text-pink-800 mb-3">Tap the Hearts!</h2>
+          <p className="text-pink-600 mb-6">
+            Hearts will appear on screen.<br/>
+            <span className="font-bold">Just tap them!</span><br/>
+            Get as many as you can in 10 seconds!
+          </p>
+          <button
+            onClick={startGame}
+            className="w-full py-4 bg-gradient-to-r from-pink-500 to-rose-500 text-white rounded-2xl font-bold text-xl shadow-lg active:scale-95 transition-transform"
+          >
+            Got it! Let's go! 🎮
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Done screen
+  if (phase === "done") {
+    return (
+      <div className="fixed inset-0 bg-gradient-to-b from-pink-400 to-rose-500 flex flex-col items-center justify-center p-6">
+        <div className="bg-white/95 rounded-3xl p-8 max-w-sm text-center shadow-2xl">
+          <div className="text-6xl mb-4">🎉</div>
+          <h2 className="text-3xl font-bold text-pink-800 mb-2">Great job!</h2>
+          <p className="text-5xl font-bold text-pink-600 mb-4">{score} 💖</p>
+          <p className="text-pink-500">Moving to next challenge...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Playing
   return (
-    <div className="fixed inset-0 bg-gradient-to-b from-purple-900 via-indigo-900 to-black flex flex-col items-center justify-center">
+    <div className="fixed inset-0 bg-gradient-to-b from-pink-400 to-rose-500 overflow-hidden select-none">
       {/* Header */}
-      <div className="absolute top-4 left-4 right-4 flex justify-between items-center text-white">
-        <div>
-          <div className="text-2xl font-bold">Score: {score}</div>
-          <div className="text-lg">Combo: {combo}x</div>
+      <div className="absolute top-4 left-0 right-0 flex justify-center gap-8 z-10">
+        <div className="bg-white/90 rounded-full px-6 py-2 shadow-lg">
+          <span className="text-2xl font-bold text-pink-600">{score} 💖</span>
         </div>
-        <div className="text-right">
-          <div className="text-lg">Misses: {misses}/5</div>
-          <ProgressBar value={15000 - gameTime} max={15000} color="pink" className="w-32" />
+        <div className="bg-white/90 rounded-full px-6 py-2 shadow-lg">
+          <span className="text-2xl font-bold text-pink-600">{timeLeft}s ⏱️</span>
         </div>
       </div>
 
-      {/* Play area */}
-      <div className="relative w-80 h-96 bg-black/30 rounded-2xl border-2 border-white/20 overflow-hidden">
-        {/* Lanes */}
-        {lanes.map((lane, i) => (
-          <div
-            key={lane}
-            className="absolute top-0 bottom-0 w-20 border-x border-white/10"
-            style={{ left: `${i * 25}%` }}
-          >
-            {/* Hit zone */}
-            <div className="absolute bottom-8 left-0 right-0 h-12 bg-white/10 border-y-2 border-pink-500/50" />
-            {/* Lane label */}
-            <div className="absolute bottom-0 left-0 right-0 h-8 flex items-center justify-center bg-gradient-to-t from-pink-600 to-transparent">
-              <span className="text-white font-bold">{laneKeys[i]}</span>
-            </div>
-          </div>
-        ))}
+      {/* Skip button */}
+      <button
+        onClick={() => onComplete(score)}
+        className="absolute top-4 right-4 bg-white/50 rounded-full px-3 py-1 text-pink-700 text-sm z-10"
+      >
+        Skip →
+      </button>
 
-        {/* Notes */}
-        {notes.map(note => (
-          <motion.div
-            key={note.id}
-            className="absolute w-16 h-12 flex items-center justify-center"
-            style={{
-              left: `${note.lane * 25 + 2.5}%`,
-              top: `${note.y}%`,
-            }}
-            animate={note.hit ? { scale: [1, 1.5, 0], opacity: [1, 1, 0] } : {}}
-            transition={{ duration: 0.3 }}
-          >
-            <span className="text-3xl">{note.hit ? "✨" : laneEmojis[note.lane]}</span>
-          </motion.div>
-        ))}
-      </div>
+      {/* Hearts to tap */}
+      {hearts.filter(h => !h.tapped).map(h => (
+        <button
+          key={h.id}
+          onClick={() => tapHeart(h.id)}
+          className="absolute text-5xl transform -translate-x-1/2 -translate-y-1/2 active:scale-75 transition-transform animate-pulse"
+          style={{ left: `${h.x}%`, top: `${h.y}%` }}
+        >
+          💖
+        </button>
+      ))}
 
-      {/* Instructions */}
-      <div className="mt-4 text-white/60 text-center">
-        Press A, S, D, F when hearts reach the zone!
+      {/* Tap feedback */}
+      {hearts.filter(h => h.tapped).map(h => (
+        <div
+          key={h.id}
+          className="absolute text-4xl transform -translate-x-1/2 -translate-y-1/2 animate-ping pointer-events-none"
+          style={{ left: `${h.x}%`, top: `${h.y}%` }}
+        >
+          ✨
+        </div>
+      ))}
+
+      {/* Hint */}
+      <div className="absolute bottom-8 left-0 right-0 text-center">
+        <p className="text-white/80 text-lg font-medium">👆 Tap the hearts!</p>
       </div>
     </div>
   );
 }
 
-function PuzzleGame({ onComplete }: { onComplete: () => void }) {
-  const [pieces, setPieces] = useState<Array<{ id: number; current: number; correct: number }>>([]);
-  const [selected, setSelected] = useState<number | null>(null);
-  const [moves, setMoves] = useState(0);
+// Simple match game - find the matching pairs!
+function MatchGame({ onComplete }: { onComplete: () => void }) {
+  const [phase, setPhase] = useState<"tutorial" | "playing" | "done">("tutorial");
+  const [cards, setCards] = useState<Array<{ id: number; emoji: string; flipped: boolean; matched: boolean }>>([]);
+  const [flippedIds, setFlippedIds] = useState<number[]>([]);
+  const [matches, setMatches] = useState(0);
+  const [canFlip, setCanFlip] = useState(true);
 
-  // Initialize puzzle
+  const emojis = ["💖", "💕", "💗", "💘"];
+  const totalPairs = 4;
+
+  // Initialize cards
   useEffect(() => {
-    const correct = [0, 1, 2, 3, 4, 5, 6, 7, 8];
-    const shuffled = [...correct].sort(() => Math.random() - 0.5);
-    setPieces(correct.map((c, i) => ({ id: i, current: shuffled[i], correct: c })));
+    const pairs = emojis.flatMap((emoji, i) => [
+      { id: i * 2, emoji, flipped: false, matched: false },
+      { id: i * 2 + 1, emoji, flipped: false, matched: false },
+    ]);
+    // Simple shuffle
+    for (let i = pairs.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [pairs[i], pairs[j]] = [pairs[j], pairs[i]];
+    }
+    setCards(pairs);
   }, []);
 
-  const heartPieces = ["💖", "💕", "💗", "💘", "💝", "💞", "💓", "💟", "❤️"];
+  const startGame = () => setPhase("playing");
 
-  const handleClick = (index: number) => {
-    if (selected === null) {
-      setSelected(index);
-    } else {
-      // Swap pieces
-      setPieces(prev => {
-        const newPieces = [...prev];
-        const temp = newPieces[selected].current;
-        newPieces[selected].current = newPieces[index].current;
-        newPieces[index].current = temp;
-        return newPieces;
-      });
-      setSelected(null);
-      setMoves(m => m + 1);
+  const flipCard = (id: number) => {
+    if (!canFlip || phase !== "playing") return;
+    const card = cards.find(c => c.id === id);
+    if (!card || card.flipped || card.matched) return;
+
+    // Flip the card
+    setCards(prev => prev.map(c => c.id === id ? { ...c, flipped: true } : c));
+    const newFlipped = [...flippedIds, id];
+    setFlippedIds(newFlipped);
+
+    // Check for match when 2 cards flipped
+    if (newFlipped.length === 2) {
+      setCanFlip(false);
+      const [first, second] = newFlipped.map(fid => cards.find(c => c.id === fid)!);
+
+      setTimeout(() => {
+        if (first.emoji === second.emoji) {
+          // Match!
+          setCards(prev => prev.map(c =>
+            c.id === first.id || c.id === second.id ? { ...c, matched: true } : c
+          ));
+          setMatches(m => {
+            const newMatches = m + 1;
+            if (newMatches >= totalPairs) {
+              setPhase("done");
+              setTimeout(() => onComplete(), 1500);
+            }
+            return newMatches;
+          });
+        } else {
+          // No match - flip back
+          setCards(prev => prev.map(c =>
+            c.id === first.id || c.id === second.id ? { ...c, flipped: false } : c
+          ));
+        }
+        setFlippedIds([]);
+        setCanFlip(true);
+      }, 800);
     }
   };
 
-  // Check win condition
-  useEffect(() => {
-    if (pieces.length > 0 && pieces.every(p => p.current === p.correct)) {
-      setTimeout(onComplete, 500);
-    }
-  }, [pieces, onComplete]);
+  // Tutorial screen
+  if (phase === "tutorial") {
+    return (
+      <div className="fixed inset-0 bg-gradient-to-b from-purple-400 to-indigo-500 flex flex-col items-center justify-center p-6">
+        <div className="bg-white/95 rounded-3xl p-8 max-w-sm text-center shadow-2xl">
+          <div className="text-6xl mb-4">🎴</div>
+          <h2 className="text-2xl font-bold text-purple-800 mb-3">Memory Match!</h2>
+          <p className="text-purple-600 mb-2">
+            Find the matching heart pairs!
+          </p>
+          <div className="flex justify-center gap-2 my-4">
+            <div className="w-12 h-12 bg-purple-200 rounded-lg flex items-center justify-center text-2xl">💖</div>
+            <div className="w-12 h-12 bg-purple-200 rounded-lg flex items-center justify-center text-2xl">💖</div>
+            <span className="self-center text-2xl">✓</span>
+          </div>
+          <p className="text-purple-500 text-sm mb-6">
+            Tap two cards to flip them.<br/>Match all 4 pairs to win!
+          </p>
+          <button
+            onClick={startGame}
+            className="w-full py-4 bg-gradient-to-r from-purple-500 to-indigo-500 text-white rounded-2xl font-bold text-xl shadow-lg active:scale-95 transition-transform"
+          >
+            Let's Play! 🎮
+          </button>
+        </div>
+      </div>
+    );
+  }
 
+  // Done screen
+  if (phase === "done") {
+    return (
+      <div className="fixed inset-0 bg-gradient-to-b from-purple-400 to-indigo-500 flex flex-col items-center justify-center p-6">
+        <div className="bg-white/95 rounded-3xl p-8 max-w-sm text-center shadow-2xl">
+          <div className="text-6xl mb-4">🏆</div>
+          <h2 className="text-3xl font-bold text-purple-800 mb-2">Perfect!</h2>
+          <p className="text-purple-600 mb-4">You found all the pairs!</p>
+          <p className="text-purple-500">Moving to next challenge...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Playing
   return (
-    <div className="fixed inset-0 bg-gradient-to-br from-pink-200 to-rose-300 flex flex-col items-center justify-center p-4">
-      <div className="text-center mb-6">
-        <h2 className="text-3xl font-bold text-pink-800 mb-2">Heart Puzzle 💕</h2>
-        <p className="text-pink-600">Arrange the hearts in order! Moves: {moves}</p>
+    <div className="fixed inset-0 bg-gradient-to-b from-purple-400 to-indigo-500 flex flex-col items-center justify-center p-4">
+      {/* Header */}
+      <div className="mb-6">
+        <div className="bg-white/90 rounded-full px-6 py-2 shadow-lg">
+          <span className="text-xl font-bold text-purple-600">Matches: {matches}/{totalPairs} 💕</span>
+        </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-2 p-4 bg-white/50 rounded-2xl shadow-xl">
-        {pieces.map((piece, index) => (
-          <motion.button
-            key={piece.id}
-            onClick={() => handleClick(index)}
+      {/* Skip button */}
+      <button
+        onClick={onComplete}
+        className="absolute top-4 right-4 bg-white/50 rounded-full px-3 py-1 text-purple-700 text-sm"
+      >
+        Skip →
+      </button>
+
+      {/* Card grid */}
+      <div className="grid grid-cols-4 gap-3">
+        {cards.map(card => (
+          <button
+            key={card.id}
+            onClick={() => flipCard(card.id)}
+            disabled={card.flipped || card.matched || !canFlip}
             className={cn(
-              "w-20 h-20 rounded-xl text-4xl flex items-center justify-center transition-all",
-              selected === index
-                ? "bg-pink-500 ring-4 ring-pink-300 scale-110"
-                : "bg-white hover:bg-pink-100",
-              piece.current === piece.correct && "bg-green-100"
+              "w-16 h-20 rounded-xl text-3xl flex items-center justify-center transition-all shadow-lg",
+              card.matched && "bg-green-300 scale-95",
+              card.flipped && !card.matched && "bg-white",
+              !card.flipped && !card.matched && "bg-purple-600 hover:bg-purple-500 active:scale-95"
             )}
-            whileHover={{ scale: selected === index ? 1.1 : 1.05 }}
-            whileTap={{ scale: 0.95 }}
           >
-            {heartPieces[piece.current]}
-          </motion.button>
+            {(card.flipped || card.matched) ? card.emoji : "❓"}
+          </button>
         ))}
       </div>
 
-      <p className="mt-4 text-pink-600 text-sm">Click two pieces to swap them</p>
+      {/* Hint */}
+      <p className="mt-6 text-white/80 text-center">👆 Tap cards to find matches!</p>
     </div>
   );
 }
 
-function CatchGame({ onComplete, onFail }: { onComplete: (score: number) => void; onFail: () => void }) {
-  const [catPos, setCatPos] = useState(50);
-  const [hearts, setHearts] = useState<Array<{ id: number; x: number; y: number; caught: boolean }>>([]);
+// Simple slider - drag the heart to the goal!
+function SliderGame({ onComplete }: { onComplete: (score: number) => void }) {
+  const [phase, setPhase] = useState<"tutorial" | "playing" | "done">("tutorial");
   const [score, setScore] = useState(0);
-  const [missed, setMissed] = useState(0);
-  const [timeLeft, setTimeLeft] = useState(20);
-  const heartIdRef = useRef(0);
+  const [round, setRound] = useState(0);
+  const [heartX, setHeartX] = useState(50);
+  const [goalX, setGoalX] = useState(75);
+  const [isDragging, setIsDragging] = useState(false);
+  const totalRounds = 5;
 
-  // Game timer
-  useEffect(() => {
-    if (timeLeft <= 0) {
-      if (score >= 15) onComplete(score);
-      else onFail();
-      return;
+  const startGame = () => {
+    setPhase("playing");
+    newRound();
+  };
+
+  const newRound = () => {
+    setHeartX(10 + Math.random() * 30); // Start on left side
+    setGoalX(60 + Math.random() * 30); // Goal on right side
+  };
+
+  const handleMove = (clientX: number) => {
+    if (!isDragging || phase !== "playing") return;
+    const pct = (clientX / window.innerWidth) * 100;
+    setHeartX(Math.max(5, Math.min(95, pct)));
+  };
+
+  const checkGoal = () => {
+    if (Math.abs(heartX - goalX) < 10) {
+      // Success!
+      setScore(s => s + 1);
     }
+    const nextRound = round + 1;
+    if (nextRound >= totalRounds) {
+      setPhase("done");
+      setTimeout(() => onComplete(score + (Math.abs(heartX - goalX) < 10 ? 1 : 0)), 1500);
+    } else {
+      setRound(nextRound);
+      newRound();
+    }
+  };
 
-    const timer = setInterval(() => setTimeLeft(t => t - 1), 1000);
-    return () => clearInterval(timer);
-  }, [timeLeft, score, onComplete, onFail]);
+  // Tutorial
+  if (phase === "tutorial") {
+    return (
+      <div className="fixed inset-0 bg-gradient-to-b from-amber-400 to-orange-500 flex flex-col items-center justify-center p-6">
+        <div className="bg-white/95 rounded-3xl p-8 max-w-sm text-center shadow-2xl">
+          <div className="text-6xl mb-4">👆</div>
+          <h2 className="text-2xl font-bold text-amber-800 mb-3">Slide to Love!</h2>
+          <p className="text-amber-600 mb-4">
+            Drag the heart 💖 to the goal 🎯
+          </p>
+          <div className="bg-amber-100 rounded-xl p-4 mb-4">
+            <div className="flex items-center justify-between">
+              <span className="text-3xl">💖</span>
+              <span className="text-amber-400">→ → →</span>
+              <span className="text-3xl">🎯</span>
+            </div>
+          </div>
+          <p className="text-amber-500 text-sm mb-6">
+            Release when you're close!<br/>5 rounds total.
+          </p>
+          <button
+            onClick={startGame}
+            className="w-full py-4 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-2xl font-bold text-xl shadow-lg active:scale-95 transition-transform"
+          >
+            Start! 🎮
+          </button>
+        </div>
+      </div>
+    );
+  }
 
-  // Spawn and move hearts
-  useEffect(() => {
-    const interval = setInterval(() => {
-      // Spawn new hearts
-      if (Math.random() < 0.2) {
-        setHearts(prev => [...prev, {
-          id: heartIdRef.current++,
-          x: rand(10, 90),
-          y: 0,
-          caught: false,
-        }]);
-      }
+  // Done
+  if (phase === "done") {
+    return (
+      <div className="fixed inset-0 bg-gradient-to-b from-amber-400 to-orange-500 flex flex-col items-center justify-center p-6">
+        <div className="bg-white/95 rounded-3xl p-8 max-w-sm text-center shadow-2xl">
+          <div className="text-6xl mb-4">⭐</div>
+          <h2 className="text-3xl font-bold text-amber-800 mb-2">Nice!</h2>
+          <p className="text-5xl font-bold text-amber-600 mb-4">{score}/{totalRounds}</p>
+          <p className="text-amber-500">Moving on...</p>
+        </div>
+      </div>
+    );
+  }
 
-      // Move hearts down
-      setHearts(prev => prev
-        .map(h => ({ ...h, y: h.y + 2 }))
-        .filter(h => {
-          if (h.y >= 90 && !h.caught) {
-            setMissed(m => {
-              if (m + 1 >= 5) onFail();
-              return m + 1;
-            });
-            return false;
-          }
-          return h.y < 100;
-        })
-      );
-
-      // Check collisions
-      setHearts(prev => prev.map(h => {
-        if (!h.caught && h.y >= 80 && h.y <= 95 && Math.abs(h.x - catPos) < 15) {
-          setScore(s => s + 1);
-          return { ...h, caught: true };
-        }
-        return h;
-      }));
-    }, 50);
-
-    return () => clearInterval(interval);
-  }, [catPos, onFail]);
-
-  // Controls
-  useEffect(() => {
-    const handleKey = (e: KeyboardEvent) => {
-      if (e.key === "ArrowLeft") setCatPos(p => Math.max(10, p - 5));
-      if (e.key === "ArrowRight") setCatPos(p => Math.min(90, p + 5));
-    };
-    window.addEventListener("keydown", handleKey);
-    return () => window.removeEventListener("keydown", handleKey);
-  }, []);
-
+  // Playing
   return (
     <div
-      className="fixed inset-0 bg-gradient-to-b from-blue-400 to-indigo-600 overflow-hidden"
-      onMouseMove={(e) => setCatPos((e.clientX / window.innerWidth) * 100)}
-      onTouchMove={(e) => setCatPos((e.touches[0].clientX / window.innerWidth) * 100)}
+      className="fixed inset-0 bg-gradient-to-b from-amber-400 to-orange-500 flex flex-col items-center justify-center select-none"
+      onMouseMove={(e) => handleMove(e.clientX)}
+      onMouseUp={checkGoal}
+      onTouchMove={(e) => handleMove(e.touches[0].clientX)}
+      onTouchEnd={checkGoal}
+      style={{ touchAction: "none" }}
     >
       {/* Header */}
-      <div className="absolute top-4 left-4 right-4 flex justify-between text-white">
-        <div className="text-2xl font-bold">💕 {score}/15</div>
-        <div className="text-2xl font-bold">⏱️ {timeLeft}s</div>
-        <div className="text-xl">❌ {missed}/5</div>
+      <div className="absolute top-4 left-0 right-0 flex justify-center gap-6 z-10">
+        <div className="bg-white/90 rounded-full px-5 py-2 shadow-lg">
+          <span className="text-lg font-bold text-amber-600">Round {round + 1}/{totalRounds}</span>
+        </div>
+        <div className="bg-white/90 rounded-full px-5 py-2 shadow-lg">
+          <span className="text-lg font-bold text-amber-600">Score: {score}</span>
+        </div>
       </div>
 
-      {/* Hearts */}
-      {hearts.map(h => (
-        <motion.div
-          key={h.id}
-          className="absolute text-4xl"
-          style={{ left: `${h.x}%`, top: `${h.y}%` }}
-          animate={h.caught ? { scale: [1, 1.5, 0], y: [0, -20] } : {}}
-        >
-          {h.caught ? "✨" : "💖"}
-        </motion.div>
-      ))}
-
-      {/* Cat */}
-      <motion.div
-        className="absolute bottom-16 text-6xl"
-        style={{ left: `${catPos}%`, transform: "translateX(-50%)" }}
+      {/* Skip */}
+      <button
+        onClick={() => onComplete(score)}
+        className="absolute top-4 right-4 bg-white/50 rounded-full px-3 py-1 text-amber-700 text-sm z-10"
       >
-        😺
-      </motion.div>
+        Skip →
+      </button>
 
-      {/* Ground */}
-      <div className="absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-green-600 to-green-500" />
+      {/* Game area */}
+      <div className="w-full px-8">
+        {/* Track */}
+        <div className="relative h-24 bg-white/30 rounded-full">
+          {/* Goal */}
+          <div
+            className="absolute top-1/2 -translate-y-1/2 text-5xl"
+            style={{ left: `${goalX}%`, transform: `translate(-50%, -50%)` }}
+          >
+            🎯
+          </div>
+
+          {/* Heart (draggable) */}
+          <button
+            className={cn(
+              "absolute top-1/2 -translate-y-1/2 text-5xl transition-transform",
+              isDragging && "scale-125"
+            )}
+            style={{ left: `${heartX}%`, transform: `translate(-50%, -50%)` }}
+            onMouseDown={() => setIsDragging(true)}
+            onTouchStart={() => setIsDragging(true)}
+          >
+            💖
+          </button>
+        </div>
+      </div>
 
       {/* Instructions */}
-      <div className="absolute bottom-20 left-0 right-0 text-center text-white/70 text-sm">
-        Move mouse or use arrow keys to catch hearts!
+      <p className="mt-8 text-white text-lg font-medium text-center">
+        {isDragging ? "Release near the goal! 🎯" : "👆 Drag the heart!"}
+      </p>
+
+      {/* Distance indicator */}
+      <div className="mt-4 bg-white/80 rounded-full px-4 py-2">
+        <span className={cn(
+          "font-bold",
+          Math.abs(heartX - goalX) < 10 ? "text-green-600" : "text-amber-600"
+        )}>
+          {Math.abs(heartX - goalX) < 10 ? "Perfect! ✓" : `Distance: ${Math.abs(Math.round(heartX - goalX))}`}
+        </span>
       </div>
     </div>
   );
@@ -774,15 +926,18 @@ export default function ValentineCat() {
     }
   }, [scene, moveNoButton]);
 
-  // Handle No button hold
+  // Handle No button hold - EASIER: shorter hold time, no escape on partial hold
   const startHold = useCallback(() => {
     if (holding) return;
     setHolding(true);
     holdStartRef.current = now();
 
+    // Hold time scales with difficulty: 500ms base, increases slightly each time
+    const holdTime = 500 + stats.noCount * 50; // 500ms -> 750ms at max
+
     const loop = () => {
       const elapsed = now() - holdStartRef.current;
-      const progress = Math.min(elapsed / 800, 1);
+      const progress = Math.min(elapsed / holdTime, 1);
       setHoldProgress(progress);
 
       if (progress >= 1) {
@@ -800,11 +955,12 @@ export default function ValentineCat() {
         setCatMood(reaction.emotion as keyof typeof CAT_EMOTIONS);
         setCatMessage(reaction.text);
 
-        // Progress to boss after enough no's
-        if (newCount >= 5) {
+        // Progress to boss after enough no's (reduced from 5 to 3)
+        if (newCount >= 3) {
           setTimeout(() => nextScene("chapter1_boss"), 1500);
         } else {
-          moveNoButton();
+          // Small delay before moving so player sees the success
+          setTimeout(() => moveNoButton(), 800);
         }
         return;
       }
@@ -817,13 +973,20 @@ export default function ValentineCat() {
 
   const endHold = useCallback(() => {
     if (holdRef.current) cancelAnimationFrame(holdRef.current);
+    const wasHolding = holding;
+    const progress = holdProgress;
     setHolding(false);
-    if (holdProgress > 0.3 && holdProgress < 1) {
-      setCatMessage("hehe, too slow! 😼");
-      moveNoButton();
-    }
     setHoldProgress(0);
-  }, [holdProgress, moveNoButton]);
+
+    // Only show message if they were actually trying (>50% progress)
+    // Don't move the button - let them try again in same spot!
+    if (wasHolding && progress > 0.5 && progress < 1) {
+      setCatMessage("So close! Try again! 😼");
+    } else if (wasHolding && progress > 0.2) {
+      setCatMessage("Keep holding! 💪");
+    }
+    // Button stays in place - much more fair!
+  }, [holding, holdProgress]);
 
   // Handle Yes button
   const handleYes = useCallback(() => {
@@ -873,7 +1036,7 @@ export default function ValentineCat() {
           transition={{ type: "spring", stiffness: 200, delay: 0.2 }}
           className="mb-8"
         >
-          <CatSprite emotion="love" size="xl" />
+          <CatSprite emotion="love" size="xl" animate />
         </motion.div>
 
         <motion.h1
@@ -954,7 +1117,7 @@ export default function ValentineCat() {
               <CatSprite emotion={catMood} size="sm" className="text-2xl" />
               <div>
                 <div className="font-bold text-pink-700">Cat Mood</div>
-                <div className="text-xs text-slate-600">No count: {stats.noCount}/5</div>
+                <div className="text-xs text-slate-600">No count: {stats.noCount}/3</div>
               </div>
             </div>
           </Card>
@@ -1006,56 +1169,48 @@ export default function ValentineCat() {
           </Card>
         </div>
 
-        {/* Floating No Button */}
-        <motion.div
-          className="fixed z-40"
+        {/* Floating No Button - Simplified for performance */}
+        <div
+          className="fixed z-40 -translate-x-1/2 -translate-y-1/2"
           style={{ left: noPos.x, top: noPos.y }}
-          initial={{ scale: 0 }}
-          animate={{ scale: 1, x: "-50%", y: "-50%" }}
-          transition={{ type: "spring", stiffness: 300 }}
         >
-          {/* Glow effect */}
+          {/* Simple CSS glow */}
           {!holding && (
-            <motion.div
-              className="absolute inset-0 rounded-2xl bg-rose-400/40 blur-xl"
-              animate={{ scale: [1, 1.3, 1], opacity: [0.5, 0.8, 0.5] }}
-              transition={{ duration: 2, repeat: Infinity }}
-              style={{ width: 140, height: 60, transform: "translate(-20px, -10px)" }}
-            />
+            <div className="absolute inset-0 rounded-2xl bg-rose-400/40 blur-xl animate-pulse" />
           )}
 
-          <motion.button
+          <button
             className={cn(
-              "relative px-6 py-4 rounded-2xl font-bold text-lg shadow-xl transition-all",
+              "relative px-8 py-5 rounded-2xl font-bold text-xl shadow-xl transition-all select-none",
               holding
                 ? "bg-rose-500 text-white scale-95"
-                : "bg-white border-2 border-rose-300 text-rose-600 hover:border-rose-400"
+                : "bg-white border-2 border-rose-300 text-rose-600 hover:border-rose-400 hover:scale-105"
             )}
             onPointerDown={startHold}
             onPointerUp={endHold}
-            onPointerLeave={endHold}
-            whileHover={{ scale: 1.05 }}
-            animate={!holding ? { y: [0, -5, 0] } : {}}
-            transition={{ duration: 2, repeat: Infinity }}
+            onPointerCancel={endHold}
+            onTouchStart={startHold}
+            onTouchEnd={endHold}
+            style={{ touchAction: "none" }}
           >
-            {/* Progress ring */}
-            {holding && (
-              <div
-                className="absolute -inset-1 rounded-2xl"
-                style={{
-                  background: `conic-gradient(rgba(244,63,94,1) ${holdProgress * 360}deg, rgba(0,0,0,0.1) 0deg)`,
-                  padding: 3,
-                }}
-              >
-                <div className="w-full h-full rounded-2xl bg-rose-500" />
-              </div>
-            )}
+            {/* Progress ring using CSS */}
+            <div
+              className="absolute -inset-1 rounded-2xl transition-opacity"
+              style={{
+                background: `conic-gradient(rgba(244,63,94,1) ${holdProgress * 360}deg, rgba(200,200,200,0.3) 0deg)`,
+                opacity: holding ? 1 : 0,
+              }}
+            >
+              <div className="absolute inset-[3px] rounded-[14px] bg-rose-500" />
+            </div>
 
-            <span className="relative z-10">
-              {holding ? `${Math.round(holdProgress * 100)}%` : `No ${CAT_EMOTIONS.surprised}`}
+            <span className="relative z-10 flex flex-col items-center gap-1">
+              <span>{holding ? `${Math.round(holdProgress * 100)}%` : `No ${CAT_EMOTIONS.surprised}`}</span>
+              {!holding && <span className="text-xs font-normal opacity-70">tap & hold</span>}
+              {holding && <span className="text-xs font-normal">keep holding!</span>}
             </span>
-          </motion.button>
-        </motion.div>
+          </button>
+        </div>
 
         {/* Achievement popup */}
         <AnimatePresence>
@@ -1070,27 +1225,22 @@ export default function ValentineCat() {
     );
   }
 
-  // Chapter 1 Boss: Shield Cat
+  // Chapter 1 Boss: Tap Game (user-friendly!)
   if (scene === "chapter1_boss") {
     return (
-      <CatchGame
+      <TapGame
         onComplete={(score) => {
           setStats(s => ({ ...s, totalScore: s.totalScore + score }));
           nextScene("chapter2_puzzle");
-        }}
-        onFail={() => {
-          setCatMessage("hehe, try again! 😼");
-          setScene("chapter1_chase");
-          setStats(s => ({ ...s, noCount: Math.max(0, s.noCount - 2) }));
         }}
       />
     );
   }
 
-  // Chapter 2: Puzzle
+  // Chapter 2: Memory Match Game (user-friendly!)
   if (scene === "chapter2_puzzle") {
     return (
-      <PuzzleGame
+      <MatchGame
         onComplete={() => {
           unlockAchievement("puzzle_solver");
           nextScene("chapter2_rhythm");
@@ -1099,18 +1249,14 @@ export default function ValentineCat() {
     );
   }
 
-  // Chapter 2: Rhythm
+  // Chapter 2: Slider Game (user-friendly!)
   if (scene === "chapter2_rhythm") {
     return (
-      <RhythmGame
+      <SliderGame
         onComplete={(score) => {
           setStats(s => ({ ...s, totalScore: s.totalScore + score }));
-          if (score >= 2000) unlockAchievement("rhythm_master");
+          if (score >= 4) unlockAchievement("rhythm_master");
           nextScene("chapter3_final");
-        }}
-        onFail={() => {
-          setCatMessage("let's try that again... 😿");
-          setScene("chapter2_puzzle");
         }}
       />
     );
