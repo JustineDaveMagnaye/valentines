@@ -3890,51 +3890,76 @@ const RejectLettersGame = memo(function RejectLettersGame({ onComplete }: { onCo
   );
 });
 
-// BOSS BATTLE - Completely Redesigned Epic Battle
-// Boss attack types for the dramatic battle
-type BossAttackType = "drama_bomb" | "tantrum_wave" | "guilt_trip" | "love_laser" | "ultimate_meow" | "rest";
-type BossPhaseType = "phase1" | "phase2" | "phase3";
+// BOSS BATTLE - ULTIMATE EDITION with Enhanced Mechanics
+type BossAttackType = "drama_bomb" | "tantrum_wave" | "guilt_trip" | "love_laser" | "ultimate_meow" | "heart_rain" | "jealousy_spiral" | "attention_beam" | "cuddle_crush" | "rest";
+type BossPhaseType = "phase1" | "phase2" | "phase3" | "rage";
 
-// Boss attack patterns and dialogue
-const BOSS_ATTACKS = {
-  drama_bomb: { name: "Drama Bomb!", emoji: "💣", damage: 15, chargeTime: 1200, warning: "💥" },
-  tantrum_wave: { name: "Tantrum Wave!", emoji: "🌊", damage: 12, chargeTime: 1000, warning: "〰️" },
-  guilt_trip: { name: "Guilt Trip!", emoji: "😿", damage: 18, chargeTime: 1500, warning: "💔" },
-  love_laser: { name: "Love Laser!", emoji: "💘", damage: 20, chargeTime: 1800, warning: "⚡" },
-  ultimate_meow: { name: "ULTIMATE MEOW!", emoji: "🔊", damage: 30, chargeTime: 2500, warning: "☠️" },
+// Enhanced boss attacks with more variety
+const BOSS_ATTACKS: Record<BossAttackType, { name: string; emoji: string; damage: number; chargeTime: number; warning: string; special?: string }> = {
+  drama_bomb: { name: "Drama Bomb!", emoji: "💣", damage: 12, chargeTime: 1000, warning: "💥" },
+  tantrum_wave: { name: "Tantrum Wave!", emoji: "🌊", damage: 10, chargeTime: 800, warning: "〰️" },
+  guilt_trip: { name: "Guilt Trip!", emoji: "😿", damage: 15, chargeTime: 1200, warning: "💔", special: "slow" },
+  love_laser: { name: "Love Laser!", emoji: "💘", damage: 18, chargeTime: 1500, warning: "⚡", special: "pierce" },
+  ultimate_meow: { name: "ULTIMATE MEOW!", emoji: "🔊", damage: 35, chargeTime: 2200, warning: "☠️", special: "stun" },
+  heart_rain: { name: "Heart Rain!", emoji: "💕", damage: 8, chargeTime: 600, warning: "🌧️", special: "multi" },
+  jealousy_spiral: { name: "Jealousy Spiral!", emoji: "💚", damage: 14, chargeTime: 1100, warning: "🌀", special: "dot" },
+  attention_beam: { name: "LOOK AT ME!", emoji: "👁️", damage: 20, chargeTime: 1800, warning: "👀", special: "track" },
+  cuddle_crush: { name: "Cuddle Crush!", emoji: "🤗", damage: 25, chargeTime: 2000, warning: "💪", special: "grab" },
   rest: { name: "", emoji: "", damage: 0, chargeTime: 0, warning: "" },
 };
 
-const PARRY_MESSAGES = ["PERFECT PARRY! ✨", "DEFLECTED! 🛡️", "REFLECTED! 💫", "BLOCKED! 🌟"];
+// Boss taunts during battle
+const BOSS_TAUNTS = [
+  "You call that love?! 😾", "PATHETIC! 😤", "I've seen better! 🙀",
+  "Is that ALL?! 😼", "TRY HARDER! 💢", "WEAK! 😾",
+  "My grandma hits harder! 👵", "BORING! 😴", "YAWN! 🥱"
+];
+
+const RAGE_TAUNTS = [
+  "NOW YOU'VE DONE IT! 🔥", "MAXIMUM DRAMA! 💥", "FEEL MY WRATH! ⚡",
+  "I AM UNSTOPPABLE! 👿", "THIS ISN'T EVEN MY FINAL FORM! 😈"
+];
+
+const PARRY_MESSAGES = ["PERFECT! ✨", "DEFLECTED! 🛡️", "COUNTERED! 💫", "PARRIED! 🌟", "REFLECTED! ⚡"];
+const CRITICAL_MESSAGES = ["CRITICAL! 💥", "SUPER! ⭐", "DEVASTATING! 🔥", "MASSIVE! 💪"];
+
 const LOVE_ATTACKS = [
-  { text: "You're purrfect! 💕", damage: 8 },
-  { text: "So fluffy! ✨", damage: 6 },
-  { text: "Best cat ever! 💖", damage: 7 },
-  { text: "I love you! 😻", damage: 10 },
-  { text: "Cutest kitty! 🌟", damage: 6 },
-  { text: "My favorite! 💝", damage: 8 },
-  { text: "So precious! 🥰", damage: 7 },
-  { text: "Adorable! 💗", damage: 6 },
+  { text: "You're purrfect! 💕", damage: 5, crit: 12 },
+  { text: "So fluffy! ✨", damage: 4, crit: 10 },
+  { text: "Best cat ever! 💖", damage: 5, crit: 11 },
+  { text: "I love you! 😻", damage: 6, crit: 15 },
+  { text: "Cutest kitty! 🌟", damage: 4, crit: 10 },
+  { text: "My favorite! 💝", damage: 5, crit: 12 },
+  { text: "So precious! 🥰", damage: 5, crit: 11 },
+  { text: "Adorable! 💗", damage: 4, crit: 10 },
+  { text: "SUPER LOVE! 💖✨", damage: 7, crit: 18 },
+  { text: "Maximum cuddles! 🤗", damage: 6, crit: 14 },
 ];
 
 const DramaKingBattle = memo(function DramaKingBattle({ onComplete }: { onComplete: (won: boolean) => void }) {
   const [phase, setPhase] = useState<"tutorial" | "countdown" | "battle" | "victory" | "defeat">("tutorial");
   const [countdownNum, setCountdownNum] = useState(3);
 
-  // Boss state
-  const [bossHP, setBossHP] = useState(100);
+  // Boss state - HARDER: 150 HP instead of 100
+  const [bossHP, setBossHP] = useState(150);
+  const [bossMaxHP] = useState(150);
   const [bossPhase, setBossPhase] = useState<BossPhaseType>("phase1");
-  const [bossAction, setBossAction] = useState<"idle" | "charging" | "attacking" | "stunned" | "enraged">("idle");
+  const [bossAction, setBossAction] = useState<"idle" | "charging" | "attacking" | "stunned" | "enraged" | "healing">("idle");
   const [currentAttack, setCurrentAttack] = useState<BossAttackType>("rest");
-  const [bossEmotion, setBossEmotion] = useState<"smug" | "angry" | "charging" | "hurt" | "defeated">("smug");
+  const [bossEmotion, setBossEmotion] = useState<"smug" | "angry" | "charging" | "hurt" | "defeated" | "rage">("smug");
+  const [attackQueue, setAttackQueue] = useState<BossAttackType[]>([]);
+  const [bossMessage, setBossMessage] = useState("");
 
   // Player state
   const [playerHP, setPlayerHP] = useState(100);
+  const [playerMaxHP] = useState(100);
   const [combo, setCombo] = useState(0);
   const [maxCombo, setMaxCombo] = useState(0);
   const [totalDamageDealt, setTotalDamageDealt] = useState(0);
   const [perfectParries, setPerfectParries] = useState(0);
   const [loveSent, setLoveSent] = useState(0);
+  const [criticalHits, setCriticalHits] = useState(0);
+  const [dodges, setDodges] = useState(0);
 
   // Battle mechanics
   const [shieldActive, setShieldActive] = useState(false);
@@ -3943,17 +3968,33 @@ const DramaKingBattle = memo(function DramaKingBattle({ onComplete }: { onComple
   const [parrySuccess, setParrySuccess] = useState(false);
   const [attackCooldown, setAttackCooldown] = useState(0);
   const [chargeProgress, setChargeProgress] = useState(0);
+  const [specialCooldown, setSpecialCooldown] = useState(0);
+  const [specialReady, setSpecialReady] = useState(false);
+  const [playerStunned, setPlayerStunned] = useState(false);
+  const [playerSlowed, setPlayerSlowed] = useState(false);
+  const [dotDamage, setDotDamage] = useState(0);
+
+  // Projectiles for multi-hit attacks
+  const [projectiles, setProjectiles] = useState<Array<{
+    id: number;
+    x: number;
+    y: number;
+    vx: number;
+    vy: number;
+    type: string;
+    damage: number;
+  }>>([]);
 
   // Visual effects
   const [screenShake, setScreenShake] = useState(0);
-  const [hitFlash, setHitFlash] = useState<"none" | "player" | "boss">("none");
+  const [hitFlash, setHitFlash] = useState<"none" | "player" | "boss" | "crit">("none");
   const [particles, setParticles] = useState<Array<{
     id: number;
     x: number;
     y: number;
     vx: number;
     vy: number;
-    type: "heart" | "star" | "spark" | "drama" | "crown" | "shield" | "heal";
+    type: "heart" | "star" | "spark" | "drama" | "crown" | "shield" | "heal" | "fire" | "poison";
     life: number;
     size: number;
     color: string;
@@ -3965,28 +4006,33 @@ const DramaKingBattle = memo(function DramaKingBattle({ onComplete }: { onComple
     y: number;
     text: string;
     color: string;
-    size: "sm" | "md" | "lg";
+    size: "sm" | "md" | "lg" | "xl";
   }>>([]);
   const [scorePopups, setScorePopups] = useState<Array<{
     id: number;
     x: number;
     y: number;
     value: number;
-    type: "damage" | "parry" | "combo" | "heal";
+    type: "damage" | "parry" | "combo" | "heal" | "crit";
   }>>([]);
 
   // Background effects
   const [bgIntensity, setBgIntensity] = useState(0);
   const [lightning, setLightning] = useState(false);
+  const [rageMode, setRageMode] = useState(false);
+  const [battleTime, setBattleTime] = useState(0);
 
-  // Refs
+  // Refs for smooth animations
   const onCompleteRef = useRef(onComplete);
   const gameEndedRef = useRef(false);
-  const bossHPRef = useRef(100);
+  const bossHPRef = useRef(150);
   const playerHPRef = useRef(100);
   const comboRef = useRef(0);
   const shieldActiveRef = useRef(false);
   const parryWindowRef = useRef(false);
+  const lastAttackTime = useRef(0);
+  const rafRef = useRef<number>(0);
+  const bossPhaseRef = useRef<BossPhaseType>("phase1");
 
   useEffect(() => { onCompleteRef.current = onComplete; }, [onComplete]);
   useEffect(() => { bossHPRef.current = bossHP; }, [bossHP]);
@@ -3994,11 +4040,12 @@ const DramaKingBattle = memo(function DramaKingBattle({ onComplete }: { onComple
   useEffect(() => { comboRef.current = combo; }, [combo]);
   useEffect(() => { shieldActiveRef.current = shieldActive; }, [shieldActive]);
   useEffect(() => { parryWindowRef.current = parryWindow; }, [parryWindow]);
+  useEffect(() => { bossPhaseRef.current = bossPhase; }, [bossPhase]);
 
-  // Spawn particles helper
+  // Spawn particles helper - enhanced with more types
   const spawnParticles = useCallback((
     x: number, y: number,
-    type: "heart" | "star" | "spark" | "drama" | "crown" | "shield" | "heal",
+    type: "heart" | "star" | "spark" | "drama" | "crown" | "shield" | "heal" | "fire" | "poison",
     count: number,
     spread: number = 1
   ) => {
@@ -4010,43 +4057,51 @@ const DramaKingBattle = memo(function DramaKingBattle({ onComplete }: { onComple
       crown: ["#ffd700", "#ffb300", "#ff8f00", "#ff6f00"],
       shield: ["#4fc3f7", "#29b6f6", "#03a9f4", "#0288d1"],
       heal: ["#66bb6a", "#4caf50", "#43a047", "#2e7d32"],
+      fire: ["#ff5722", "#ff9800", "#ffeb3b", "#f44336"],
+      poison: ["#4caf50", "#8bc34a", "#cddc39", "#00e676"],
     };
     const newParticles = Array.from({ length: count }, (_, i) => ({
       id: performance.now() + i + Math.random() * 1000,
       x, y,
-      vx: (Math.random() - 0.5) * 12 * spread,
-      vy: (Math.random() - 0.5) * 12 * spread - 3,
+      vx: (Math.random() - 0.5) * 14 * spread,
+      vy: (Math.random() - 0.5) * 14 * spread - 4,
       type,
       life: 1,
-      size: 6 + Math.random() * 8,
+      size: 6 + Math.random() * 10,
       color: colors[type][Math.floor(Math.random() * colors[type].length)],
       rotation: Math.random() * 360,
     }));
-    setParticles(prev => [...prev.slice(-60), ...newParticles]);
+    setParticles(prev => [...prev.slice(-80), ...newParticles]);
   }, []);
 
-  // Spawn floating text
-  const spawnFloatingText = useCallback((x: number, y: number, text: string, color: string, size: "sm" | "md" | "lg" = "md") => {
-    setFloatingTexts(prev => [...prev.slice(-8), { id: performance.now(), x, y, text, color, size }]);
-    setTimeout(() => setFloatingTexts(prev => prev.slice(1)), 1500);
+  // Spawn floating text - enhanced
+  const spawnFloatingText = useCallback((x: number, y: number, text: string, color: string, size: "sm" | "md" | "lg" | "xl" = "md") => {
+    setFloatingTexts(prev => [...prev.slice(-10), { id: performance.now() + Math.random(), x, y, text, color, size }]);
+    setTimeout(() => setFloatingTexts(prev => prev.slice(1)), 1800);
   }, []);
 
   // Spawn score popup
-  const spawnScorePopup = useCallback((x: number, y: number, value: number, type: "damage" | "parry" | "combo" | "heal") => {
-    setScorePopups(prev => [...prev.slice(-6), { id: performance.now(), x, y, value, type }]);
+  const spawnScorePopup = useCallback((x: number, y: number, value: number, type: "damage" | "parry" | "combo" | "heal" | "crit") => {
+    setScorePopups(prev => [...prev.slice(-8), { id: performance.now() + Math.random(), x, y, value, type }]);
     setTimeout(() => setScorePopups(prev => prev.slice(1)), 1200);
   }, []);
 
   // Screen shake helper
   const triggerShake = useCallback((intensity: number) => {
     setScreenShake(intensity);
-    setTimeout(() => setScreenShake(0), 300);
+    setTimeout(() => setScreenShake(0), 350);
   }, []);
 
   // Lightning flash
   const triggerLightning = useCallback(() => {
     setLightning(true);
-    setTimeout(() => setLightning(false), 100);
+    setTimeout(() => setLightning(false), 120);
+  }, []);
+
+  // Show boss message
+  const showBossMessage = useCallback((msg: string, duration = 2000) => {
+    setBossMessage(msg);
+    setTimeout(() => setBossMessage(""), duration);
   }, []);
 
   // Start countdown
@@ -4060,28 +4115,41 @@ const DramaKingBattle = memo(function DramaKingBattle({ onComplete }: { onComple
     if (phase !== "countdown") return;
     if (countdownNum === 0) {
       gameEndedRef.current = false;
-      setBossHP(100);
-      bossHPRef.current = 100;
+      setBossHP(150);
+      bossHPRef.current = 150;
       setPlayerHP(100);
       playerHPRef.current = 100;
       setBossPhase("phase1");
+      bossPhaseRef.current = "phase1";
       setBossAction("idle");
       setBossEmotion("smug");
       setCurrentAttack("rest");
+      setAttackQueue([]);
       setCombo(0);
       comboRef.current = 0;
       setMaxCombo(0);
       setTotalDamageDealt(0);
       setPerfectParries(0);
       setLoveSent(0);
+      setCriticalHits(0);
+      setDodges(0);
       setShieldActive(false);
       setShieldCooldown(0);
       setAttackCooldown(0);
+      setSpecialCooldown(0);
+      setSpecialReady(false);
       setChargeProgress(0);
       setParticles([]);
       setFloatingTexts([]);
       setScorePopups([]);
+      setProjectiles([]);
       setBgIntensity(0);
+      setRageMode(false);
+      setBattleTime(0);
+      setPlayerStunned(false);
+      setPlayerSlowed(false);
+      setDotDamage(0);
+      lastAttackTime.current = performance.now();
       setPhase("battle");
       return;
     }
@@ -4089,61 +4157,167 @@ const DramaKingBattle = memo(function DramaKingBattle({ onComplete }: { onComple
     return () => clearTimeout(timer);
   }, [phase, countdownNum]);
 
-  // Update particles
-  useEffect(() => {
-    if (particles.length === 0) return;
-    const interval = setInterval(() => {
-      setParticles(prev => prev.map(p => ({
-        ...p,
-        x: p.x + p.vx * 0.5,
-        y: p.y + p.vy * 0.5,
-        vy: p.vy + 0.3,
-        life: p.life - 0.03,
-        rotation: p.rotation + p.vx * 2,
-      })).filter(p => p.life > 0));
-    }, 16);
-    return () => clearInterval(interval);
-  }, [particles.length]);
-
-  // Boss phase transitions
+  // Main game loop using RAF for smooth updates
   useEffect(() => {
     if (phase !== "battle") return;
-    if (bossHP <= 30 && bossPhase !== "phase3") {
+
+    let lastTime = performance.now();
+
+    const gameLoop = (currentTime: number) => {
+      if (gameEndedRef.current) return;
+
+      const deltaTime = (currentTime - lastTime) / 1000;
+      lastTime = currentTime;
+
+      // Update battle time
+      setBattleTime(t => t + deltaTime);
+
+      // Update particles smoothly
+      setParticles(prev => prev.map(p => ({
+        ...p,
+        x: p.x + p.vx * deltaTime * 30,
+        y: p.y + p.vy * deltaTime * 30,
+        vy: p.vy + 15 * deltaTime,
+        life: p.life - deltaTime * 1.5,
+        rotation: p.rotation + p.vx * deltaTime * 100,
+      })).filter(p => p.life > 0));
+
+      // Update projectiles
+      setProjectiles(prev => {
+        const updated = prev.map(p => ({
+          ...p,
+          x: p.x + p.vx * deltaTime * 60,
+          y: p.y + p.vy * deltaTime * 60,
+        })).filter(p => p.y < 100 && p.y > 0 && p.x > 0 && p.x < 100);
+
+        // Check projectile collisions with player area (bottom center)
+        updated.forEach(p => {
+          if (p.y > 65 && p.y < 85 && p.x > 35 && p.x < 65) {
+            if (!shieldActiveRef.current) {
+              setPlayerHP(hp => {
+                const newHP = Math.max(0, hp - p.damage);
+                playerHPRef.current = newHP;
+                if (newHP <= 0 && !gameEndedRef.current) {
+                  gameEndedRef.current = true;
+                  setPhase("defeat");
+                  setTimeout(() => onCompleteRef.current(false), 2500);
+                }
+                return newHP;
+              });
+              spawnFloatingText(50, 70, `-${p.damage}`, "#ff1744", "md");
+              setCombo(0);
+              comboRef.current = 0;
+            } else {
+              spawnParticles(50, 70, "shield", 4, 0.5);
+              setDodges(d => d + 1);
+            }
+            // Remove this projectile
+            p.y = -100;
+          }
+        });
+
+        return updated.filter(p => p.y > 0);
+      });
+
+      // DOT damage tick
+      if (dotDamage > 0) {
+        setDotDamage(d => Math.max(0, d - deltaTime * 2));
+        if (Math.random() < deltaTime * 3) {
+          setPlayerHP(hp => {
+            const newHP = Math.max(0, hp - 1);
+            playerHPRef.current = newHP;
+            return newHP;
+          });
+          spawnParticles(50, 75, "poison", 2, 0.3);
+        }
+      }
+
+      // Boss heals slowly if player doesn't attack for 5+ seconds
+      if (currentTime - lastAttackTime.current > 5000 && bossHPRef.current < 150 && bossHPRef.current > 0) {
+        setBossHP(hp => {
+          const newHP = Math.min(150, hp + deltaTime * 3);
+          bossHPRef.current = newHP;
+          return newHP;
+        });
+        if (Math.random() < deltaTime * 2) {
+          spawnParticles(50, 30, "heal", 2, 0.3);
+          showBossMessage("*healing* 😌");
+        }
+      }
+
+      rafRef.current = requestAnimationFrame(gameLoop);
+    };
+
+    rafRef.current = requestAnimationFrame(gameLoop);
+    return () => cancelAnimationFrame(rafRef.current);
+  }, [phase, dotDamage, spawnParticles, spawnFloatingText, showBossMessage]);
+
+  // Boss phase transitions - enhanced
+  useEffect(() => {
+    if (phase !== "battle") return;
+    const hpPercent = (bossHP / bossMaxHP) * 100;
+
+    if (hpPercent <= 15 && !rageMode) {
+      setRageMode(true);
+      setBossPhase("rage");
+      bossPhaseRef.current = "rage";
+      setBossEmotion("rage");
+      setBgIntensity(3);
+      triggerShake(20);
+      triggerLightning();
+      spawnParticles(50, 25, "fire", 30, 2.5);
+      spawnParticles(50, 25, "crown", 20, 2);
+      spawnFloatingText(50, 30, "RAGE MODE! 🔥👿🔥", "#ff0000", "xl");
+      showBossMessage(pick(RAGE_TAUNTS));
+    } else if (hpPercent <= 35 && hpPercent > 15 && bossPhase !== "phase3" && bossPhase !== "rage") {
       setBossPhase("phase3");
+      bossPhaseRef.current = "phase3";
       setBossEmotion("angry");
       setBgIntensity(2);
       triggerShake(15);
       triggerLightning();
       spawnParticles(50, 25, "crown", 20, 2);
       spawnFloatingText(50, 30, "FINAL FORM! 👑", "#ffd700", "lg");
-    } else if (bossHP <= 60 && bossHP > 30 && bossPhase === "phase1") {
+      showBossMessage("THIS IS MY FINAL FORM! 😾");
+    } else if (hpPercent <= 65 && hpPercent > 35 && bossPhase === "phase1") {
       setBossPhase("phase2");
+      bossPhaseRef.current = "phase2";
       setBossEmotion("angry");
       setBgIntensity(1);
       triggerShake(10);
       spawnParticles(50, 25, "drama", 15, 1.5);
       spawnFloatingText(50, 30, "ENRAGED! 😾", "#e040fb", "lg");
+      showBossMessage(pick(BOSS_TAUNTS));
     }
-  }, [bossHP, bossPhase, phase, triggerShake, triggerLightning, spawnParticles, spawnFloatingText]);
+  }, [bossHP, bossMaxHP, bossPhase, phase, rageMode, triggerShake, triggerLightning, spawnParticles, spawnFloatingText, showBossMessage]);
 
-  // Boss attack loop
+  // Boss attack loop - enhanced with more attacks and combos
   useEffect(() => {
     if (phase !== "battle" || gameEndedRef.current) return;
 
-    const getAttackSpeed = () => {
-      switch (bossPhase) {
-        case "phase1": return 2500 + Math.random() * 1500;
-        case "phase2": return 2000 + Math.random() * 1000;
-        case "phase3": return 1500 + Math.random() * 800;
+    const getAttackSpeed = (): number => {
+      switch (bossPhaseRef.current) {
+        case "phase1": return 2200 + Math.random() * 1200;
+        case "phase2": return 1600 + Math.random() * 800;
+        case "phase3": return 1200 + Math.random() * 600;
+        case "rage": return 800 + Math.random() * 400;
+        default: return 2000;
       }
     };
 
     const getRandomAttack = (): BossAttackType => {
-      const attacks: BossAttackType[] = bossPhase === "phase3"
-        ? ["drama_bomb", "tantrum_wave", "guilt_trip", "love_laser", "ultimate_meow"]
-        : bossPhase === "phase2"
-        ? ["drama_bomb", "tantrum_wave", "guilt_trip", "love_laser"]
-        : ["drama_bomb", "tantrum_wave", "guilt_trip"];
+      const phase = bossPhaseRef.current;
+      let attacks: BossAttackType[];
+
+      if (phase === "rage") {
+        attacks = ["ultimate_meow", "cuddle_crush", "attention_beam", "love_laser", "jealousy_spiral", "heart_rain"];
+      } else if (phase === "phase3") {
+        attacks = ["drama_bomb", "tantrum_wave", "guilt_trip", "love_laser", "ultimate_meow", "heart_rain", "jealousy_spiral"];
+      } else if (phase === "phase2") {
+        attacks = ["drama_bomb", "tantrum_wave", "guilt_trip", "love_laser", "heart_rain", "attention_beam"];
+      } else {
+        attacks = ["drama_bomb", "tantrum_wave", "guilt_trip", "heart_rain"];
+      }
       return attacks[Math.floor(Math.random() * attacks.length)];
     };
 
@@ -4158,16 +4332,24 @@ const DramaKingBattle = memo(function DramaKingBattle({ onComplete }: { onComple
       setBossEmotion("charging");
       setChargeProgress(0);
 
-      // Show warning
+      // Show warning with attack name
       spawnFloatingText(50, 40, attackData.warning + " " + attackData.name, "#ff5722", "md");
+
+      // Taunt occasionally
+      if (Math.random() < 0.3) {
+        const taunt = bossPhaseRef.current === "rage" ? pick(RAGE_TAUNTS) : pick(BOSS_TAUNTS);
+        showBossMessage(taunt);
+      }
 
       // Charge animation
       let progress = 0;
+      const chargeSpeed = bossPhaseRef.current === "rage" ? 0.7 : 1;
       const chargeInterval = setInterval(() => {
-        progress += 50 / attackData.chargeTime;
+        progress += (50 / attackData.chargeTime) * chargeSpeed;
         setChargeProgress(Math.min(progress, 1));
 
-        if (progress >= 0.8 && progress < 0.85) {
+        // Parry window - slightly before attack lands
+        if (progress >= 0.75 && progress < 0.82) {
           setParryWindow(true);
           parryWindowRef.current = true;
         }
@@ -4178,17 +4360,43 @@ const DramaKingBattle = memo(function DramaKingBattle({ onComplete }: { onComple
           setParryWindow(false);
           parryWindowRef.current = false;
 
-          // Execute attack
+          // Execute attack based on type
           setBossAction("attacking");
           setBossEmotion("angry");
-          triggerShake(8);
-          spawnParticles(50, 35, "drama", 12, 1.5);
+          triggerShake(attackData.damage > 20 ? 15 : 8);
+          spawnParticles(50, 35, attackData.special === "dot" ? "poison" : "drama", 12, 1.5);
+
+          // Handle special attack effects
+          if (attackData.special === "multi") {
+            // Heart rain - spawn multiple projectiles
+            for (let i = 0; i < 5; i++) {
+              setTimeout(() => {
+                if (gameEndedRef.current) return;
+                setProjectiles(prev => [...prev, {
+                  id: performance.now() + i,
+                  x: 20 + Math.random() * 60,
+                  y: 20,
+                  vx: (Math.random() - 0.5) * 0.3,
+                  vy: 0.8 + Math.random() * 0.3,
+                  type: "heart",
+                  damage: 5,
+                }]);
+              }, i * 200);
+            }
+          } else if (attackData.special === "dot") {
+            // Jealousy spiral - apply DOT
+            if (!shieldActiveRef.current) {
+              setDotDamage(8);
+              spawnFloatingText(50, 65, "POISONED! 🤢", "#4caf50", "md");
+            }
+          }
 
           // Check if player blocked
           if (!shieldActiveRef.current) {
             // Player takes damage
+            const damage = bossPhaseRef.current === "rage" ? Math.floor(attackData.damage * 1.3) : attackData.damage;
             setPlayerHP(hp => {
-              const newHP = Math.max(0, hp - attackData.damage);
+              const newHP = Math.max(0, hp - damage);
               playerHPRef.current = newHP;
               if (newHP <= 0 && !gameEndedRef.current) {
                 gameEndedRef.current = true;
@@ -4201,66 +4409,111 @@ const DramaKingBattle = memo(function DramaKingBattle({ onComplete }: { onComple
             setTimeout(() => setHitFlash("none"), 200);
             setCombo(0);
             comboRef.current = 0;
-            spawnFloatingText(50, 70, `-${attackData.damage}`, "#ff1744", "lg");
+            spawnFloatingText(50, 70, `-${damage}`, "#ff1744", "lg");
+
+            // Special effects on player
+            if (attackData.special === "stun") {
+              setPlayerStunned(true);
+              spawnFloatingText(50, 60, "STUNNED! 💫", "#9c27b0", "lg");
+              setTimeout(() => setPlayerStunned(false), 2000);
+            } else if (attackData.special === "slow") {
+              setPlayerSlowed(true);
+              setTimeout(() => setPlayerSlowed(false), 3000);
+            }
           } else {
             // Blocked
-            spawnParticles(50, 60, "shield", 8);
+            spawnParticles(50, 60, "shield", 10);
             spawnFloatingText(50, 60, "BLOCKED!", "#29b6f6", "md");
+            setDodges(d => d + 1);
+          }
+
+          // Combo attacks in rage mode
+          if (bossPhaseRef.current === "rage" && Math.random() < 0.4) {
+            setTimeout(() => {
+              if (!gameEndedRef.current) {
+                executeAttack();
+              }
+            }, 400);
           }
 
           // Reset after attack
           setTimeout(() => {
             if (gameEndedRef.current) return;
             setBossAction("idle");
-            setBossEmotion("smug");
+            setBossEmotion(bossPhaseRef.current === "rage" ? "rage" : "smug");
             setCurrentAttack("rest");
             setTimeout(executeAttack, getAttackSpeed());
-          }, 800);
+          }, 600);
         }
       }, 50);
 
       return () => clearInterval(chargeInterval);
     };
 
-    const timeout = setTimeout(executeAttack, 1500);
+    const timeout = setTimeout(executeAttack, 1200);
     return () => clearTimeout(timeout);
-  }, [phase, bossPhase, bossAction, triggerShake, spawnParticles, spawnFloatingText]);
+  }, [phase, bossAction, triggerShake, spawnParticles, spawnFloatingText, showBossMessage]);
 
-  // Shield cooldown
+  // Cooldown updates
   useEffect(() => {
-    if (shieldCooldown <= 0) return;
+    if (phase !== "battle") return;
     const timer = setInterval(() => {
-      setShieldCooldown(c => Math.max(0, c - 0.1));
+      if (shieldCooldown > 0) setShieldCooldown(c => Math.max(0, c - 0.1));
+      if (attackCooldown > 0) setAttackCooldown(c => Math.max(0, c - 0.1));
+      if (specialCooldown > 0) {
+        setSpecialCooldown(c => {
+          const newC = Math.max(0, c - 0.1);
+          if (newC === 0) setSpecialReady(true);
+          return newC;
+        });
+      }
     }, 100);
     return () => clearInterval(timer);
-  }, [shieldCooldown]);
+  }, [phase, shieldCooldown, attackCooldown, specialCooldown]);
 
-  // Attack cooldown
+  // Build special meter based on combo
   useEffect(() => {
-    if (attackCooldown <= 0) return;
-    const timer = setInterval(() => {
-      setAttackCooldown(c => Math.max(0, c - 0.1));
-    }, 100);
-    return () => clearInterval(timer);
-  }, [attackCooldown]);
+    if (combo >= 15 && !specialReady && specialCooldown === 0) {
+      setSpecialReady(true);
+    }
+  }, [combo, specialReady, specialCooldown]);
 
-  // Send love attack
+  // Send love attack - enhanced with crits
   const sendLove = useCallback(() => {
-    if (gameEndedRef.current || attackCooldown > 0) return;
+    if (gameEndedRef.current || attackCooldown > 0 || playerStunned) return;
+
+    lastAttackTime.current = performance.now();
 
     const loveAttack = LOVE_ATTACKS[Math.floor(Math.random() * LOVE_ATTACKS.length)];
-    const comboBonus = Math.floor(comboRef.current / 3);
-    const phaseBonus = bossPhase === "phase3" ? 3 : bossPhase === "phase2" ? 1 : 0;
-    const totalDamage = loveAttack.damage + comboBonus + phaseBonus;
+
+    // Critical hit chance - 15% base, +5% per 5 combo
+    const critChance = 0.15 + Math.floor(comboRef.current / 5) * 0.05;
+    const isCritical = Math.random() < critChance;
+
+    const baseDamage = isCritical ? loveAttack.crit : loveAttack.damage;
+    const comboBonus = Math.floor(comboRef.current / 4);
+    const stunBonus = bossAction === "stunned" ? 5 : 0;
+    const totalDamage = baseDamage + comboBonus + stunBonus;
 
     setLoveSent(l => l + 1);
-    setAttackCooldown(0.3);
+    setAttackCooldown(playerSlowed ? 0.5 : 0.25);
 
     // Spawn particles towards boss
-    spawnParticles(50, 55, "heart", 5, 0.5);
+    spawnParticles(50, 55, isCritical ? "star" : "heart", isCritical ? 10 : 5, isCritical ? 1 : 0.5);
 
     // Floating love text
-    spawnFloatingText(50 + (Math.random() - 0.5) * 30, 40, loveAttack.text, "#ff4081", "sm");
+    const textX = 50 + (Math.random() - 0.5) * 30;
+    if (isCritical) {
+      setCriticalHits(c => c + 1);
+      spawnFloatingText(textX, 38, pick(CRITICAL_MESSAGES), "#ffd700", "lg");
+      spawnFloatingText(textX, 45, loveAttack.text, "#ff4081", "sm");
+      triggerShake(5);
+      setHitFlash("crit");
+    } else {
+      spawnFloatingText(textX, 40, loveAttack.text, "#ff4081", "sm");
+      setHitFlash("boss");
+    }
+    setTimeout(() => setHitFlash("none"), 100);
 
     // Deal damage
     setBossHP(hp => {
@@ -4268,11 +4521,13 @@ const DramaKingBattle = memo(function DramaKingBattle({ onComplete }: { onComple
       bossHPRef.current = newHP;
       if (newHP <= 0 && !gameEndedRef.current) {
         gameEndedRef.current = true;
-        triggerShake(20);
-        spawnParticles(50, 25, "star", 30, 2);
-        spawnParticles(50, 25, "crown", 15, 2);
-        setTimeout(() => setPhase("victory"), 1000);
-        setTimeout(() => onCompleteRef.current(true), 3500);
+        triggerShake(25);
+        triggerLightning();
+        spawnParticles(50, 25, "star", 40, 2.5);
+        spawnParticles(50, 25, "crown", 20, 2);
+        spawnParticles(50, 25, "heart", 30, 2);
+        setTimeout(() => setPhase("victory"), 1200);
+        setTimeout(() => onCompleteRef.current(true), 3800);
       }
       return newHP;
     });
@@ -4285,23 +4540,72 @@ const DramaKingBattle = memo(function DramaKingBattle({ onComplete }: { onComple
     });
 
     // Score popup
-    spawnScorePopup(50 + (Math.random() - 0.5) * 20, 35, totalDamage, comboRef.current >= 5 ? "combo" : "damage");
+    spawnScorePopup(
+      50 + (Math.random() - 0.5) * 20,
+      35,
+      totalDamage,
+      isCritical ? "crit" : comboRef.current >= 5 ? "combo" : "damage"
+    );
 
     // Boss react
-    if (Math.random() < 0.2) {
+    if (isCritical || Math.random() < 0.15) {
       setBossEmotion("hurt");
       setTimeout(() => {
-        if (!gameEndedRef.current && bossAction === "idle") setBossEmotion("smug");
-      }, 300);
+        if (!gameEndedRef.current && bossAction === "idle") {
+          setBossEmotion(bossPhaseRef.current === "rage" ? "rage" : "smug");
+        }
+      }, 250);
     }
+  }, [attackCooldown, maxCombo, bossAction, playerStunned, playerSlowed, triggerShake, triggerLightning, spawnParticles, spawnFloatingText, spawnScorePopup]);
 
-    setHitFlash("boss");
-    setTimeout(() => setHitFlash("none"), 100);
-  }, [attackCooldown, bossPhase, maxCombo, bossAction, triggerShake, spawnParticles, spawnFloatingText, spawnScorePopup]);
+  // Special attack - uses combo meter
+  const useSpecialAttack = useCallback(() => {
+    if (!specialReady || gameEndedRef.current || playerStunned) return;
+
+    setSpecialReady(false);
+    setSpecialCooldown(10);
+
+    // Mega love attack!
+    const megaDamage = 25 + Math.floor(comboRef.current / 2);
+
+    triggerShake(15);
+    triggerLightning();
+    spawnParticles(50, 50, "star", 25, 2);
+    spawnParticles(50, 50, "heart", 20, 2);
+    spawnFloatingText(50, 35, "💖 MEGA LOVE! 💖", "#ff1493", "xl");
+    spawnScorePopup(50, 30, megaDamage, "crit");
+
+    setBossHP(hp => {
+      const newHP = Math.max(0, hp - megaDamage);
+      bossHPRef.current = newHP;
+      if (newHP <= 0 && !gameEndedRef.current) {
+        gameEndedRef.current = true;
+        setTimeout(() => setPhase("victory"), 1000);
+        setTimeout(() => onCompleteRef.current(true), 3500);
+      }
+      return newHP;
+    });
+
+    setTotalDamageDealt(d => d + megaDamage);
+    setBossEmotion("hurt");
+    showBossMessage("THAT ACTUALLY HURT! 😿");
+
+    // Stun boss briefly
+    setBossAction("stunned");
+    setTimeout(() => {
+      if (!gameEndedRef.current) {
+        setBossAction("idle");
+        setBossEmotion(bossPhaseRef.current === "rage" ? "rage" : "angry");
+      }
+    }, 1500);
+
+    setCombo(0);
+    comboRef.current = 0;
+  }, [specialReady, playerStunned, triggerShake, triggerLightning, spawnParticles, spawnFloatingText, spawnScorePopup, showBossMessage]);
 
   // Activate shield / parry
   const activateShield = useCallback(() => {
-    if (gameEndedRef.current || shieldCooldown > 0) return;
+    if (gameEndedRef.current || shieldCooldown > 0 || playerStunned) return;
 
     // Check for perfect parry
     if (parryWindowRef.current && bossAction === "charging") {
@@ -4318,44 +4622,49 @@ const DramaKingBattle = memo(function DramaKingBattle({ onComplete }: { onComple
       parryWindowRef.current = false;
 
       // Visual feedback
-      triggerShake(12);
+      triggerShake(15);
       triggerLightning();
-      spawnParticles(50, 30, "star", 20, 2);
-      spawnParticles(50, 50, "shield", 15, 1.5);
+      spawnParticles(50, 30, "star", 25, 2);
+      spawnParticles(50, 50, "shield", 20, 1.5);
       spawnFloatingText(50, 45, pick(PARRY_MESSAGES), "#ffd700", "lg");
-      spawnScorePopup(50, 40, 25, "parry");
 
-      // Bonus damage
+      // Counter damage - parry deals damage back!
+      const counterDamage = 20;
+      spawnScorePopup(50, 38, counterDamage, "parry");
       setBossHP(hp => {
-        const newHP = Math.max(0, hp - 15);
+        const newHP = Math.max(0, hp - counterDamage);
         bossHPRef.current = newHP;
         return newHP;
       });
-      setTotalDamageDealt(d => d + 15);
+      setTotalDamageDealt(d => d + counterDamage);
+      showBossMessage("OW! MY DRAMA! 😿");
+
+      // Combo bonus for parry
+      setCombo(c => c + 3);
 
       // Recover from stun
       setTimeout(() => {
         if (gameEndedRef.current) return;
         setParrySuccess(false);
         setBossAction("idle");
-        setBossEmotion("angry");
-      }, 1500);
+        setBossEmotion(bossPhaseRef.current === "rage" ? "rage" : "angry");
+      }, 1800);
 
-      setShieldCooldown(2);
+      setShieldCooldown(1.5);
     } else {
       // Normal shield
       setShieldActive(true);
       shieldActiveRef.current = true;
-      spawnParticles(50, 60, "shield", 8, 0.5);
+      spawnParticles(50, 60, "shield", 10, 0.5);
 
       setTimeout(() => {
         setShieldActive(false);
         shieldActiveRef.current = false;
-      }, 800);
+      }, 700);
 
-      setShieldCooldown(3);
+      setShieldCooldown(2.5);
     }
-  }, [shieldCooldown, bossAction, triggerShake, triggerLightning, spawnParticles, spawnFloatingText, spawnScorePopup]);
+  }, [shieldCooldown, bossAction, playerStunned, triggerShake, triggerLightning, spawnParticles, spawnFloatingText, spawnScorePopup, showBossMessage]);
 
   // Get boss emoji based on state
   const getBossEmoji = () => {
@@ -4364,7 +4673,8 @@ const DramaKingBattle = memo(function DramaKingBattle({ onComplete }: { onComple
     if (bossEmotion === "charging") return "🙀";
     if (bossAction === "attacking") return "😾";
     if (bossAction === "stunned") return "😵‍💫";
-    if (bossPhase === "phase3") return "👿";
+    if (bossEmotion === "rage" || rageMode) return "👿";
+    if (bossPhase === "phase3") return "😈";
     if (bossPhase === "phase2") return "😾";
     return "😼";
   };
@@ -4572,27 +4882,42 @@ const DramaKingBattle = memo(function DramaKingBattle({ onComplete }: { onComple
           </motion.div>
 
           {/* Stats */}
-          <div className="grid grid-cols-2 gap-2 mb-4">
+          <div className="grid grid-cols-3 gap-2 mb-4">
             <div className="bg-pink-100 rounded-xl p-2">
-              <div className="text-2xl">💖</div>
+              <div className="text-xl">💖</div>
               <div className="text-xs text-pink-600 font-bold">Love Sent</div>
               <div className="text-lg font-black text-pink-700">{loveSent}</div>
             </div>
             <div className="bg-purple-100 rounded-xl p-2">
-              <div className="text-2xl">💥</div>
-              <div className="text-xs text-purple-600 font-bold">Total DMG</div>
+              <div className="text-xl">💥</div>
+              <div className="text-xs text-purple-600 font-bold">DMG</div>
               <div className="text-lg font-black text-purple-700">{totalDamageDealt}</div>
             </div>
             <div className="bg-amber-100 rounded-xl p-2">
-              <div className="text-2xl">🔥</div>
-              <div className="text-xs text-amber-600 font-bold">Max Combo</div>
+              <div className="text-xl">🔥</div>
+              <div className="text-xs text-amber-600 font-bold">Combo</div>
               <div className="text-lg font-black text-amber-700">{maxCombo}</div>
             </div>
             <div className="bg-cyan-100 rounded-xl p-2">
-              <div className="text-2xl">✨</div>
+              <div className="text-xl">✨</div>
               <div className="text-xs text-cyan-600 font-bold">Parries</div>
               <div className="text-lg font-black text-cyan-700">{perfectParries}</div>
             </div>
+            <div className="bg-yellow-100 rounded-xl p-2">
+              <div className="text-xl">⚡</div>
+              <div className="text-xs text-yellow-600 font-bold">Crits</div>
+              <div className="text-lg font-black text-yellow-700">{criticalHits}</div>
+            </div>
+            <div className="bg-blue-100 rounded-xl p-2">
+              <div className="text-xl">🛡️</div>
+              <div className="text-xs text-blue-600 font-bold">Dodges</div>
+              <div className="text-lg font-black text-blue-700">{dodges}</div>
+            </div>
+          </div>
+
+          {/* Battle time */}
+          <div className="text-xs text-slate-400 mb-2">
+            Battle Time: {Math.floor(battleTime)}s
           </div>
 
           <div className="text-sm text-slate-500">
@@ -4750,11 +5075,21 @@ const DramaKingBattle = memo(function DramaKingBattle({ onComplete }: { onComple
           <div className="flex-1 h-5 bg-slate-800 rounded-full overflow-hidden border border-slate-600">
             <motion.div
               className="h-full bg-gradient-to-r from-pink-500 to-rose-500 transition-all duration-300"
-              style={{ width: `${playerHP}%` }}
+              style={{ width: `${(playerHP / playerMaxHP) * 100}%` }}
             />
           </div>
-          <span className="text-white text-xs font-bold w-10 text-right">{Math.ceil(playerHP)}%</span>
+          <span className="text-white text-xs font-bold w-14 text-right">{Math.ceil(playerHP)}/{playerMaxHP}</span>
         </div>
+
+        {/* Attack queue indicator */}
+        {attackQueue.length > 0 && (
+          <div className="flex items-center justify-center gap-1">
+            <span className="text-xs text-red-400">Incoming:</span>
+            {attackQueue.slice(0, 3).map((atk, i) => (
+              <span key={i} className="text-sm">{BOSS_ATTACKS[atk].emoji}</span>
+            ))}
+          </div>
+        )}
 
         {/* Combo counter */}
         {combo > 0 && (
@@ -4879,6 +5214,18 @@ const DramaKingBattle = memo(function DramaKingBattle({ onComplete }: { onComple
             ⭐ STUNNED! ⭐
           </motion.div>
         )}
+
+        {/* Boss message */}
+        {bossMessage && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0 }}
+            className="mt-3 px-4 py-2 bg-slate-800/90 rounded-lg border border-purple-500/50 max-w-[200px]"
+          >
+            <p className="text-purple-200 text-sm font-medium text-center">{bossMessage}</p>
+          </motion.div>
+        )}
       </div>
 
       {/* Shield effect */}
@@ -4919,6 +5266,22 @@ const DramaKingBattle = memo(function DramaKingBattle({ onComplete }: { onComple
           {p.type === "heart" ? "💖" : p.type === "star" ? "⭐" : p.type === "spark" ? "✨" :
            p.type === "drama" ? "💢" : p.type === "crown" ? "👑" : p.type === "shield" ? "🛡️" : "💚"}
         </div>
+      ))}
+
+      {/* Projectiles */}
+      {projectiles.map(proj => (
+        <motion.div
+          key={proj.id}
+          className="absolute pointer-events-none text-2xl z-20"
+          style={{
+            left: `${proj.x}%`,
+            top: `${proj.y}%`,
+          }}
+          animate={{ rotate: [0, 360] }}
+          transition={{ duration: 0.5, repeat: Infinity, ease: "linear" }}
+        >
+          {proj.type === "heart" ? "💔" : proj.type === "jealousy" ? "💚" : "💢"}
+        </motion.div>
       ))}
 
       {/* Floating texts */}
@@ -4967,21 +5330,21 @@ const DramaKingBattle = memo(function DramaKingBattle({ onComplete }: { onComple
       </AnimatePresence>
 
       {/* Action buttons */}
-      <div className="absolute bottom-6 left-0 right-0 flex justify-center gap-4 px-4 z-20">
+      <div className="absolute bottom-6 left-0 right-0 flex justify-center gap-3 px-4 z-20">
         {/* Love button */}
         <motion.button
           onClick={sendLove}
-          disabled={attackCooldown > 0}
+          disabled={attackCooldown > 0 || playerStunned}
           className={cn(
-            "flex-1 max-w-[140px] py-5 rounded-2xl font-bold text-lg shadow-xl transition-all relative overflow-hidden",
-            attackCooldown > 0
+            "flex-1 max-w-[100px] py-4 rounded-2xl font-bold text-lg shadow-xl transition-all relative overflow-hidden",
+            attackCooldown > 0 || playerStunned
               ? "bg-slate-600 text-slate-400"
               : "bg-gradient-to-br from-pink-500 to-rose-600 text-white active:scale-95"
           )}
-          whileTap={attackCooldown > 0 ? {} : { scale: 0.95 }}
+          whileTap={attackCooldown > 0 || playerStunned ? {} : { scale: 0.95 }}
         >
-          <span className="text-2xl">💖</span>
-          <div className="text-sm">LOVE!</div>
+          <span className="text-xl">💖</span>
+          <div className="text-xs">LOVE!</div>
           {attackCooldown > 0 && (
             <div
               className="absolute bottom-0 left-0 h-1 bg-pink-400"
@@ -4990,22 +5353,44 @@ const DramaKingBattle = memo(function DramaKingBattle({ onComplete }: { onComple
           )}
         </motion.button>
 
+        {/* Special attack button */}
+        <motion.button
+          onClick={useSpecialAttack}
+          disabled={!specialReady || playerStunned}
+          className={cn(
+            "flex-1 max-w-[100px] py-4 rounded-2xl font-bold text-lg shadow-xl transition-all relative overflow-hidden",
+            !specialReady || playerStunned
+              ? "bg-slate-700 text-slate-500"
+              : "bg-gradient-to-br from-amber-400 via-orange-500 to-red-500 text-white active:scale-95 animate-pulse"
+          )}
+          whileTap={!specialReady || playerStunned ? {} : { scale: 0.95 }}
+        >
+          <span className="text-xl">⚡</span>
+          <div className="text-xs">{specialReady ? "MEGA!" : `${Math.max(0, 15 - combo)}`}</div>
+          {!specialReady && combo > 0 && (
+            <div
+              className="absolute bottom-0 left-0 h-1 bg-amber-400"
+              style={{ width: `${Math.min(100, (combo / 15) * 100)}%` }}
+            />
+          )}
+        </motion.button>
+
         {/* Shield button */}
         <motion.button
           onClick={activateShield}
-          disabled={shieldCooldown > 0}
+          disabled={shieldCooldown > 0 || playerStunned}
           className={cn(
-            "flex-1 max-w-[140px] py-5 rounded-2xl font-bold text-lg shadow-xl transition-all relative overflow-hidden",
-            shieldCooldown > 0
+            "flex-1 max-w-[100px] py-4 rounded-2xl font-bold text-lg shadow-xl transition-all relative overflow-hidden",
+            shieldCooldown > 0 || playerStunned
               ? "bg-slate-600 text-slate-400"
               : parryWindow
               ? "bg-gradient-to-br from-yellow-400 to-amber-500 text-white active:scale-95 animate-pulse"
               : "bg-gradient-to-br from-cyan-500 to-blue-600 text-white active:scale-95"
           )}
-          whileTap={shieldCooldown > 0 ? {} : { scale: 0.95 }}
+          whileTap={shieldCooldown > 0 || playerStunned ? {} : { scale: 0.95 }}
         >
-          <span className="text-2xl">🛡️</span>
-          <div className="text-sm">{shieldCooldown > 0 ? `${Math.ceil(shieldCooldown)}s` : parryWindow ? "PARRY!" : "SHIELD"}</div>
+          <span className="text-xl">🛡️</span>
+          <div className="text-xs">{shieldCooldown > 0 ? `${Math.ceil(shieldCooldown)}s` : parryWindow ? "PARRY!" : "SHIELD"}</div>
           {shieldCooldown > 0 && (
             <div
               className="absolute bottom-0 left-0 h-1 bg-cyan-400"
