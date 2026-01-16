@@ -29,8 +29,7 @@ type GameScene =
   | "chapter3_boss_battle"
   | "chapter3_final"
   | "ending_good"
-  | "ending_perfect"
-  | "ending_friend";
+  | "ending_perfect";
 
 type Achievement = {
   id: string;
@@ -5444,11 +5443,11 @@ const FinalProposalScene = memo(function FinalProposalScene({
     { text: "And now...", emoji: "🌟", delay: 1500 },
   ];
 
-  // Animate background hue
+  // Animate background hue - slower for better performance
   useEffect(() => {
     const interval = setInterval(() => {
-      setBgHue(h => (h + 0.5) % 360);
-    }, 50);
+      setBgHue(h => (h + 0.3) % 360);
+    }, 100);
     return () => clearInterval(interval);
   }, []);
 
@@ -5534,94 +5533,57 @@ const FinalProposalScene = memo(function FinalProposalScene({
           hsl(${320 + bgHue * 0.1}, 70%, 70%) 100%)`
       }}
     >
-      {/* Floating hearts background */}
+      {/* Floating hearts background - optimized */}
       <div className="absolute inset-0 pointer-events-none overflow-hidden">
-        {Array.from({ length: 30 }).map((_, i) => (
+        {Array.from({ length: 15 }).map((_, i) => (
           <motion.div
             key={i}
-            className="absolute text-2xl opacity-40"
-            style={{ left: `${(i * 7) % 100}%` }}
-            initial={{ y: "100vh", rotate: 0 }}
-            animate={{
-              y: "-100vh",
-              rotate: [0, 360],
-              x: [0, Math.sin(i) * 30, 0],
-            }}
+            className="absolute text-2xl opacity-30"
+            style={{ left: `${(i * 13) % 100}%` }}
+            initial={{ y: "100vh" }}
+            animate={{ y: "-100vh" }}
             transition={{
-              duration: 8 + (i % 5) * 2,
+              duration: 10 + (i % 4) * 3,
               repeat: Infinity,
-              delay: i * 0.3,
+              delay: i * 0.5,
               ease: "linear"
             }}
           >
-            {["💖", "💕", "💗", "💘", "💝", "✨", "🌸"][i % 7]}
+            {["💖", "💕", "💗", "✨", "🌸"][i % 5]}
           </motion.div>
         ))}
       </div>
 
-      {/* Sparkle particles */}
-      <AnimatePresence>
-        {phase === "question" && (
-          <>
-            {Array.from({ length: 20 }).map((_, i) => (
-              <motion.div
-                key={`sparkle-${i}`}
-                className="absolute text-xl pointer-events-none"
-                style={{
-                  left: `${20 + Math.random() * 60}%`,
-                  top: `${20 + Math.random() * 60}%`
-                }}
-                initial={{ scale: 0, opacity: 0 }}
-                animate={{
-                  scale: [0, 1.5, 0],
-                  opacity: [0, 1, 0],
-                  rotate: [0, 180],
-                }}
-                transition={{
-                  duration: 2,
-                  repeat: Infinity,
-                  delay: i * 0.2,
-                  repeatDelay: 1
-                }}
-              >
-                ✨
-              </motion.div>
-            ))}
-          </>
-        )}
-      </AnimatePresence>
-
-      {/* Heart burst effect */}
+      {/* Heart burst effect - optimized */}
       <AnimatePresence>
         {heartBurst && (
           <>
-            {Array.from({ length: 50 }).map((_, i) => {
-              const angle = (i / 50) * Math.PI * 2;
-              const distance = 150 + Math.random() * 200;
+            {Array.from({ length: 24 }).map((_, i) => {
+              const angle = (i / 24) * Math.PI * 2;
+              const distance = 120 + (i % 3) * 60;
               return (
                 <motion.div
                   key={`burst-${i}`}
-                  className="absolute left-1/2 top-1/2 text-3xl pointer-events-none"
+                  className="absolute left-1/2 top-1/2 text-2xl pointer-events-none"
                   initial={{ x: 0, y: 0, scale: 0, opacity: 1 }}
                   animate={{
                     x: Math.cos(angle) * distance,
                     y: Math.sin(angle) * distance,
-                    scale: [0, 1.5, 1],
-                    opacity: [1, 1, 0],
-                    rotate: [0, 360],
+                    scale: 1.2,
+                    opacity: 0,
                   }}
-                  transition={{ duration: 1.5, ease: "easeOut" }}
+                  transition={{ duration: 1.2, ease: "easeOut" }}
                 >
-                  {["💖", "💕", "💗", "💘", "💝", "❤️", "🧡", "💛"][i % 8]}
+                  {["💖", "💕", "💗", "❤️"][i % 4]}
                 </motion.div>
               );
             })}
             <motion.div
-              className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[200vmax] h-[200vmax] rounded-full pointer-events-none"
-              initial={{ scale: 0, opacity: 0.5 }}
-              animate={{ scale: 2, opacity: 0 }}
-              transition={{ duration: 1.5 }}
-              style={{ background: "radial-gradient(circle, rgba(255,182,193,0.8) 0%, transparent 70%)" }}
+              className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[150vmax] h-[150vmax] rounded-full pointer-events-none"
+              initial={{ scale: 0, opacity: 0.4 }}
+              animate={{ scale: 1.5, opacity: 0 }}
+              transition={{ duration: 1 }}
+              style={{ background: "radial-gradient(circle, rgba(255,182,193,0.6) 0%, transparent 60%)" }}
             />
           </>
         )}
@@ -5980,12 +5942,12 @@ export default function ValentineCat() {
     if (elapsed < 5000) unlockAchievement("speedrun");
     if (stats.noCount >= 3) unlockAchievement("persistent");
 
-    if (stats.noCount === 0 && stats.petCount >= 10) {
+    // Perfect ending: never said no and petted cat lots during the adventure
+    if (stats.noCount === 0 && stats.petCount >= 5) {
       nextScene("ending_perfect");
       unlockAchievement("true_love");
-    } else if (stats.noCount >= 3 && stats.petCount === 0) {
-      nextScene("ending_friend");
     } else {
+      // Good ending: completed all the games and said yes!
       nextScene("ending_good");
     }
   }, [stats.noCount, stats.petCount, unlockAchievement, nextScene]);
@@ -6178,29 +6140,122 @@ export default function ValentineCat() {
 
   if (scene === "ending_good") {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-pink-200 via-rose-300 to-pink-400 flex items-center justify-center p-4">
-        <Particles emojis={["💖", "💕", "🎉", "✨", "🌸", "💗"]} count={50} />
-        <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: "spring", stiffness: 200 }} className="max-w-lg w-full text-center">
-          <Card className="p-8 bg-white/95 shadow-2xl">
-            <motion.div animate={{ y: [0, -20, 0], rotate: [0, 10, -10, 0] }} transition={{ duration: 2, repeat: Infinity }}>
-              <span className="text-[100px]">😻</span>
+      <div className="fixed inset-0 bg-gradient-to-b from-pink-300 via-rose-400 to-pink-500 flex items-center justify-center p-4 overflow-hidden">
+        {/* Floating hearts */}
+        <div className="absolute inset-0 pointer-events-none">
+          {Array.from({ length: 20 }).map((_, i) => (
+            <motion.div
+              key={i}
+              className="absolute text-3xl"
+              style={{ left: `${(i * 11) % 100}%` }}
+              initial={{ y: "100vh", opacity: 0.6 }}
+              animate={{ y: "-100vh" }}
+              transition={{ duration: 8 + (i % 4) * 2, repeat: Infinity, delay: i * 0.4, ease: "linear" }}
+            >
+              {["💖", "💕", "💗", "✨", "🎉"][i % 5]}
             </motion.div>
-            <h1 className="text-4xl font-bold text-pink-800 mt-4 mb-4">YAYYY! 💖</h1>
-            <p className="text-xl text-slate-600 mb-4">You are now officially my Valentine!</p>
-            <div className="bg-pink-50 rounded-xl p-4 mb-6">
-              <h3 className="font-bold text-pink-700 mb-2">Your Stats:</h3>
-              <div className="grid grid-cols-2 gap-2 text-sm">
-                <div>Times said no: {stats.noCount}</div>
-                <div>Cat pets: {stats.petCount}</div>
-                <div>Total score: {stats.totalScore}</div>
-                <div>Time: {Math.round(stats.yesTime / 1000)}s</div>
+          ))}
+        </div>
+
+        <motion.div
+          initial={{ scale: 0, y: 50 }}
+          animate={{ scale: 1, y: 0 }}
+          transition={{ type: "spring", stiffness: 200, delay: 0.2 }}
+          className="max-w-md w-full relative z-10"
+        >
+          {/* Main card */}
+          <div className="bg-white/95 backdrop-blur-xl rounded-3xl p-8 shadow-2xl border-2 border-pink-200 text-center">
+            {/* Cat celebration */}
+            <motion.div
+              className="relative inline-block mb-4"
+              animate={{ y: [0, -15, 0] }}
+              transition={{ duration: 1.5, repeat: Infinity }}
+            >
+              <motion.div
+                className="absolute inset-0 blur-2xl rounded-full"
+                style={{ background: "radial-gradient(circle, rgba(255,182,193,0.8) 0%, transparent 70%)" }}
+              />
+              <motion.span
+                className="text-[100px] relative z-10 block"
+                animate={{ rotate: [0, -10, 10, 0] }}
+                transition={{ duration: 0.5, repeat: Infinity }}
+              >
+                😻
+              </motion.span>
+            </motion.div>
+
+            <motion.h1
+              className="text-4xl font-black bg-gradient-to-r from-pink-500 via-rose-500 to-red-500 bg-clip-text text-transparent mb-2"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.4 }}
+            >
+              YAYYY! 💖
+            </motion.h1>
+
+            <motion.p
+              className="text-xl text-slate-600 mb-6"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.6 }}
+            >
+              You are now officially my Valentine!
+            </motion.p>
+
+            {/* Stats */}
+            <motion.div
+              className="grid grid-cols-2 gap-3 mb-6"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.8 }}
+            >
+              <div className="bg-pink-50 rounded-xl p-3">
+                <div className="text-2xl">🎮</div>
+                <div className="text-xs text-slate-500">Score</div>
+                <div className="text-xl font-bold text-pink-600">{stats.totalScore}</div>
               </div>
-            </div>
-            <div className="flex gap-4 justify-center">
-              <Button variant="outline" onClick={() => window.location.reload()}>Play Again</Button>
-              <Button variant="pink" onClick={() => setScene("title")}>Title Screen</Button>
-            </div>
-          </Card>
+              <div className="bg-rose-50 rounded-xl p-3">
+                <div className="text-2xl">🐱</div>
+                <div className="text-xs text-slate-500">Cat Pets</div>
+                <div className="text-xl font-bold text-rose-600">{stats.petCount}</div>
+              </div>
+              <div className="bg-red-50 rounded-xl p-3">
+                <div className="text-2xl">⏱️</div>
+                <div className="text-xs text-slate-500">Time</div>
+                <div className="text-xl font-bold text-red-500">{Math.round(stats.yesTime / 1000)}s</div>
+              </div>
+              <div className="bg-purple-50 rounded-xl p-3">
+                <div className="text-2xl">💬</div>
+                <div className="text-xs text-slate-500">Said No</div>
+                <div className="text-xl font-bold text-purple-600">{stats.noCount}x</div>
+              </div>
+            </motion.div>
+
+            {/* Message */}
+            <motion.p
+              className="text-sm text-pink-500 italic mb-6"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 1 }}
+            >
+              "Thank you for going on this adventure with me! 💕" — The Cat
+            </motion.p>
+
+            {/* Buttons */}
+            <motion.div
+              className="flex gap-3 justify-center"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 1.2 }}
+            >
+              <Button variant="outline" onClick={() => window.location.reload()}>
+                Play Again 🔄
+              </Button>
+              <Button variant="pink" onClick={() => setScene("title")}>
+                Title Screen 🏠
+              </Button>
+            </motion.div>
+          </div>
         </motion.div>
       </div>
     );
@@ -6208,47 +6263,174 @@ export default function ValentineCat() {
 
   if (scene === "ending_perfect") {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-amber-200 via-yellow-300 to-amber-400 flex items-center justify-center p-4">
-        <Particles emojis={["⭐", "✨", "💖", "🏆", "👑", "💫"]} count={60} />
-        <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} className="max-w-lg w-full text-center">
-          <Card className="p-8 bg-white/95 shadow-2xl border-4 border-amber-400">
-            <motion.div animate={{ scale: [1, 1.2, 1], rotate: [0, 360] }} transition={{ duration: 3, repeat: Infinity }}>
-              <span className="text-[120px]">👑</span>
+      <div className="fixed inset-0 bg-gradient-to-b from-amber-300 via-yellow-400 to-orange-400 flex items-center justify-center p-4 overflow-hidden">
+        {/* Floating stars and crowns */}
+        <div className="absolute inset-0 pointer-events-none">
+          {Array.from({ length: 25 }).map((_, i) => (
+            <motion.div
+              key={i}
+              className="absolute text-3xl"
+              style={{ left: `${(i * 9) % 100}%` }}
+              initial={{ y: "100vh", opacity: 0.7 }}
+              animate={{ y: "-100vh", rotate: [0, 360] }}
+              transition={{ duration: 7 + (i % 4) * 2, repeat: Infinity, delay: i * 0.3, ease: "linear" }}
+            >
+              {["⭐", "✨", "👑", "🏆", "💫", "🌟"][i % 6]}
             </motion.div>
-            <h1 className="text-4xl font-bold bg-gradient-to-r from-amber-600 to-yellow-500 bg-clip-text text-transparent mt-4 mb-4">
-              PERFECT ENDING! 🏆
-            </h1>
-            <p className="text-xl text-slate-600 mb-4">You showed TRUE LOVE from the start! 💕</p>
-            <p className="text-lg text-amber-700 mb-6">The cat is eternally grateful and will love you forever! 😻</p>
-            <div className="flex gap-4 justify-center">
-              <Button variant="gold" size="lg" onClick={() => window.location.reload()}>
+          ))}
+        </div>
+
+        {/* Golden sparkles */}
+        <div className="absolute inset-0 pointer-events-none">
+          {Array.from({ length: 10 }).map((_, i) => (
+            <motion.div
+              key={`spark-${i}`}
+              className="absolute w-2 h-2 bg-yellow-300 rounded-full"
+              style={{ left: `${20 + Math.random() * 60}%`, top: `${20 + Math.random() * 60}%` }}
+              animate={{
+                scale: [0, 1, 0],
+                opacity: [0, 1, 0],
+              }}
+              transition={{ duration: 1.5, repeat: Infinity, delay: i * 0.3 }}
+            />
+          ))}
+        </div>
+
+        <motion.div
+          initial={{ scale: 0, y: 50 }}
+          animate={{ scale: 1, y: 0 }}
+          transition={{ type: "spring", stiffness: 200, delay: 0.2 }}
+          className="max-w-md w-full relative z-10"
+        >
+          {/* Main card */}
+          <div className="bg-white/95 backdrop-blur-xl rounded-3xl p-8 shadow-2xl border-4 border-amber-400 text-center relative overflow-hidden">
+            {/* Shimmer effect */}
+            <motion.div
+              className="absolute inset-0 bg-gradient-to-r from-transparent via-yellow-200/50 to-transparent"
+              animate={{ x: ["-100%", "100%"] }}
+              transition={{ duration: 2, repeat: Infinity, repeatDelay: 1 }}
+            />
+
+            {/* Crown and cat */}
+            <motion.div
+              className="relative inline-block mb-4"
+              animate={{ y: [0, -10, 0] }}
+              transition={{ duration: 2, repeat: Infinity }}
+            >
+              <motion.div
+                className="absolute -top-8 left-1/2 -translate-x-1/2 text-5xl z-20"
+                animate={{ rotate: [-5, 5, -5], y: [0, -5, 0] }}
+                transition={{ duration: 1, repeat: Infinity }}
+              >
+                👑
+              </motion.div>
+              <motion.div
+                className="absolute inset-0 blur-3xl rounded-full"
+                style={{ background: "radial-gradient(circle, rgba(251,191,36,0.6) 0%, transparent 70%)" }}
+              />
+              <motion.span
+                className="text-[100px] relative z-10 block"
+                animate={{ scale: [1, 1.1, 1] }}
+                transition={{ duration: 0.8, repeat: Infinity }}
+              >
+                😻
+              </motion.span>
+            </motion.div>
+
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.4 }}
+              className="relative z-10"
+            >
+              <h1 className="text-4xl font-black bg-gradient-to-r from-amber-500 via-yellow-500 to-orange-500 bg-clip-text text-transparent mb-2">
+                PERFECT ENDING! 🏆
+              </h1>
+
+              <motion.div
+                className="flex justify-center gap-1 mb-4"
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                transition={{ delay: 0.6, type: "spring" }}
+              >
+                {["⭐", "⭐", "⭐", "⭐", "⭐"].map((s, i) => (
+                  <motion.span
+                    key={i}
+                    className="text-2xl"
+                    animate={{ scale: [1, 1.3, 1], rotate: [0, 10, -10, 0] }}
+                    transition={{ duration: 0.5, delay: i * 0.1, repeat: Infinity, repeatDelay: 2 }}
+                  >
+                    {s}
+                  </motion.span>
+                ))}
+              </motion.div>
+            </motion.div>
+
+            <motion.p
+              className="text-xl text-slate-600 mb-2 relative z-10"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.8 }}
+            >
+              You showed TRUE LOVE! 💕
+            </motion.p>
+
+            <motion.p
+              className="text-lg text-amber-700 mb-6 relative z-10"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 1 }}
+            >
+              Never said no, always gave pets... <br />
+              You're the ULTIMATE Valentine! 👑
+            </motion.p>
+
+            {/* Stats in gold theme */}
+            <motion.div
+              className="grid grid-cols-3 gap-2 mb-6 relative z-10"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 1.2 }}
+            >
+              <div className="bg-amber-50 rounded-xl p-3 border border-amber-200">
+                <div className="text-xl">🎮</div>
+                <div className="text-lg font-bold text-amber-600">{stats.totalScore}</div>
+                <div className="text-xs text-amber-500">Score</div>
+              </div>
+              <div className="bg-amber-50 rounded-xl p-3 border border-amber-200">
+                <div className="text-xl">🐱</div>
+                <div className="text-lg font-bold text-amber-600">{stats.petCount}</div>
+                <div className="text-xs text-amber-500">Pets</div>
+              </div>
+              <div className="bg-amber-50 rounded-xl p-3 border border-amber-200">
+                <div className="text-xl">⏱️</div>
+                <div className="text-lg font-bold text-amber-600">{Math.round(stats.yesTime / 1000)}s</div>
+                <div className="text-xs text-amber-500">Time</div>
+              </div>
+            </motion.div>
+
+            {/* Button */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 1.4 }}
+              className="relative z-10"
+            >
+              <Button
+                variant="gold"
+                size="lg"
+                onClick={() => window.location.reload()}
+                className="w-full"
+              >
                 <Trophy className="w-5 h-5" /> Play Again
               </Button>
-            </div>
-          </Card>
+            </motion.div>
+          </div>
         </motion.div>
       </div>
     );
   }
 
-  if (scene === "ending_friend") {
-    return (
-      <div className="min-h-screen bg-gradient-to-b from-blue-200 via-indigo-300 to-purple-400 flex items-center justify-center p-4">
-        <Particles emojis={["💙", "🤝", "✨", "⭐"]} count={30} />
-        <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} className="max-w-lg w-full text-center">
-          <Card className="p-8 bg-white/95 shadow-2xl">
-            <span className="text-[100px]">🤝</span>
-            <h1 className="text-4xl font-bold text-indigo-800 mt-4 mb-4">Friend Ending 💙</h1>
-            <p className="text-xl text-slate-600 mb-4">After all those "no's", the cat respects your boundaries!</p>
-            <p className="text-lg text-indigo-600 mb-6">"We can still be friends, right? 😺" — The Cat</p>
-            <Button variant="outline" size="lg" onClick={() => window.location.reload()}>
-              Try for a different ending?
-            </Button>
-          </Card>
-        </motion.div>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen flex items-center justify-center">
