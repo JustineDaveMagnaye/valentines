@@ -397,52 +397,91 @@ const CatSprite = memo(function CatSprite({ emotion = "happy", size = "md", clas
 // MINI-GAMES - Optimized with requestAnimationFrame
 // ============================================================================
 
-// Game 1: CATCH THE NO - Optimized with RAF
+// Game 1: CATCH THE NO - Enhanced with better UX, animations, and game dynamics
 const CatchTheNoGame = memo(function CatchTheNoGame({ onComplete }: { onComplete: (score: number) => void }) {
-  const [phase, setPhase] = useState<"tutorial" | "playing" | "done">("tutorial");
+  const [phase, setPhase] = useState<"tutorial" | "countdown" | "playing" | "done">("tutorial");
   const [noLetters, setNoLetters] = useState(0);
-  const [timeLeft, setTimeLeft] = useState(15);
-  const [items, setItems] = useState<Array<{ id: number; x: number; y: number; type: "N" | "O" | "heart"; speed: number }>>([]);
+  const [timeLeft, setTimeLeft] = useState(20);
+  const [items, setItems] = useState<Array<{
+    id: number;
+    x: number;
+    y: number;
+    type: "N" | "O" | "heart" | "star";
+    speed: number;
+    rotation: number;
+    scale: number;
+    caught?: boolean;
+  }>>([]);
   const [catMessage, setCatMessage] = useState("");
   const [basketX, setBasketX] = useState(50);
+  const [combo, setCombo] = useState(0);
+  const [lastCatch, setLastCatch] = useState<{ x: number; y: number; type: string } | null>(null);
+  const [countdownNum, setCountdownNum] = useState(3);
+  const [screenShake, setScreenShake] = useState(false);
+  const [catEmotion, setCatEmotion] = useState<"happy" | "angry" | "worried">("happy");
 
   // Refs for RAF loop
   const onCompleteRef = useRef(onComplete);
   const gameEndedRef = useRef(false);
   const noRef = useRef(0);
   const basketXRef = useRef(50);
-  const itemsRef = useRef(items);
+  const comboRef = useRef(0);
   const lastSpawnRef = useRef(0);
   const rafRef = useRef<number>(0);
+  const difficultyRef = useRef(1);
 
   useEffect(() => { onCompleteRef.current = onComplete; }, [onComplete]);
   useEffect(() => { noRef.current = noLetters; }, [noLetters]);
   useEffect(() => { basketXRef.current = basketX; }, [basketX]);
-  useEffect(() => { itemsRef.current = items; }, [items]);
+  useEffect(() => { comboRef.current = combo; }, [combo]);
 
-  const startGame = useCallback(() => {
-    gameEndedRef.current = false;
-    setNoLetters(0);
-    noRef.current = 0;
-    setTimeLeft(15);
-    setItems([]);
-    itemsRef.current = [];
-    setCatMessage("");
-    lastSpawnRef.current = performance.now();
-    setPhase("playing");
+  // Update cat emotion based on player progress
+  useEffect(() => {
+    if (noLetters >= 4) setCatEmotion("worried");
+    else if (noLetters >= 2) setCatEmotion("angry");
+    else setCatEmotion("happy");
+  }, [noLetters]);
+
+  const startCountdown = useCallback(() => {
+    setPhase("countdown");
+    setCountdownNum(3);
   }, []);
 
-  // Timer
+  // Countdown effect
+  useEffect(() => {
+    if (phase !== "countdown") return;
+    if (countdownNum === 0) {
+      gameEndedRef.current = false;
+      setNoLetters(0);
+      noRef.current = 0;
+      setTimeLeft(20);
+      setItems([]);
+      setCatMessage("");
+      setCombo(0);
+      comboRef.current = 0;
+      lastSpawnRef.current = performance.now();
+      difficultyRef.current = 1;
+      setPhase("playing");
+      return;
+    }
+    const timer = setTimeout(() => setCountdownNum(c => c - 1), 800);
+    return () => clearTimeout(timer);
+  }, [phase, countdownNum]);
+
+  // Timer with difficulty scaling
   useEffect(() => {
     if (phase !== "playing") return;
     const timer = setInterval(() => {
       setTimeLeft(t => {
+        // Increase difficulty over time
+        difficultyRef.current = 1 + (20 - t) * 0.03;
+
         if (t <= 1) {
           clearInterval(timer);
           if (!gameEndedRef.current) {
             gameEndedRef.current = true;
             setPhase("done");
-            setTimeout(() => onCompleteRef.current(noRef.current), 1500);
+            setTimeout(() => onCompleteRef.current(noRef.current), 2000);
           }
           return 0;
         }
@@ -452,7 +491,7 @@ const CatchTheNoGame = memo(function CatchTheNoGame({ onComplete }: { onComplete
     return () => clearInterval(timer);
   }, [phase]);
 
-  // Main game loop with RAF
+  // Main game loop with RAF - SLOWER falling speed
   useEffect(() => {
     if (phase !== "playing") return;
 
@@ -461,50 +500,77 @@ const CatchTheNoGame = memo(function CatchTheNoGame({ onComplete }: { onComplete
     const gameLoop = (currentTime: number) => {
       if (gameEndedRef.current) return;
 
-      const deltaTime = (currentTime - lastTime) / 1000; // Convert to seconds
+      const deltaTime = (currentTime - lastTime) / 1000;
       lastTime = currentTime;
 
-      // Spawn new items every 600ms
-      if (currentTime - lastSpawnRef.current > 600) {
+      // Spawn new items - slower spawn rate (900ms base)
+      const spawnInterval = Math.max(600, 900 - difficultyRef.current * 50);
+      if (currentTime - lastSpawnRef.current > spawnInterval) {
         lastSpawnRef.current = currentTime;
         const randVal = Math.random();
-        const type = randVal < 0.3 ? "N" : randVal < 0.6 ? "O" : "heart";
+        // Better distribution: 35% N, 35% O, 25% heart, 5% star (bonus)
+        let type: "N" | "O" | "heart" | "star";
+        if (randVal < 0.35) type = "N";
+        else if (randVal < 0.70) type = "O";
+        else if (randVal < 0.95) type = "heart";
+        else type = "star"; // Bonus item!
+
         const newItem = {
           id: currentTime + Math.random(),
-          x: 10 + Math.random() * 80,
-          y: -10,
-          type: type as "N" | "O" | "heart",
-          speed: 2 + Math.random() * 2,
+          x: 8 + Math.random() * 84,
+          y: -8,
+          type,
+          // MUCH SLOWER base speed: 0.6-1.2 instead of 2-4
+          speed: (0.6 + Math.random() * 0.6) * difficultyRef.current,
+          rotation: Math.random() * 360,
+          scale: type === "star" ? 1.2 : (0.9 + Math.random() * 0.3),
         };
-        setItems(prev => [...prev.slice(-8), newItem]);
+        setItems(prev => [...prev.slice(-10), newItem]);
       }
 
-      // Move items
+      // Move items - SLOWER movement (30fps feel instead of 60fps)
       setItems(prev => {
         const updated = prev.map(item => ({
           ...item,
-          y: item.y + item.speed * deltaTime * 60 // Normalize to 60fps
+          y: item.y + item.speed * deltaTime * 30, // Changed from 60 to 30 for slower fall
+          rotation: item.rotation + (item.type === "heart" ? 2 : 1) * deltaTime * 60,
         }));
 
-        // Check catches
-        let caught = false;
+        // Check catches with better hitbox
         updated.forEach(item => {
-          if (item.y >= 75 && item.y <= 90 && !caught) {
+          if (item.caught) return;
+          if (item.y >= 72 && item.y <= 88) {
             const dist = Math.abs(item.x - basketXRef.current);
-            if (dist < 15) {
+            if (dist < 12) {
               if (item.type === "heart") {
+                // Heart caught - bad!
+                setCombo(0);
+                comboRef.current = 0;
+                setScreenShake(true);
+                setTimeout(() => setScreenShake(false), 300);
                 setCatMessage(CAT_TAUNTS_CATCH[Math.floor(Math.random() * CAT_TAUNTS_CATCH.length)]);
-                setTimeout(() => setCatMessage(""), 1000);
+                setTimeout(() => setCatMessage(""), 1200);
+              } else if (item.type === "star") {
+                // Star bonus - adds 2 letters!
+                setNoLetters(n => Math.min(n + 2, 10));
+                setCombo(c => c + 1);
+                comboRef.current += 1;
+                setLastCatch({ x: item.x, y: item.y, type: "star" });
+                setTimeout(() => setLastCatch(null), 600);
               } else {
+                // N or O caught - good!
                 setNoLetters(n => n + 1);
+                setCombo(c => c + 1);
+                comboRef.current += 1;
+                setLastCatch({ x: item.x, y: item.y, type: item.type });
+                setTimeout(() => setLastCatch(null), 600);
               }
-              item.y = 200;
-              caught = true;
+              item.caught = true;
             }
           }
         });
 
-        return updated.filter(item => item.y < 100);
+        return updated.filter(item => item.y < 105 && !item.caught);
       });
 
       rafRef.current = requestAnimationFrame(gameLoop);
@@ -514,89 +580,266 @@ const CatchTheNoGame = memo(function CatchTheNoGame({ onComplete }: { onComplete
     return () => cancelAnimationFrame(rafRef.current);
   }, [phase]);
 
+  // Smooth basket movement with lerp interpolation
+  const targetBasketXRef = useRef(50);
+  const smoothRafRef = useRef<number>(0);
+
+  useEffect(() => {
+    if (phase !== "playing") return;
+
+    let animating = true;
+    const smoothMove = () => {
+      if (!animating) return;
+      setBasketX(prev => {
+        const diff = targetBasketXRef.current - prev;
+        // Smooth interpolation - move 30% of the distance each frame for responsive feel
+        if (Math.abs(diff) < 0.3) return targetBasketXRef.current;
+        return prev + diff * 0.3;
+      });
+      smoothRafRef.current = requestAnimationFrame(smoothMove);
+    };
+    smoothRafRef.current = requestAnimationFrame(smoothMove);
+    return () => {
+      animating = false;
+      cancelAnimationFrame(smoothRafRef.current);
+    };
+  }, [phase]);
+
   const handleMove = useCallback((clientX: number, rect: DOMRect) => {
     const x = ((clientX - rect.left) / rect.width) * 100;
-    setBasketX(Math.max(10, Math.min(90, x)));
+    targetBasketXRef.current = Math.max(8, Math.min(92, x));
   }, []);
 
+  // Tutorial screen with better styling
   if (phase === "tutorial") {
     return (
-      <div className="fixed inset-0 bg-gradient-to-b from-indigo-500 to-purple-700 flex flex-col items-center justify-center p-6">
-        <div className="bg-white/95 rounded-3xl p-8 max-w-sm text-center shadow-2xl">
-          <div className="text-6xl mb-4">🚫</div>
-          <h2 className="text-2xl font-bold text-indigo-800 mb-3">Catch the NO!</h2>
-          <p className="text-indigo-600 mb-4">
-            Catch falling <span className="font-bold text-red-500">N</span> and <span className="font-bold text-red-500">O</span> letters!<br/>
-            The cat throws 💕 to block you!
-          </p>
-          <div className="flex justify-center gap-4 my-4">
-            <div className="text-center">
-              <div className="text-3xl font-bold text-red-500">N O</div>
-              <div className="text-xs text-green-600 font-bold">Catch these!</div>
-            </div>
-            <div className="text-center">
-              <div className="text-3xl">💕</div>
-              <div className="text-xs text-red-600 font-bold">Avoid!</div>
-            </div>
-          </div>
-          <p className="text-indigo-500 text-sm mb-6">Slide to move your basket! 🧺</p>
-          <button
-            onClick={startGame}
-            className="w-full py-4 bg-gradient-to-r from-indigo-500 to-purple-500 text-white rounded-2xl font-bold text-xl shadow-lg active:scale-95 transition-transform"
-          >
-            Try to say NO! 🚫
-          </button>
+      <div className="fixed inset-0 bg-gradient-to-b from-indigo-600 via-purple-600 to-fuchsia-700 flex flex-col items-center justify-center p-4 overflow-hidden">
+        {/* Animated background particles */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          {Array.from({ length: 20 }).map((_, i) => (
+            <motion.div
+              key={i}
+              className="absolute text-2xl opacity-20"
+              initial={{ y: "110vh", x: `${Math.random() * 100}%` }}
+              animate={{ y: "-10vh" }}
+              transition={{ duration: 8 + Math.random() * 4, repeat: Infinity, delay: Math.random() * 5 }}
+            >
+              {["N", "O", "💕", "✨"][i % 4]}
+            </motion.div>
+          ))}
         </div>
+
+        <motion.div
+          initial={{ scale: 0.8, opacity: 0, y: 20 }}
+          animate={{ scale: 1, opacity: 1, y: 0 }}
+          transition={{ type: "spring", stiffness: 200, damping: 20 }}
+          className="bg-white/95 backdrop-blur-xl rounded-3xl p-8 max-w-sm text-center shadow-2xl border border-white/20 relative z-10"
+        >
+          <motion.div
+            className="text-7xl mb-4"
+            animate={{ rotate: [0, -10, 10, 0], scale: [1, 1.1, 1] }}
+            transition={{ duration: 2, repeat: Infinity }}
+          >
+            🚫
+          </motion.div>
+          <h2 className="text-3xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent mb-4">
+            Catch the NO!
+          </h2>
+          <p className="text-slate-600 mb-6 leading-relaxed">
+            Catch the falling <span className="font-bold text-red-500 text-lg">N</span> and <span className="font-bold text-red-500 text-lg">O</span> letters to spell your rejection!
+          </p>
+
+          <div className="flex justify-center gap-6 my-6">
+            <motion.div
+              className="text-center bg-green-50 rounded-2xl p-4 border-2 border-green-200"
+              whileHover={{ scale: 1.05 }}
+            >
+              <div className="text-4xl font-black text-red-500 drop-shadow-lg">N O</div>
+              <div className="text-xs text-green-600 font-bold mt-2">✓ CATCH!</div>
+            </motion.div>
+            <motion.div
+              className="text-center bg-red-50 rounded-2xl p-4 border-2 border-red-200"
+              whileHover={{ scale: 1.05 }}
+            >
+              <div className="text-4xl">💕</div>
+              <div className="text-xs text-red-600 font-bold mt-2">✗ AVOID!</div>
+            </motion.div>
+            <motion.div
+              className="text-center bg-yellow-50 rounded-2xl p-4 border-2 border-yellow-200"
+              whileHover={{ scale: 1.05 }}
+            >
+              <div className="text-4xl">⭐</div>
+              <div className="text-xs text-amber-600 font-bold mt-2">★ BONUS!</div>
+            </motion.div>
+          </div>
+
+          <div className="bg-indigo-50 rounded-xl p-3 mb-6">
+            <p className="text-indigo-600 text-sm">
+              👆 <span className="font-semibold">Slide your finger</span> to move the basket!
+            </p>
+          </div>
+
+          <motion.button
+            onClick={startCountdown}
+            className="w-full py-4 bg-gradient-to-r from-indigo-500 via-purple-500 to-fuchsia-500 text-white rounded-2xl font-bold text-xl shadow-xl relative overflow-hidden"
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+          >
+            <motion.div
+              className="absolute inset-0 bg-white/20"
+              initial={{ x: "-100%" }}
+              animate={{ x: "200%" }}
+              transition={{ duration: 1.5, repeat: Infinity, repeatDelay: 1 }}
+            />
+            <span className="relative">Start Game! 🎮</span>
+          </motion.button>
+        </motion.div>
       </div>
     );
   }
 
+  // Countdown screen
+  if (phase === "countdown") {
+    return (
+      <div className="fixed inset-0 bg-gradient-to-b from-indigo-600 via-purple-600 to-fuchsia-700 flex items-center justify-center">
+        <motion.div
+          key={countdownNum}
+          initial={{ scale: 0, rotate: -180 }}
+          animate={{ scale: 1, rotate: 0 }}
+          exit={{ scale: 2, opacity: 0 }}
+          transition={{ type: "spring", stiffness: 300, damping: 15 }}
+          className="text-[150px] font-black text-white drop-shadow-2xl"
+        >
+          {countdownNum || "GO!"}
+        </motion.div>
+      </div>
+    );
+  }
+
+  // Done screen with better styling
   if (phase === "done") {
     const won = noLetters >= 5;
     return (
-      <div className="fixed inset-0 bg-gradient-to-b from-indigo-500 to-purple-700 flex flex-col items-center justify-center p-6">
-        <div className="bg-white/95 rounded-3xl p-8 max-w-sm text-center shadow-2xl">
-          <div className="text-6xl mb-4">{won ? "😾" : "😹"}</div>
-          <h2 className="text-3xl font-bold text-indigo-800 mb-2">
+      <div className="fixed inset-0 bg-gradient-to-b from-indigo-600 via-purple-600 to-fuchsia-700 flex flex-col items-center justify-center p-4">
+        <motion.div
+          initial={{ scale: 0, rotate: -20 }}
+          animate={{ scale: 1, rotate: 0 }}
+          transition={{ type: "spring", stiffness: 200 }}
+          className="bg-white/95 backdrop-blur-xl rounded-3xl p-8 max-w-sm text-center shadow-2xl"
+        >
+          <motion.div
+            className="text-8xl mb-4"
+            animate={won ? { rotate: [0, -10, 10, 0] } : { y: [0, -10, 0] }}
+            transition={{ duration: 1, repeat: Infinity }}
+          >
+            {won ? "😾" : "😹"}
+          </motion.div>
+          <h2 className="text-3xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent mb-3">
             {won ? "You spelled NO!" : "Cat blocked you!"}
           </h2>
-          <p className="text-2xl font-bold text-indigo-600 mb-2">{noLetters} letters caught</p>
-          <p className="text-indigo-500 italic mb-4">
+          <div className="bg-indigo-50 rounded-2xl p-4 mb-4">
+            <p className="text-4xl font-black text-indigo-600">{noLetters}</p>
+            <p className="text-indigo-400 text-sm">letters caught</p>
+          </div>
+          <motion.p
+            className="text-slate-600 italic text-lg"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.5 }}
+          >
             {won ? '"Fine, but I\'m not giving up!" 😾' : '"You can\'t reject ME!" 😹'}
-          </p>
-          <p className="text-indigo-400">Next challenge...</p>
-        </div>
+          </motion.p>
+          <motion.p
+            className="text-indigo-400 mt-4 text-sm"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 1 }}
+          >
+            Loading next challenge...
+          </motion.p>
+        </motion.div>
       </div>
     );
   }
 
+  // Main game screen with enhanced visuals
   return (
-    <div
-      className="fixed inset-0 bg-gradient-to-b from-indigo-500 to-purple-700 overflow-hidden select-none touch-none"
+    <motion.div
+      className="fixed inset-0 bg-gradient-to-b from-indigo-600 via-purple-600 to-fuchsia-700 overflow-hidden select-none touch-none"
+      animate={screenShake ? { x: [0, -5, 5, -5, 5, 0] } : {}}
+      transition={{ duration: 0.3 }}
       onMouseMove={(e) => handleMove(e.clientX, e.currentTarget.getBoundingClientRect())}
       onTouchMove={(e) => { e.preventDefault(); handleMove(e.touches[0].clientX, e.currentTarget.getBoundingClientRect()); }}
     >
-      {/* Header */}
-      <div className="absolute top-4 left-0 right-0 flex justify-center gap-4 z-10">
-        <div className="bg-white/90 rounded-full px-4 py-2 shadow-lg">
-          <span className="text-lg font-bold text-indigo-600">Letters: {noLetters}</span>
-        </div>
-        <div className="bg-white/90 rounded-full px-4 py-2 shadow-lg">
-          <span className="text-lg font-bold text-indigo-600">{timeLeft}s</span>
-        </div>
+      {/* Animated background grid */}
+      <div className="absolute inset-0 opacity-10">
+        <div className="absolute inset-0" style={{
+          backgroundImage: "linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)",
+          backgroundSize: "40px 40px",
+        }} />
       </div>
 
-      {/* Cat */}
-      <div className="absolute top-20 left-1/2 -translate-x-1/2 text-center z-20">
-        <div className="text-4xl mb-2">😼</div>
-        {catMessage && (
-          <div className="bg-pink-500 text-white px-4 py-2 rounded-full font-bold animate-bounce">
-            {catMessage}
-          </div>
+      {/* Header with improved styling */}
+      <div className="absolute top-4 left-0 right-0 flex justify-center gap-3 z-10 px-4">
+        <motion.div
+          className="bg-white/95 backdrop-blur rounded-2xl px-5 py-3 shadow-xl flex items-center gap-2"
+          animate={noLetters > 0 ? { scale: [1, 1.05, 1] } : {}}
+        >
+          <span className="text-2xl">📝</span>
+          <span className="text-xl font-black text-indigo-600">{noLetters}/5</span>
+        </motion.div>
+        <motion.div
+          className={cn(
+            "backdrop-blur rounded-2xl px-5 py-3 shadow-xl flex items-center gap-2",
+            timeLeft <= 5 ? "bg-red-100/95" : "bg-white/95"
+          )}
+          animate={timeLeft <= 5 ? { scale: [1, 1.05, 1] } : {}}
+          transition={{ duration: 0.5, repeat: timeLeft <= 5 ? Infinity : 0 }}
+        >
+          <span className="text-2xl">⏱️</span>
+          <span className={cn("text-xl font-black", timeLeft <= 5 ? "text-red-600" : "text-indigo-600")}>
+            {timeLeft}s
+          </span>
+        </motion.div>
+        {combo >= 2 && (
+          <motion.div
+            initial={{ scale: 0, rotate: -20 }}
+            animate={{ scale: 1, rotate: 0 }}
+            className="bg-gradient-to-r from-amber-400 to-orange-500 rounded-2xl px-4 py-3 shadow-xl"
+          >
+            <span className="text-xl font-black text-white">x{combo} 🔥</span>
+          </motion.div>
         )}
       </div>
 
-      {/* Skip */}
+      {/* Cat with emotions */}
+      <motion.div
+        className="absolute top-24 left-1/2 -translate-x-1/2 text-center z-20"
+        animate={{ y: [0, -5, 0] }}
+        transition={{ duration: 2, repeat: Infinity }}
+      >
+        <motion.div
+          className="text-6xl mb-2 drop-shadow-lg"
+          animate={catEmotion === "worried" ? { rotate: [0, -5, 5, 0] } : {}}
+          transition={{ duration: 0.5, repeat: catEmotion === "worried" ? Infinity : 0 }}
+        >
+          {catEmotion === "happy" ? "😼" : catEmotion === "angry" ? "😾" : "🙀"}
+        </motion.div>
+        <AnimatePresence>
+          {catMessage && (
+            <motion.div
+              initial={{ scale: 0, y: 10 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0, y: -10 }}
+              className="bg-gradient-to-r from-pink-500 to-rose-500 text-white px-5 py-2 rounded-full font-bold shadow-xl text-sm"
+            >
+              {catMessage}
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </motion.div>
+
+      {/* Skip button */}
       <button
         onClick={() => {
           if (!gameEndedRef.current) {
@@ -604,57 +847,104 @@ const CatchTheNoGame = memo(function CatchTheNoGame({ onComplete }: { onComplete
             onComplete(noLetters);
           }
         }}
-        className="absolute top-4 right-4 bg-white/50 rounded-full px-3 py-1 text-indigo-200 text-sm z-10"
+        className="absolute top-4 right-4 bg-white/30 backdrop-blur rounded-full px-4 py-2 text-white/80 text-sm z-10 hover:bg-white/40 transition-colors"
       >
         Skip →
       </button>
 
-      {/* Falling items - GPU accelerated */}
+      {/* Catch effect */}
+      <AnimatePresence>
+        {lastCatch && (
+          <motion.div
+            initial={{ scale: 0, opacity: 1 }}
+            animate={{ scale: 2, opacity: 0 }}
+            exit={{ opacity: 0 }}
+            className="absolute pointer-events-none z-30"
+            style={{ left: `${lastCatch.x}%`, top: `${lastCatch.y}%` }}
+          >
+            <div className={cn(
+              "text-4xl font-black",
+              lastCatch.type === "star" ? "text-yellow-300" : "text-green-400"
+            )}>
+              {lastCatch.type === "star" ? "+2! ⭐" : "+1!"}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Falling items with enhanced visuals */}
       {items.map(item => (
-        <div
+        <motion.div
           key={item.id}
-          className="absolute text-4xl font-bold pointer-events-none"
+          className="absolute pointer-events-none"
           style={{
             left: `${item.x}%`,
             top: `${item.y}%`,
-            transform: "translate(-50%, -50%)",
-            willChange: "top",
+            transform: `translate(-50%, -50%) rotate(${item.rotation}deg) scale(${item.scale})`,
+            willChange: "top, transform",
           }}
+          initial={{ scale: 0 }}
+          animate={{ scale: item.scale }}
+          transition={{ duration: 0.2 }}
         >
-          {item.type === "heart" ? "💕" : (
-            <span className="text-red-400 drop-shadow-lg">{item.type}</span>
+          {item.type === "heart" ? (
+            <span className="text-5xl drop-shadow-lg filter">💕</span>
+          ) : item.type === "star" ? (
+            <motion.span
+              className="text-5xl drop-shadow-lg"
+              animate={{ rotate: 360, scale: [1, 1.2, 1] }}
+              transition={{ duration: 1, repeat: Infinity }}
+            >
+              ⭐
+            </motion.span>
+          ) : (
+            <span className="text-5xl font-black text-white drop-shadow-[0_0_10px_rgba(239,68,68,0.8)] [text-shadow:_2px_2px_0_rgb(185_28_28)]">
+              {item.type}
+            </span>
           )}
-        </div>
+        </motion.div>
       ))}
 
-      {/* Basket */}
-      <div
-        className="absolute bottom-20 text-5xl"
+      {/* Basket with glow effect */}
+      <motion.div
+        className="absolute bottom-24"
         style={{
           left: `${basketX}%`,
           transform: "translateX(-50%)",
           willChange: "left",
-          transition: "left 50ms linear",
         }}
+        animate={{ y: [0, -3, 0] }}
+        transition={{ duration: 1.5, repeat: Infinity }}
       >
-        🧺
-      </div>
-
-      {/* Progress */}
-      <div className="absolute bottom-8 left-0 right-0 text-center">
-        <div className="inline-flex gap-1">
-          {[0, 1, 2, 3, 4].map(i => (
-            <span key={i} className={cn(
-              "text-2xl transition-all",
-              i < noLetters ? "opacity-100 scale-110" : "opacity-30"
-            )}>
-              {i % 2 === 0 ? "N" : "O"}
-            </span>
-          ))}
+        <div className="relative">
+          <div className="absolute inset-0 bg-amber-400/30 blur-xl rounded-full scale-150" />
+          <span className="text-6xl drop-shadow-lg relative">🧺</span>
         </div>
-        <p className="text-white/60 text-sm mt-2">Collect 5 to spell "NO NO N..."</p>
+      </motion.div>
+
+      {/* Progress bar */}
+      <div className="absolute bottom-8 left-4 right-4 z-10">
+        <div className="bg-white/20 backdrop-blur rounded-full p-1">
+          <div className="flex gap-1">
+            {[0, 1, 2, 3, 4].map(i => (
+              <motion.div
+                key={i}
+                className={cn(
+                  "flex-1 h-3 rounded-full transition-all duration-300",
+                  i < noLetters
+                    ? "bg-gradient-to-r from-green-400 to-emerald-500"
+                    : "bg-white/20"
+                )}
+                animate={i < noLetters ? { scale: [1, 1.1, 1] } : {}}
+              />
+            ))}
+          </div>
+        </div>
+        <p className="text-white/60 text-sm mt-2 text-center">
+          {noLetters < 5 ? `Collect ${5 - noLetters} more to spell "NO"!` : "You spelled NO! 🎉"}
+        </p>
       </div>
-    </div>
+    </motion.div>
   );
 });
 
