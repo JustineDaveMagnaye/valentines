@@ -948,33 +948,98 @@ const CatchTheNoGame = memo(function CatchTheNoGame({ onComplete }: { onComplete
   );
 });
 
-// Game 2: SMASH THE HEARTS - Optimized with RAF
+// Game 2: SMASH THE HEARTS - Complete redesign with grid, animations, and better mechanics
 const SmashTheHeartsGame = memo(function SmashTheHeartsGame({ onComplete }: { onComplete: (score: number) => void }) {
-  const [phase, setPhase] = useState<"tutorial" | "playing" | "done">("tutorial");
+  const [phase, setPhase] = useState<"tutorial" | "countdown" | "playing" | "done">("tutorial");
   const [score, setScore] = useState(0);
-  const [timeLeft, setTimeLeft] = useState(12);
-  const [hearts, setHearts] = useState<Array<{ id: number; x: number; y: number; type: "heart" | "cat"; scale: number; speed: number; hit: boolean }>>([]);
+  const [timeLeft, setTimeLeft] = useState(15);
+  const [countdownNum, setCountdownNum] = useState(3);
+  const [combo, setCombo] = useState(0);
+  const [maxCombo, setMaxCombo] = useState(0);
+
+  // Grid of hearts - 4x5 grid with different types
+  const [hearts, setHearts] = useState<Array<{
+    id: number;
+    row: number;
+    col: number;
+    type: "pink" | "red" | "gold" | "cat" | "bomb";
+    smashed: boolean;
+    shaking: boolean;
+  }>>([]);
+
+  // Smash particles for effects
+  const [particles, setParticles] = useState<Array<{
+    id: number;
+    x: number;
+    y: number;
+    emoji: string;
+    color: string;
+  }>>([]);
+
+  // Cat state
   const [catReaction, setCatReaction] = useState("");
+  const [catEmotion, setCatEmotion] = useState<"happy" | "sad" | "angry" | "shocked">("happy");
+  const [screenShake, setScreenShake] = useState(false);
 
   const onCompleteRef = useRef(onComplete);
   const gameEndedRef = useRef(false);
   const scoreRef = useRef(0);
-  const lastSpawnRef = useRef(0);
-  const rafRef = useRef<number>(0);
 
   useEffect(() => { onCompleteRef.current = onComplete; }, [onComplete]);
   useEffect(() => { scoreRef.current = score; }, [score]);
 
-  const startGame = useCallback(() => {
-    gameEndedRef.current = false;
-    setScore(0);
-    scoreRef.current = 0;
-    setTimeLeft(12);
-    setHearts([]);
-    setCatReaction("");
-    lastSpawnRef.current = performance.now();
-    setPhase("playing");
+  // Generate initial heart grid
+  const generateHearts = useCallback(() => {
+    const newHearts: typeof hearts = [];
+    let id = 0;
+    for (let row = 0; row < 4; row++) {
+      for (let col = 0; col < 5; col++) {
+        const rand = Math.random();
+        let type: "pink" | "red" | "gold" | "cat" | "bomb";
+        if (rand < 0.50) type = "pink";      // 50% pink hearts (+10)
+        else if (rand < 0.75) type = "red";  // 25% red hearts (+15)
+        else if (rand < 0.85) type = "gold"; // 10% gold hearts (+25)
+        else if (rand < 0.92) type = "cat";  // 7% cat (don't hit!)
+        else type = "bomb";                   // 8% bomb (clears row!)
+
+        newHearts.push({
+          id: id++,
+          row,
+          col,
+          type,
+          smashed: false,
+          shaking: false,
+        });
+      }
+    }
+    return newHearts;
   }, []);
+
+  const startCountdown = useCallback(() => {
+    setPhase("countdown");
+    setCountdownNum(3);
+  }, []);
+
+  // Countdown effect
+  useEffect(() => {
+    if (phase !== "countdown") return;
+    if (countdownNum === 0) {
+      gameEndedRef.current = false;
+      setScore(0);
+      scoreRef.current = 0;
+      setTimeLeft(15);
+      setCombo(0);
+      setMaxCombo(0);
+      setHearts(generateHearts());
+      setParticles([]);
+      setCatReaction("");
+      setCatEmotion("happy");
+      setPhase("playing");
+      return;
+    }
+    const timer = setTimeout(() => setCountdownNum(c => c - 1), 800);
+    return () => clearTimeout(timer);
+  }, [phase, countdownNum, generateHearts]);
 
   // Timer
   useEffect(() => {
@@ -986,7 +1051,7 @@ const SmashTheHeartsGame = memo(function SmashTheHeartsGame({ onComplete }: { on
           if (!gameEndedRef.current) {
             gameEndedRef.current = true;
             setPhase("done");
-            setTimeout(() => onCompleteRef.current(scoreRef.current), 1500);
+            setTimeout(() => onCompleteRef.current(scoreRef.current), 2000);
           }
           return 0;
         }
@@ -996,135 +1061,376 @@ const SmashTheHeartsGame = memo(function SmashTheHeartsGame({ onComplete }: { on
     return () => clearInterval(timer);
   }, [phase]);
 
-  // Game loop with RAF
+  // Respawn hearts periodically
   useEffect(() => {
     if (phase !== "playing") return;
+    const interval = setInterval(() => {
+      setHearts(prev => {
+        const smashed = prev.filter(h => h.smashed);
+        if (smashed.length < 3) return prev;
 
-    let lastTime = performance.now();
-
-    const gameLoop = (currentTime: number) => {
-      if (gameEndedRef.current) return;
-
-      const deltaTime = (currentTime - lastTime) / 1000;
-      lastTime = currentTime;
-
-      // Spawn hearts
-      if (currentTime - lastSpawnRef.current > 600) {
-        lastSpawnRef.current = currentTime;
-        const isCat = Math.random() < 0.15;
-        setHearts(prev => [...prev.slice(-12), {
-          id: currentTime + Math.random(),
-          x: 10 + Math.random() * 80,
-          y: -5,
-          type: isCat ? "cat" : "heart",
-          scale: 0.8 + Math.random() * 0.4,
-          speed: 1.5 + Math.random() * 2,
-          hit: false,
-        }]);
-      }
-
-      // Move hearts
-      setHearts(prev => prev
-        .map(h => ({ ...h, y: h.y + h.speed * deltaTime * 60 }))
-        .filter(h => h.y < 100 || h.hit)
-      );
-
-      rafRef.current = requestAnimationFrame(gameLoop);
-    };
-
-    rafRef.current = requestAnimationFrame(gameLoop);
-    return () => cancelAnimationFrame(rafRef.current);
+        // Respawn some smashed hearts
+        return prev.map(h => {
+          if (h.smashed && Math.random() < 0.3) {
+            const rand = Math.random();
+            let type: "pink" | "red" | "gold" | "cat" | "bomb";
+            if (rand < 0.50) type = "pink";
+            else if (rand < 0.75) type = "red";
+            else if (rand < 0.85) type = "gold";
+            else if (rand < 0.92) type = "cat";
+            else type = "bomb";
+            return { ...h, type, smashed: false, shaking: false };
+          }
+          return h;
+        });
+      });
+    }, 2000);
+    return () => clearInterval(interval);
   }, [phase]);
 
-  const smashHeart = useCallback((id: number, type: "heart" | "cat") => {
-    if (type === "cat") {
-      setScore(s => Math.max(0, s - 20));
-      setCatReaction("OW! That's ME! 😾");
-    } else {
-      setScore(s => {
-        scoreRef.current = s + 10;
-        return s + 10;
-      });
-      setCatReaction(CAT_CRIES_SMASH[Math.floor(Math.random() * CAT_CRIES_SMASH.length)]);
-    }
-    setTimeout(() => setCatReaction(""), 800);
-    setHearts(prev => prev.map(h => h.id === id ? { ...h, hit: true } : h));
-    setTimeout(() => setHearts(prev => prev.filter(h => h.id !== id)), 200);
+  // Update cat emotion based on score
+  useEffect(() => {
+    if (score >= 150) setCatEmotion("shocked");
+    else if (score >= 100) setCatEmotion("sad");
+    else if (score >= 50) setCatEmotion("angry");
+    else setCatEmotion("happy");
+  }, [score]);
+
+  // Create smash particles
+  const createParticles = useCallback((x: number, y: number, type: string) => {
+    const emojis = type === "gold" ? ["⭐", "✨", "💫", "🌟"] :
+                   type === "bomb" ? ["💥", "🔥", "💨", "⚡"] :
+                   ["💔", "💢", "✨", "❌"];
+    const colors = type === "gold" ? "text-yellow-400" :
+                   type === "bomb" ? "text-orange-500" : "text-pink-400";
+
+    const newParticles = Array.from({ length: 8 }).map((_, i) => ({
+      id: Date.now() + i,
+      x: x + (Math.random() - 0.5) * 60,
+      y: y + (Math.random() - 0.5) * 60,
+      emoji: emojis[Math.floor(Math.random() * emojis.length)],
+      color: colors,
+    }));
+
+    setParticles(prev => [...prev.slice(-20), ...newParticles]);
+    setTimeout(() => {
+      setParticles(prev => prev.filter(p => !newParticles.find(np => np.id === p.id)));
+    }, 600);
   }, []);
 
+  const smashHeart = useCallback((heart: typeof hearts[0], event: React.MouseEvent | React.TouchEvent) => {
+    if (heart.smashed || gameEndedRef.current) return;
+
+    const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
+    const x = rect.left + rect.width / 2;
+    const y = rect.top + rect.height / 2;
+
+    if (heart.type === "cat") {
+      // Hit the cat - bad!
+      setScore(s => Math.max(0, s - 30));
+      setCombo(0);
+      setScreenShake(true);
+      setTimeout(() => setScreenShake(false), 300);
+      setCatReaction("OW! That's ME! 😾💢");
+      setTimeout(() => setCatReaction(""), 1200);
+      // Make cat shake instead of disappear
+      setHearts(prev => prev.map(h => h.id === heart.id ? { ...h, shaking: true } : h));
+      setTimeout(() => {
+        setHearts(prev => prev.map(h => h.id === heart.id ? { ...h, shaking: false } : h));
+      }, 500);
+    } else if (heart.type === "bomb") {
+      // Bomb - clears entire row!
+      setScreenShake(true);
+      setTimeout(() => setScreenShake(false), 200);
+      createParticles(x, y, "bomb");
+
+      const rowHearts = hearts.filter(h => h.row === heart.row && !h.smashed && h.type !== "cat");
+      let bonusScore = 0;
+      rowHearts.forEach(h => {
+        if (h.type === "pink") bonusScore += 10;
+        else if (h.type === "red") bonusScore += 15;
+        else if (h.type === "gold") bonusScore += 25;
+        else if (h.type === "bomb") bonusScore += 5;
+      });
+
+      setScore(s => s + bonusScore + 20);
+      setCombo(c => {
+        const newCombo = c + rowHearts.length;
+        setMaxCombo(m => Math.max(m, newCombo));
+        return newCombo;
+      });
+      setCatReaction(`BOOM! ${rowHearts.length} hearts! 💥🙀`);
+      setTimeout(() => setCatReaction(""), 1000);
+
+      setHearts(prev => prev.map(h =>
+        h.row === heart.row && h.type !== "cat" ? { ...h, smashed: true } : h
+      ));
+    } else {
+      // Regular heart smash
+      const points = heart.type === "gold" ? 25 : heart.type === "red" ? 15 : 10;
+      const comboBonus = Math.floor(combo / 3) * 5;
+
+      setScore(s => s + points + comboBonus);
+      setCombo(c => {
+        const newCombo = c + 1;
+        setMaxCombo(m => Math.max(m, newCombo));
+        return newCombo;
+      });
+
+      createParticles(x, y, heart.type);
+
+      if (heart.type === "gold") {
+        setCatReaction("NOT MY GOLDEN HEART! 😭✨");
+      } else {
+        setCatReaction(CAT_CRIES_SMASH[Math.floor(Math.random() * CAT_CRIES_SMASH.length)]);
+      }
+      setTimeout(() => setCatReaction(""), 800);
+
+      setHearts(prev => prev.map(h => h.id === heart.id ? { ...h, smashed: true } : h));
+    }
+  }, [combo, hearts, createParticles]);
+
+  // Tutorial screen
   if (phase === "tutorial") {
     return (
-      <div className="fixed inset-0 bg-gradient-to-b from-red-600 to-rose-800 flex flex-col items-center justify-center p-6">
-        <div className="bg-white/95 rounded-3xl p-8 max-w-sm text-center shadow-2xl">
-          <div className="text-6xl mb-4">💔</div>
-          <h2 className="text-2xl font-bold text-red-800 mb-3">Smash the Hearts!</h2>
-          <p className="text-red-600 mb-4">
-            The cat decorated everything with 💕!<br/>
-            <span className="font-bold">Destroy them to reject the love!</span>
+      <div className="fixed inset-0 bg-gradient-to-b from-rose-600 via-red-600 to-pink-700 flex flex-col items-center justify-center p-4 overflow-hidden">
+        {/* Background hearts */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none opacity-20">
+          {Array.from({ length: 15 }).map((_, i) => (
+            <motion.div
+              key={i}
+              className="absolute text-4xl"
+              initial={{ scale: 0, rotate: 0 }}
+              animate={{ scale: [0, 1, 0], rotate: 360 }}
+              transition={{ duration: 3, repeat: Infinity, delay: i * 0.3 }}
+              style={{ left: `${10 + (i % 5) * 20}%`, top: `${10 + Math.floor(i / 5) * 30}%` }}
+            >
+              💕
+            </motion.div>
+          ))}
+        </div>
+
+        <motion.div
+          initial={{ scale: 0.8, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          className="bg-white/95 backdrop-blur-xl rounded-3xl p-6 max-w-sm text-center shadow-2xl relative z-10"
+        >
+          <motion.div
+            className="text-7xl mb-4"
+            animate={{ scale: [1, 1.2, 1], rotate: [0, -10, 10, 0] }}
+            transition={{ duration: 1.5, repeat: Infinity }}
+          >
+            💔
+          </motion.div>
+          <h2 className="text-3xl font-bold bg-gradient-to-r from-red-600 to-pink-600 bg-clip-text text-transparent mb-3">
+            Smash the Hearts!
+          </h2>
+          <p className="text-slate-600 mb-4">
+            The cat covered everything with hearts!<br/>
+            <span className="font-bold text-red-500">TAP to SMASH them!</span>
           </p>
-          <div className="flex justify-center gap-4 my-4">
-            <div className="text-center">
-              <div className="text-4xl">💕</div>
-              <div className="text-xs text-green-600 font-bold">SMASH! +10</div>
+
+          <div className="grid grid-cols-5 gap-2 my-4 text-center">
+            <div className="bg-pink-50 rounded-xl p-2">
+              <div className="text-2xl">💕</div>
+              <div className="text-[10px] text-pink-600 font-bold">+10</div>
             </div>
-            <div className="text-center">
-              <div className="text-4xl">😺</div>
-              <div className="text-xs text-red-600 font-bold">DON'T HIT! -20</div>
+            <div className="bg-red-50 rounded-xl p-2">
+              <div className="text-2xl">❤️</div>
+              <div className="text-[10px] text-red-600 font-bold">+15</div>
+            </div>
+            <div className="bg-yellow-50 rounded-xl p-2">
+              <div className="text-2xl">💛</div>
+              <div className="text-[10px] text-amber-600 font-bold">+25</div>
+            </div>
+            <div className="bg-orange-50 rounded-xl p-2">
+              <div className="text-2xl">💣</div>
+              <div className="text-[10px] text-orange-600 font-bold">ROW!</div>
+            </div>
+            <div className="bg-slate-50 rounded-xl p-2">
+              <div className="text-2xl">😺</div>
+              <div className="text-[10px] text-slate-600 font-bold">-30!</div>
             </div>
           </div>
-          <p className="text-red-500 text-sm mb-6">The cat will cry but STAY STRONG! 💪</p>
-          <button
-            onClick={startGame}
-            className="w-full py-4 bg-gradient-to-r from-red-500 to-rose-500 text-white rounded-2xl font-bold text-xl shadow-lg active:scale-95 transition-transform"
+
+          <div className="bg-gradient-to-r from-amber-50 to-orange-50 rounded-xl p-3 mb-4">
+            <p className="text-amber-700 text-sm font-medium">
+              🔥 Build combos for bonus points!
+            </p>
+          </div>
+
+          <motion.button
+            onClick={startCountdown}
+            className="w-full py-4 bg-gradient-to-r from-red-500 via-rose-500 to-pink-500 text-white rounded-2xl font-bold text-xl shadow-xl"
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
           >
-            Destroy the Love! 💔
-          </button>
-        </div>
+            <motion.span
+              animate={{ scale: [1, 1.1, 1] }}
+              transition={{ duration: 0.5, repeat: Infinity }}
+            >
+              Start Smashing! 👊
+            </motion.span>
+          </motion.button>
+        </motion.div>
       </div>
     );
   }
 
-  if (phase === "done") {
-    const won = score >= 50;
+  // Countdown
+  if (phase === "countdown") {
     return (
-      <div className="fixed inset-0 bg-gradient-to-b from-red-600 to-rose-800 flex flex-col items-center justify-center p-6">
-        <div className="bg-white/95 rounded-3xl p-8 max-w-sm text-center shadow-2xl">
-          <div className="text-6xl mb-4">{won ? "💔" : "😿"}</div>
-          <h2 className="text-3xl font-bold text-red-800 mb-2">
+      <div className="fixed inset-0 bg-gradient-to-b from-rose-600 via-red-600 to-pink-700 flex items-center justify-center">
+        <motion.div
+          key={countdownNum}
+          initial={{ scale: 0, rotate: -180 }}
+          animate={{ scale: 1, rotate: 0 }}
+          transition={{ type: "spring", stiffness: 300 }}
+          className="text-[150px] font-black text-white drop-shadow-2xl"
+        >
+          {countdownNum || "SMASH!"}
+        </motion.div>
+      </div>
+    );
+  }
+
+  // Done screen
+  if (phase === "done") {
+    const won = score >= 80;
+    const smashedCount = hearts.filter(h => h.smashed).length;
+
+    return (
+      <div className="fixed inset-0 bg-gradient-to-b from-rose-600 via-red-600 to-pink-700 flex flex-col items-center justify-center p-4">
+        <motion.div
+          initial={{ scale: 0, rotate: -20 }}
+          animate={{ scale: 1, rotate: 0 }}
+          className="bg-white/95 backdrop-blur-xl rounded-3xl p-8 max-w-sm text-center shadow-2xl"
+        >
+          <motion.div
+            className="text-8xl mb-4"
+            animate={won ? { rotate: [0, -15, 15, 0] } : { y: [0, -10, 0] }}
+            transition={{ duration: 1, repeat: Infinity }}
+          >
+            {won ? "💔" : "😿"}
+          </motion.div>
+          <h2 className="text-3xl font-bold bg-gradient-to-r from-red-600 to-pink-600 bg-clip-text text-transparent mb-3">
             {won ? "Hearts Destroyed!" : "Cat Protected Them!"}
           </h2>
-          <p className="text-4xl font-bold text-red-600 mb-2">{score} pts</p>
-          <p className="text-red-500 italic mb-4">
+
+          <div className="grid grid-cols-2 gap-3 mb-4">
+            <div className="bg-red-50 rounded-2xl p-3">
+              <p className="text-3xl font-black text-red-600">{score}</p>
+              <p className="text-red-400 text-xs">points</p>
+            </div>
+            <div className="bg-orange-50 rounded-2xl p-3">
+              <p className="text-3xl font-black text-orange-600">x{maxCombo}</p>
+              <p className="text-orange-400 text-xs">max combo</p>
+            </div>
+          </div>
+
+          <div className="bg-pink-50 rounded-xl p-3 mb-4">
+            <p className="text-pink-600 text-sm">
+              💔 {smashedCount} hearts smashed
+            </p>
+          </div>
+
+          <motion.p
+            className="text-slate-600 italic"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.5 }}
+          >
             {won ? '"My beautiful decorations... 😿"' : '"Ha! You missed! 😹"'}
-          </p>
-          <p className="text-red-400">Next challenge...</p>
-        </div>
+          </motion.p>
+          <motion.p
+            className="text-red-400 mt-4 text-sm"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 1 }}
+          >
+            Loading next challenge...
+          </motion.p>
+        </motion.div>
       </div>
     );
   }
 
+  // Main game screen
   return (
-    <div className="fixed inset-0 bg-gradient-to-b from-red-600 to-rose-800 overflow-hidden select-none">
-      {/* Header */}
-      <div className="absolute top-4 left-0 right-0 flex justify-center gap-4 z-10">
-        <div className="bg-white/90 rounded-full px-4 py-2 shadow-lg">
-          <span className="text-lg font-bold text-red-600">{score} pts</span>
-        </div>
-        <div className="bg-white/90 rounded-full px-4 py-2 shadow-lg">
-          <span className="text-lg font-bold text-red-600">{timeLeft}s</span>
-        </div>
+    <motion.div
+      className="fixed inset-0 bg-gradient-to-b from-rose-600 via-red-600 to-pink-700 overflow-hidden select-none"
+      animate={screenShake ? { x: [0, -8, 8, -8, 8, 0] } : {}}
+      transition={{ duration: 0.3 }}
+    >
+      {/* Background pattern */}
+      <div className="absolute inset-0 opacity-10">
+        <div className="absolute inset-0" style={{
+          backgroundImage: "radial-gradient(circle, white 1px, transparent 1px)",
+          backgroundSize: "30px 30px",
+        }} />
       </div>
 
-      {/* Cat reaction */}
-      {catReaction && (
-        <div className="absolute top-20 left-1/2 -translate-x-1/2 z-20">
-          <div className="bg-white text-red-600 px-4 py-2 rounded-full font-bold shadow-lg">
-            {catReaction}
-          </div>
-        </div>
-      )}
+      {/* Header */}
+      <div className="absolute top-4 left-0 right-0 flex justify-center gap-3 z-20 px-4">
+        <motion.div
+          className="bg-white/95 backdrop-blur rounded-2xl px-5 py-3 shadow-xl flex items-center gap-2"
+          animate={score > 0 ? { scale: [1, 1.05, 1] } : {}}
+        >
+          <span className="text-2xl">💯</span>
+          <span className="text-xl font-black text-red-600">{score}</span>
+        </motion.div>
+        <motion.div
+          className={cn(
+            "backdrop-blur rounded-2xl px-5 py-3 shadow-xl flex items-center gap-2",
+            timeLeft <= 5 ? "bg-red-100/95" : "bg-white/95"
+          )}
+          animate={timeLeft <= 5 ? { scale: [1, 1.05, 1] } : {}}
+          transition={{ duration: 0.5, repeat: timeLeft <= 5 ? Infinity : 0 }}
+        >
+          <span className="text-2xl">⏱️</span>
+          <span className={cn("text-xl font-black", timeLeft <= 5 ? "text-red-600" : "text-pink-600")}>
+            {timeLeft}s
+          </span>
+        </motion.div>
+        {combo >= 3 && (
+          <motion.div
+            initial={{ scale: 0, rotate: -20 }}
+            animate={{ scale: 1, rotate: 0 }}
+            className="bg-gradient-to-r from-orange-400 to-red-500 rounded-2xl px-4 py-3 shadow-xl"
+          >
+            <span className="text-xl font-black text-white">x{combo} 🔥</span>
+          </motion.div>
+        )}
+      </div>
 
-      {/* Skip */}
+      {/* Cat with reactions */}
+      <motion.div
+        className="absolute top-20 left-1/2 -translate-x-1/2 text-center z-20"
+        animate={{ y: [0, -3, 0] }}
+        transition={{ duration: 1.5, repeat: Infinity }}
+      >
+        <motion.div
+          className="text-5xl mb-1"
+          animate={catEmotion === "shocked" ? { scale: [1, 1.3, 1], rotate: [0, -10, 10, 0] } : {}}
+          transition={{ duration: 0.3, repeat: catEmotion === "shocked" ? Infinity : 0 }}
+        >
+          {catEmotion === "happy" ? "😼" : catEmotion === "angry" ? "😾" : catEmotion === "sad" ? "😿" : "🙀"}
+        </motion.div>
+        <AnimatePresence>
+          {catReaction && (
+            <motion.div
+              initial={{ scale: 0, y: 10 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0, y: -10 }}
+              className="bg-white/95 text-red-600 px-4 py-2 rounded-full font-bold shadow-xl text-sm whitespace-nowrap"
+            >
+              {catReaction}
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </motion.div>
+
+      {/* Skip button */}
       <button
         onClick={() => {
           if (!gameEndedRef.current) {
@@ -1132,37 +1438,102 @@ const SmashTheHeartsGame = memo(function SmashTheHeartsGame({ onComplete }: { on
             onComplete(score);
           }
         }}
-        className="absolute top-4 right-4 bg-white/50 rounded-full px-3 py-1 text-red-200 text-sm z-10"
+        className="absolute top-4 right-4 bg-white/30 backdrop-blur rounded-full px-4 py-2 text-white/80 text-sm z-20"
       >
         Skip →
       </button>
 
-      {/* Hearts - GPU accelerated */}
-      {hearts.map(h => (
-        <button
-          key={h.id}
-          onClick={() => !h.hit && smashHeart(h.id, h.type)}
-          className={cn(
-            "absolute",
-            h.hit && "scale-0 rotate-45 transition-transform duration-100"
-          )}
-          style={{
-            left: `${h.x}%`,
-            top: `${h.y}%`,
-            transform: "translate(-50%, -50%)",
-            fontSize: `${h.scale * 4}rem`,
-            willChange: "top, transform",
-          }}
-        >
-          {h.type === "heart" ? "💕" : "😺"}
-        </button>
-      ))}
+      {/* Smash particles */}
+      <AnimatePresence>
+        {particles.map(p => (
+          <motion.div
+            key={p.id}
+            initial={{ scale: 1, opacity: 1 }}
+            animate={{ scale: 0, opacity: 0, y: -50 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.6 }}
+            className={cn("absolute text-2xl pointer-events-none z-30", p.color)}
+            style={{ left: p.x, top: p.y }}
+          >
+            {p.emoji}
+          </motion.div>
+        ))}
+      </AnimatePresence>
 
-      {/* Instruction */}
-      <div className="absolute bottom-8 left-0 right-0 text-center">
-        <p className="text-white/80 text-lg font-medium">👆 Tap 💕 to smash! Don't hit 😺!</p>
+      {/* Hearts grid */}
+      <div className="absolute inset-0 flex items-center justify-center pt-32 pb-20">
+        <div className="grid grid-cols-5 gap-3 p-4">
+          {hearts.map(heart => (
+            <motion.button
+              key={heart.id}
+              onClick={(e) => smashHeart(heart, e)}
+              disabled={heart.smashed}
+              className={cn(
+                "w-14 h-14 sm:w-16 sm:h-16 rounded-2xl flex items-center justify-center text-4xl sm:text-5xl transition-all",
+                heart.smashed ? "opacity-0 scale-0" : "shadow-lg active:scale-90",
+                heart.type === "pink" && !heart.smashed && "bg-pink-100/80 hover:bg-pink-200/80",
+                heart.type === "red" && !heart.smashed && "bg-red-100/80 hover:bg-red-200/80",
+                heart.type === "gold" && !heart.smashed && "bg-yellow-100/80 hover:bg-yellow-200/80",
+                heart.type === "cat" && !heart.smashed && "bg-slate-100/80 hover:bg-slate-200/80",
+                heart.type === "bomb" && !heart.smashed && "bg-orange-100/80 hover:bg-orange-200/80",
+              )}
+              initial={{ scale: 0, rotate: -180 }}
+              animate={{
+                scale: heart.smashed ? 0 : 1,
+                rotate: heart.shaking ? [0, -15, 15, -15, 15, 0] : 0,
+                y: heart.smashed ? -20 : 0,
+              }}
+              transition={{
+                type: "spring",
+                stiffness: 300,
+                damping: 20,
+                rotate: { duration: 0.4 },
+              }}
+              whileHover={{ scale: heart.smashed ? 0 : 1.1 }}
+              whileTap={{ scale: heart.smashed ? 0 : 0.8 }}
+            >
+              {heart.type === "pink" && "💕"}
+              {heart.type === "red" && "❤️"}
+              {heart.type === "gold" && (
+                <motion.span
+                  animate={{ rotate: [0, 10, -10, 0] }}
+                  transition={{ duration: 1, repeat: Infinity }}
+                >
+                  💛
+                </motion.span>
+              )}
+              {heart.type === "cat" && "😺"}
+              {heart.type === "bomb" && (
+                <motion.span
+                  animate={{ scale: [1, 1.15, 1] }}
+                  transition={{ duration: 0.5, repeat: Infinity }}
+                >
+                  💣
+                </motion.span>
+              )}
+            </motion.button>
+          ))}
+        </div>
       </div>
-    </div>
+
+      {/* Progress / Instructions */}
+      <div className="absolute bottom-6 left-4 right-4 z-10">
+        <div className="bg-white/20 backdrop-blur rounded-2xl p-3 text-center">
+          <p className="text-white font-medium">
+            👆 Tap hearts to smash! Avoid the cat! 😺
+          </p>
+          {combo >= 2 && (
+            <motion.p
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="text-yellow-200 text-sm mt-1"
+            >
+              🔥 {combo} combo! +{Math.floor(combo / 3) * 5} bonus per hit!
+            </motion.p>
+          )}
+        </div>
+      </div>
+    </motion.div>
   );
 });
 
