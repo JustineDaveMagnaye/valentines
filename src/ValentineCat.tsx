@@ -614,15 +614,15 @@ const CatchTheNoGame = memo(function CatchTheNoGame({ onComplete }: { onComplete
               key={i}
               className="absolute text-3xl"
               style={{
-                left: `${(i % 8) * 12.5 + Math.random() * 5}%`,
-                opacity: 0.15 + Math.random() * 0.15,
+                left: `${(i % 8) * 12.5 + (i % 5)}%`,
+                opacity: 0.15 + (i % 3) * 0.05,
               }}
               initial={{ y: "-10%", rotate: 0 }}
               animate={{ y: "110%", rotate: 360 }}
               transition={{
-                duration: 6 + Math.random() * 4,
+                duration: 6 + (i % 4),
                 repeat: Infinity,
-                delay: Math.random() * 3,
+                delay: i * 0.3,
                 ease: "linear"
               }}
             >
@@ -823,7 +823,7 @@ const CatchTheNoGame = memo(function CatchTheNoGame({ onComplete }: { onComplete
               style={{ left: `${10 + (i * 7)}%`, bottom: "-10%" }}
               animate={{ y: "-120vh", rotate: 360 }}
               transition={{
-                duration: 2 + Math.random(),
+                duration: 2 + (i % 3) * 0.5,
                 repeat: Infinity,
                 delay: i * 0.2,
                 ease: "linear"
@@ -853,7 +853,7 @@ const CatchTheNoGame = memo(function CatchTheNoGame({ onComplete }: { onComplete
                 initial={{ y: 0, opacity: 1 }}
                 animate={{ y: "120vh", opacity: 0.5, rotate: 360 }}
                 transition={{
-                  duration: 3 + Math.random() * 2,
+                  duration: 3 + (i % 4) * 0.5,
                   repeat: Infinity,
                   delay: i * 0.15,
                 }}
@@ -1493,7 +1493,7 @@ const SmashTheHeartsGame = memo(function SmashTheHeartsGame({ onComplete }: { on
               style={{ left: `${(i * 5) % 100}%`, bottom: "-10%" }}
               animate={{ y: "-120vh", rotate: 360, scale: [1, 1.2, 1] }}
               transition={{
-                duration: 6 + Math.random() * 3,
+                duration: 6 + (i % 3),
                 repeat: Infinity,
                 delay: i * 0.3,
                 ease: "linear"
@@ -1661,7 +1661,7 @@ const SmashTheHeartsGame = memo(function SmashTheHeartsGame({ onComplete }: { on
               style={{ left: `${10 + (i * 7)}%`, bottom: "-10%" }}
               animate={{ y: "-120vh", rotate: 360 }}
               transition={{
-                duration: 2 + Math.random(),
+                duration: 2 + (i % 3) * 0.5,
                 repeat: Infinity,
                 delay: i * 0.15,
                 ease: "linear"
@@ -1713,7 +1713,7 @@ const SmashTheHeartsGame = memo(function SmashTheHeartsGame({ onComplete }: { on
                 initial={{ y: 0, opacity: 1 }}
                 animate={{ y: "120vh", opacity: 0.5, rotate: 360 }}
                 transition={{
-                  duration: 3 + Math.random() * 2,
+                  duration: 3 + (i % 4) * 0.5,
                   repeat: Infinity,
                   delay: i * 0.15,
                 }}
@@ -2603,7 +2603,7 @@ const DodgeTheLoveGame = memo(function DodgeTheLoveGame({ onComplete }: { onComp
                 opacity: [0.2, 0.9, 0.2],
                 scale: i % 5 === 0 ? [1, 1.8, 1] : [1, 1.3, 1]
               }}
-              transition={{ duration: 2 + Math.random() * 2, repeat: Infinity, delay: Math.random() * 2 }}
+              transition={{ duration: 2 + (i % 4) * 0.5, repeat: Infinity, delay: (i % 5) * 0.4 }}
             />
           ))}
         </div>
@@ -2617,7 +2617,7 @@ const DodgeTheLoveGame = memo(function DodgeTheLoveGame({ onComplete }: { onComp
               style={{ left: `${10 + (i * 10)}%`, top: "-10%" }}
               animate={{ y: "120vh", rotate: 360 }}
               transition={{
-                duration: 5 + Math.random() * 3,
+                duration: 5 + (i % 4) * 0.75,
                 repeat: Infinity,
                 delay: i * 0.5,
                 ease: "linear"
@@ -2861,7 +2861,7 @@ const DodgeTheLoveGame = memo(function DodgeTheLoveGame({ onComplete }: { onComp
                 rotate: survived ? 360 : [0, 10, -10, 0],
               }}
               transition={{
-                duration: survived ? (3 + Math.random() * 2) : 3,
+                duration: survived ? (3 + (i % 4) * 0.5) : 3,
                 repeat: Infinity,
                 delay: i * 0.1,
               }}
@@ -3608,8 +3608,11 @@ const RejectLettersGame = memo(function RejectLettersGame({ onComplete }: { onCo
 
   // Destruction animation state
   const [destruction, setDestruction] = useState<{
-    type: "burn" | "rip" | null;
+    type: "burn" | "rip" | "shred" | "crumple" | "dissolve" | "freeze" | "blackhole" | null;
     progress: number;
+    shredLines?: number[];
+    crumpleAngle?: number;
+    freezeCracks?: Array<{ x: number; y: number; angle: number }>;
   }>({ type: null, progress: 0 });
 
   // Particles
@@ -3619,11 +3622,14 @@ const RejectLettersGame = memo(function RejectLettersGame({ onComplete }: { onCo
     y: number;
     vx: number;
     vy: number;
-    type: "fire" | "ash" | "paper" | "ember" | "sparkle";
+    type: "fire" | "ash" | "paper" | "ember" | "sparkle" | "shred" | "ice" | "bubble" | "void" | "confetti";
     life: number;
     size: number;
     color: string;
     rotation: number;
+    width?: number;
+    height?: number;
+    text?: string;
   }>>([]);
 
   // Score popups
@@ -3646,9 +3652,10 @@ const RejectLettersGame = memo(function RejectLettersGame({ onComplete }: { onCo
   const spawnParticles = useCallback((
     x: number,
     y: number,
-    type: "fire" | "ash" | "paper" | "ember" | "sparkle",
+    type: "fire" | "ash" | "paper" | "ember" | "sparkle" | "shred" | "ice" | "bubble" | "void" | "confetti",
     count: number,
-    spread: number = 1
+    spread: number = 1,
+    extras?: { width?: number; height?: number; text?: string }
   ) => {
     const colors: Record<string, string[]> = {
       fire: ["#ff4500", "#ff6b35", "#ffa500", "#ffcc00", "#ff0000"],
@@ -3656,19 +3663,46 @@ const RejectLettersGame = memo(function RejectLettersGame({ onComplete }: { onCo
       paper: ["#fff5f5", "#ffe4e6", "#fecdd3", "#fda4af", "#ffffff"],
       ember: ["#ff4500", "#ff6b00", "#ffcc00"],
       sparkle: ["#ffd700", "#ffec8b", "#fff8dc"],
+      shred: ["#fff5f5", "#ffe4e6", "#fecdd3", "#fff0f3", "#ffffff", "#fdf2f8"],
+      ice: ["#a5f3fc", "#67e8f9", "#22d3ee", "#e0f2fe", "#bae6fd", "#7dd3fc"],
+      bubble: ["#a855f7", "#c084fc", "#d8b4fe", "#9333ea", "#7c3aed"],
+      void: ["#1e1b4b", "#312e81", "#3730a3", "#000000", "#0f0f23"],
+      confetti: ["#ff6b6b", "#4ecdc4", "#ffe66d", "#95e1d3", "#f38181", "#aa96da", "#fcbad3"],
     };
-    const newParticles = Array.from({ length: count }, (_, i) => ({
-      id: performance.now() + i + Math.random() * 1000,
-      x, y,
-      vx: (Math.random() - 0.5) * 10 * spread,
-      vy: type === "fire" || type === "ember" ? -Math.random() * 8 - 2 : (Math.random() - 0.5) * 10 * spread,
-      type,
-      life: 1,
-      size: type === "fire" ? 8 + Math.random() * 8 : type === "paper" ? 6 + Math.random() * 10 : 4 + Math.random() * 4,
-      color: colors[type][Math.floor(Math.random() * colors[type].length)],
-      rotation: Math.random() * 360,
-    }));
-    setParticles(prev => [...prev.slice(-80), ...newParticles]);
+    const newParticles = Array.from({ length: count }, (_, i) => {
+      const isShred = type === "shred";
+      const isIce = type === "ice";
+      const isVoid = type === "void";
+      return {
+        id: performance.now() + i + Math.random() * 1000,
+        x: x + (Math.random() - 0.5) * 10,
+        y: y + (Math.random() - 0.5) * 10,
+        vx: isVoid ? (50 - x) * 0.1 + (Math.random() - 0.5) * 2 : (Math.random() - 0.5) * 10 * spread,
+        vy: type === "fire" || type === "ember"
+          ? -Math.random() * 8 - 2
+          : isShred
+            ? Math.random() * 3 + 2
+            : isIce
+              ? (Math.random() - 0.5) * 15
+              : isVoid
+                ? (50 - y) * 0.1 + (Math.random() - 0.5) * 2
+                : (Math.random() - 0.5) * 10 * spread,
+        type,
+        life: 1,
+        size: type === "fire" ? 8 + Math.random() * 8
+          : type === "paper" ? 6 + Math.random() * 10
+          : isShred ? 3 + Math.random() * 2
+          : isIce ? 6 + Math.random() * 10
+          : isVoid ? 4 + Math.random() * 6
+          : 4 + Math.random() * 4,
+        color: colors[type][Math.floor(Math.random() * colors[type].length)],
+        rotation: Math.random() * 360,
+        width: isShred ? (extras?.width || 4 + Math.random() * 8) : undefined,
+        height: isShred ? (extras?.height || 20 + Math.random() * 30) : undefined,
+        text: extras?.text,
+      };
+    });
+    setParticles(prev => [...prev.slice(-120), ...newParticles]);
   }, []);
 
   // Spawn score popup
@@ -3846,46 +3880,61 @@ const RejectLettersGame = memo(function RejectLettersGame({ onComplete }: { onCo
     }, 30);
   }, [openLetter, destruction.type, spawnParticles, spawnScorePopup]);
 
-  // Destroy letter with rip
+  // Destroy letter with rip - enhanced with tiny pieces flying
   const handleRip = useCallback(() => {
     if (!openLetter || destruction.type) return;
 
     setDestruction({ type: "rip", progress: 0 });
 
-    // Animate rip progress
+    // Animate rip progress with more dramatic tearing
     let progress = 0;
+    let ripPhase = 0;
     const ripInterval = setInterval(() => {
-      progress += 0.08;
+      progress += 0.04;
+      ripPhase++;
       setDestruction({ type: "rip", progress });
 
-      // Spawn paper particles during rip
+      // Spawn tiny paper pieces continuously as it rips
       if (progress < 1) {
-        spawnParticles(50, 50, "paper", 2, 0.8);
+        // Create tearing effect - pieces fly from the rip line
+        const ripX = 50 + (progress - 0.5) * 30;
+        for (let i = 0; i < 3; i++) {
+          spawnParticles(ripX + (Math.random() - 0.5) * 20, 40 + Math.random() * 20, "paper", 1, 1.2);
+        }
+        // Additional tiny confetti pieces
+        if (ripPhase % 2 === 0) {
+          spawnParticles(50 + (Math.random() - 0.5) * 40, 50, "confetti", 2, 0.8);
+        }
       }
 
       if (progress >= 1) {
         clearInterval(ripInterval);
 
         // Calculate score
-        const basePoints = openLetter.isGold ? 25 : 10;
+        const basePoints = openLetter.isGold ? 25 : 12;
         const total = basePoints;
 
         setScore(s => s + total);
         setLettersDestroyed(d => d + 1);
         setRipCount(r => r + 1);
 
-        // Paper explosion
-        spawnParticles(50, 50, "paper", 25, 2);
+        // Massive paper explosion - LOTS of tiny pieces
+        for (let wave = 0; wave < 4; wave++) {
+          setTimeout(() => {
+            spawnParticles(40 + wave * 8, 45, "paper", 10, 2.5);
+            spawnParticles(50, 50, "confetti", 5, 2);
+          }, wave * 50);
+        }
         if (openLetter.isGold) {
-          spawnParticles(50, 50, "sparkle", 10, 1.5);
+          spawnParticles(50, 50, "sparkle", 15, 2);
         }
 
-        spawnScorePopup(50, 40, total, "📄 RIPPED!");
+        spawnScorePopup(50, 40, total, "✂️ TORN APART!");
 
-        setScreenShake(5);
-        setTimeout(() => setScreenShake(0), 200);
+        setScreenShake(8);
+        setTimeout(() => setScreenShake(0), 300);
 
-        setCatMessage(pick(["MY LETTER! 😿", "In PIECES! 💔", "You tore it up! 😭", "How could you?! 🙀"]));
+        setCatMessage(pick(["MY LETTER! 😿", "In PIECES! 💔", "TORN TO SHREDS! 😭", "How could you?! 🙀"]));
         setTimeout(() => setCatMessage(""), 1500);
 
         // Reset
@@ -3893,7 +3942,292 @@ const RejectLettersGame = memo(function RejectLettersGame({ onComplete }: { onCo
           setOpenLetter(null);
           setDestruction({ type: null, progress: 0 });
           setPhase("playing");
-        }, 300);
+        }, 400);
+      }
+    }, 20);
+  }, [openLetter, destruction.type, spawnParticles, spawnScorePopup]);
+
+  // Destroy letter with SHRED - realistic paper shredder effect
+  const handleShred = useCallback(() => {
+    if (!openLetter || destruction.type) return;
+
+    // Generate shred line positions
+    const shredLines = Array.from({ length: 12 }, (_, i) => 8 + i * 7 + (i % 2) * 2);
+    setDestruction({ type: "shred", progress: 0, shredLines });
+
+    let progress = 0;
+    const shredInterval = setInterval(() => {
+      progress += 0.02;
+      setDestruction(prev => ({ ...prev, progress }));
+
+      // Spawn thin paper strips falling continuously
+      if (progress < 1 && progress > 0.1) {
+        const stripX = 30 + Math.random() * 40;
+        for (let i = 0; i < 3; i++) {
+          spawnParticles(stripX + i * 5, 55 + progress * 20, "shred", 1, 0.3, {
+            width: 3 + Math.random() * 4,
+            height: 15 + Math.random() * 25
+          });
+        }
+      }
+
+      if (progress >= 1) {
+        clearInterval(shredInterval);
+
+        const basePoints = openLetter.isGold ? 35 : 20;
+        const bonus = 15;
+        const total = basePoints + bonus;
+
+        setScore(s => s + total);
+        setLettersDestroyed(d => d + 1);
+
+        // Massive shred explosion - tons of tiny strips
+        for (let i = 0; i < 8; i++) {
+          setTimeout(() => {
+            spawnParticles(35 + i * 4, 50, "shred", 8, 1.5, {
+              width: 2 + Math.random() * 3,
+              height: 12 + Math.random() * 20
+            });
+          }, i * 30);
+        }
+        spawnParticles(50, 50, "confetti", 15, 2);
+
+        spawnScorePopup(50, 40, total, "📄 SHREDDED!");
+
+        setScreenShake(10);
+        setTimeout(() => setScreenShake(0), 400);
+
+        setCatMessage(pick(["INTO CONFETTI! 😭", "MY POETRY! 🙀", "So many pieces! 😿", "You monster! 😾"]));
+        setTimeout(() => setCatMessage(""), 1500);
+
+        setTimeout(() => {
+          setOpenLetter(null);
+          setDestruction({ type: null, progress: 0 });
+          setPhase("playing");
+        }, 500);
+      }
+    }, 25);
+  }, [openLetter, destruction.type, spawnParticles, spawnScorePopup]);
+
+  // Destroy letter with CRUMPLE - ball it up and toss
+  const handleCrumple = useCallback(() => {
+    if (!openLetter || destruction.type) return;
+
+    const crumpleAngle = (Math.random() - 0.5) * 60;
+    setDestruction({ type: "crumple", progress: 0, crumpleAngle });
+
+    let progress = 0;
+    const crumpleInterval = setInterval(() => {
+      progress += 0.025;
+      setDestruction(prev => ({ ...prev, progress }));
+
+      // Paper crinkle particles during crumple
+      if (progress < 0.6 && progress > 0.1) {
+        spawnParticles(50 + (Math.random() - 0.5) * 20, 50, "paper", 2, 0.5);
+      }
+
+      if (progress >= 1) {
+        clearInterval(crumpleInterval);
+
+        const basePoints = openLetter.isGold ? 30 : 18;
+        const total = basePoints;
+
+        setScore(s => s + total);
+        setLettersDestroyed(d => d + 1);
+
+        // Paper ball bounces away with trail
+        spawnParticles(50, 70, "paper", 20, 2.5);
+        spawnParticles(50, 50, "confetti", 8, 1);
+
+        spawnScorePopup(50, 40, total, "🗑️ CRUMPLED!");
+
+        setScreenShake(6);
+        setTimeout(() => setScreenShake(0), 250);
+
+        setCatMessage(pick(["In the TRASH?! 😭", "Balled up! 🙀", "So disrespectful! 😿", "That was ART! 😾"]));
+        setTimeout(() => setCatMessage(""), 1500);
+
+        setTimeout(() => {
+          setOpenLetter(null);
+          setDestruction({ type: null, progress: 0 });
+          setPhase("playing");
+        }, 400);
+      }
+    }, 20);
+  }, [openLetter, destruction.type, spawnParticles, spawnScorePopup]);
+
+  // Destroy letter with DISSOLVE - acid/melting effect
+  const handleDissolve = useCallback(() => {
+    if (!openLetter || destruction.type) return;
+
+    setDestruction({ type: "dissolve", progress: 0 });
+
+    let progress = 0;
+    const dissolveInterval = setInterval(() => {
+      progress += 0.015;
+      setDestruction(prev => ({ ...prev, progress }));
+
+      // Bubbling particles rising
+      if (progress < 1) {
+        const bubbleX = 30 + Math.random() * 40;
+        spawnParticles(bubbleX, 60 - progress * 20, "bubble", 2, 0.8);
+        if (progress > 0.3) {
+          spawnParticles(bubbleX, 50, "sparkle", 1, 0.5);
+        }
+      }
+
+      if (progress >= 1) {
+        clearInterval(dissolveInterval);
+
+        const basePoints = openLetter.isGold ? 40 : 25;
+        const bonus = 20;
+        const total = basePoints + bonus;
+
+        setScore(s => s + total);
+        setLettersDestroyed(d => d + 1);
+
+        // Final dissolve burst
+        spawnParticles(50, 50, "bubble", 30, 2);
+        spawnParticles(50, 50, "sparkle", 15, 1.5);
+
+        spawnScorePopup(50, 40, total, "🧪 DISSOLVED!");
+
+        setScreenShake(4);
+        setTimeout(() => setScreenShake(0), 200);
+
+        setCatMessage(pick(["MELTED AWAY! 😭", "Chemistry is cruel! 🙀", "Bubbles of sadness! 😿", "Science hurts! 😾"]));
+        setTimeout(() => setCatMessage(""), 1500);
+
+        setTimeout(() => {
+          setOpenLetter(null);
+          setDestruction({ type: null, progress: 0 });
+          setPhase("playing");
+        }, 400);
+      }
+    }, 30);
+  }, [openLetter, destruction.type, spawnParticles, spawnScorePopup]);
+
+  // Destroy letter with FREEZE & SHATTER
+  const handleFreeze = useCallback(() => {
+    if (!openLetter || destruction.type) return;
+
+    // Generate crack positions
+    const freezeCracks = Array.from({ length: 8 }, () => ({
+      x: 20 + Math.random() * 60,
+      y: 20 + Math.random() * 60,
+      angle: Math.random() * 360
+    }));
+    setDestruction({ type: "freeze", progress: 0, freezeCracks });
+
+    let progress = 0;
+    let phase: "freezing" | "shattering" = "freezing";
+
+    const freezeInterval = setInterval(() => {
+      if (phase === "freezing") {
+        progress += 0.03;
+        setDestruction(prev => ({ ...prev, progress: Math.min(progress, 0.5) }));
+
+        // Ice crystals forming
+        if (progress < 0.5) {
+          spawnParticles(30 + Math.random() * 40, 30 + Math.random() * 40, "ice", 2, 0.3);
+        }
+
+        if (progress >= 0.5) {
+          phase = "shattering";
+          setScreenShake(15);
+          setTimeout(() => setScreenShake(0), 100);
+        }
+      } else {
+        progress += 0.05;
+        setDestruction(prev => ({ ...prev, progress }));
+
+        // Shattering ice shards
+        if (progress < 1) {
+          spawnParticles(50, 50, "ice", 5, 3);
+        }
+
+        if (progress >= 1) {
+          clearInterval(freezeInterval);
+
+          const basePoints = openLetter.isGold ? 45 : 28;
+          const bonus = 25;
+          const total = basePoints + bonus;
+
+          setScore(s => s + total);
+          setLettersDestroyed(d => d + 1);
+
+          // Epic shatter explosion
+          spawnParticles(50, 50, "ice", 40, 4);
+          spawnParticles(50, 50, "sparkle", 20, 2);
+
+          spawnScorePopup(50, 40, total, "❄️ SHATTERED!");
+
+          setScreenShake(12);
+          setTimeout(() => setScreenShake(0), 300);
+
+          setCatMessage(pick(["FROZEN SOLID! 😭", "Cold as your heart! 🙀", "Ice cold rejection! 😿", "Brrr-utal! 😾"]));
+          setTimeout(() => setCatMessage(""), 1500);
+
+          setTimeout(() => {
+            setOpenLetter(null);
+            setDestruction({ type: null, progress: 0 });
+            setPhase("playing");
+          }, 400);
+        }
+      }
+    }, 25);
+  }, [openLetter, destruction.type, spawnParticles, spawnScorePopup]);
+
+  // Destroy letter with BLACK HOLE - sucked into void
+  const handleBlackHole = useCallback(() => {
+    if (!openLetter || destruction.type) return;
+
+    setDestruction({ type: "blackhole", progress: 0 });
+
+    let progress = 0;
+    const voidInterval = setInterval(() => {
+      progress += 0.012;
+      setDestruction(prev => ({ ...prev, progress }));
+
+      // Particles being sucked toward center
+      if (progress < 0.9) {
+        const angle = progress * Math.PI * 8;
+        const radius = 30 - progress * 25;
+        const px = 50 + Math.cos(angle) * radius;
+        const py = 50 + Math.sin(angle) * radius;
+        spawnParticles(px, py, "void", 3, 0.5);
+        spawnParticles(px, py, "sparkle", 1, 0.3);
+      }
+
+      if (progress >= 1) {
+        clearInterval(voidInterval);
+
+        const basePoints = openLetter.isGold ? 50 : 30;
+        const bonus = 30;
+        const total = basePoints + bonus;
+
+        setScore(s => s + total);
+        setLettersDestroyed(d => d + 1);
+
+        // Void collapse with reverse burst
+        setTimeout(() => {
+          spawnParticles(50, 50, "sparkle", 30, 3);
+          spawnParticles(50, 50, "confetti", 20, 2.5);
+        }, 200);
+
+        spawnScorePopup(50, 40, total, "🕳️ VOIDED!");
+
+        setScreenShake(8);
+        setTimeout(() => setScreenShake(0), 400);
+
+        setCatMessage(pick(["INTO THE VOID! 😭", "Gone forever! 🙀", "Erased from existence! 😿", "Dimension-ally rejected! 😾"]));
+        setTimeout(() => setCatMessage(""), 1500);
+
+        setTimeout(() => {
+          setOpenLetter(null);
+          setDestruction({ type: null, progress: 0 });
+          setPhase("playing");
+        }, 600);
       }
     }, 25);
   }, [openLetter, destruction.type, spawnParticles, spawnScorePopup]);
@@ -3911,7 +4245,7 @@ const RejectLettersGame = memo(function RejectLettersGame({ onComplete }: { onCo
               style={{ left: `${(i * 7) % 100}%`, top: "-10%" }}
               animate={{ y: "120vh", rotate: [-10, 10, -10], x: [0, 10, -10, 0] }}
               transition={{
-                duration: 8 + Math.random() * 4,
+                duration: 8 + (i % 5),
                 repeat: Infinity,
                 delay: i * 0.5,
                 ease: "linear"
@@ -4107,7 +4441,7 @@ const RejectLettersGame = memo(function RejectLettersGame({ onComplete }: { onCo
               style={{ left: `${10 + (i * 7)}%`, bottom: "-10%" }}
               animate={{ y: "-120vh", rotate: 360 }}
               transition={{
-                duration: 3 + Math.random() * 2,
+                duration: 3 + (i % 4) * 0.5,
                 repeat: Infinity,
                 delay: i * 0.2,
                 ease: "linear"
@@ -4169,9 +4503,9 @@ const RejectLettersGame = memo(function RejectLettersGame({ onComplete }: { onCo
             <motion.div
               key={i}
               className="absolute w-2 h-2 bg-gray-400/30 rounded-full"
-              style={{ left: `${Math.random() * 100}%`, top: `${Math.random() * 100}%` }}
+              style={{ left: `${(i * 5) % 100}%`, top: `${(i * 7 + 10) % 100}%` }}
               animate={{ y: [0, -30, 0], opacity: [0.2, 0.5, 0.2] }}
-              transition={{ duration: 4 + Math.random() * 2, repeat: Infinity, delay: Math.random() * 2 }}
+              transition={{ duration: 4 + (i % 4) * 0.5, repeat: Infinity, delay: (i % 5) * 0.4 }}
             />
           ))}
         </div>
@@ -4354,22 +4688,200 @@ const RejectLettersGame = memo(function RejectLettersGame({ onComplete }: { onCo
             />
           )}
 
-          {/* Rip effect */}
-          {destruction.type === "rip" && (
-            <div
+          {/* Rip effect - jagged tear lines */}
+          {destruction.type === "rip" && destruction.progress > 0.1 && (
+            <>
+              <div className="absolute inset-0 pointer-events-none overflow-hidden">
+                {/* Left piece */}
+                <motion.div
+                  className="absolute inset-0 bg-white"
+                  style={{
+                    clipPath: `polygon(0 0, ${45 - destruction.progress * 25}% 0, ${40 - destruction.progress * 20}% 30%, ${48 - destruction.progress * 28}% 50%, ${35 - destruction.progress * 18}% 70%, ${42 - destruction.progress * 22}% 100%, 0 100%)`,
+                    transform: `translateX(${-destruction.progress * 40}px) rotate(${-destruction.progress * 15}deg)`,
+                  }}
+                />
+                {/* Right piece */}
+                <motion.div
+                  className="absolute inset-0 bg-white"
+                  style={{
+                    clipPath: `polygon(${55 + destruction.progress * 25}% 0, 100% 0, 100% 100%, ${58 + destruction.progress * 22}% 100%, ${52 + destruction.progress * 18}% 70%, ${60 + destruction.progress * 28}% 50%, ${55 + destruction.progress * 20}% 30%)`,
+                    transform: `translateX(${destruction.progress * 40}px) rotate(${destruction.progress * 15}deg)`,
+                  }}
+                />
+              </div>
+              {/* Tear line effect */}
+              <div className="absolute left-1/2 top-0 bottom-0 w-1 -translate-x-1/2 pointer-events-none"
+                style={{
+                  background: `linear-gradient(to bottom, transparent, rgba(0,0,0,${destruction.progress * 0.3}), transparent)`,
+                  filter: 'blur(2px)',
+                }}
+              />
+            </>
+          )}
+
+          {/* Shred effect - vertical lines cutting through */}
+          {destruction.type === "shred" && destruction.shredLines && (
+            <div className="absolute inset-0 pointer-events-none overflow-hidden rounded-2xl">
+              {destruction.shredLines.map((linePos, i) => (
+                <motion.div
+                  key={i}
+                  className="absolute top-0 w-0.5 bg-gradient-to-b from-transparent via-slate-400 to-transparent"
+                  style={{
+                    left: `${linePos}%`,
+                    height: `${destruction.progress * 120}%`,
+                    opacity: destruction.progress > 0.2 ? 0.6 : 0,
+                  }}
+                />
+              ))}
+              {/* Paper being pulled down effect */}
+              <motion.div
+                className="absolute inset-0"
+                style={{
+                  background: `linear-gradient(to bottom, transparent ${100 - destruction.progress * 100}%, rgba(200,200,200,0.5) ${100 - destruction.progress * 80}%, transparent)`,
+                }}
+              />
+            </div>
+          )}
+
+          {/* Crumple effect - paper crinkling */}
+          {destruction.type === "crumple" && (
+            <motion.div
               className="absolute inset-0 pointer-events-none"
               style={{
-                clipPath: destruction.progress > 0.3
-                  ? `polygon(0 0, ${50 - destruction.progress * 30}% 0, ${50 - destruction.progress * 20}% 100%, 0 100%)`
-                  : undefined,
+                transform: `scale(${1 - destruction.progress * 0.7}) rotate(${(destruction.crumpleAngle || 0) * destruction.progress}deg)`,
+                borderRadius: `${destruction.progress * 50}%`,
+                filter: `brightness(${1 - destruction.progress * 0.3})`,
               }}
-            />
+            >
+              {/* Crinkle shadows */}
+              {destruction.progress > 0.2 && Array.from({ length: 8 }).map((_, i) => (
+                <div
+                  key={i}
+                  className="absolute bg-slate-400/30"
+                  style={{
+                    left: `${20 + (i % 4) * 20}%`,
+                    top: `${15 + Math.floor(i / 4) * 40}%`,
+                    width: `${10 + destruction.progress * 15}%`,
+                    height: '2px',
+                    transform: `rotate(${-30 + i * 25 + destruction.progress * 20}deg)`,
+                    opacity: destruction.progress * 0.8,
+                  }}
+                />
+              ))}
+            </motion.div>
+          )}
+
+          {/* Dissolve effect - melting/bubbling */}
+          {destruction.type === "dissolve" && (
+            <motion.div
+              className="absolute inset-0 pointer-events-none overflow-hidden rounded-2xl"
+              style={{
+                background: `linear-gradient(to top,
+                  rgba(168,85,247,${destruction.progress * 0.6}) ${destruction.progress * 60}%,
+                  rgba(192,132,252,${destruction.progress * 0.3}) ${destruction.progress * 80}%,
+                  transparent)`,
+              }}
+            >
+              {/* Bubbles */}
+              {Array.from({ length: 12 }).map((_, i) => (
+                <motion.div
+                  key={i}
+                  className="absolute rounded-full bg-purple-400/50"
+                  style={{
+                    left: `${10 + (i % 6) * 15}%`,
+                    bottom: `${destruction.progress * 100 - 20 - (i % 3) * 10}%`,
+                    width: `${6 + (i % 4) * 4}px`,
+                    height: `${6 + (i % 4) * 4}px`,
+                    opacity: destruction.progress > 0.1 ? Math.min(1, (destruction.progress - 0.1) * 2) : 0,
+                  }}
+                  animate={{ y: [-5, -15, -5], scale: [1, 1.2, 1] }}
+                  transition={{ duration: 0.5 + (i % 3) * 0.2, repeat: Infinity }}
+                />
+              ))}
+            </motion.div>
+          )}
+
+          {/* Freeze effect - ice crystals and cracks */}
+          {destruction.type === "freeze" && (
+            <motion.div className="absolute inset-0 pointer-events-none overflow-hidden rounded-2xl">
+              {/* Ice overlay */}
+              <div
+                className="absolute inset-0"
+                style={{
+                  background: `linear-gradient(135deg,
+                    rgba(165,243,252,${destruction.progress * 0.8}),
+                    rgba(103,232,249,${destruction.progress * 0.6}),
+                    rgba(34,211,238,${destruction.progress * 0.4}))`,
+                  opacity: destruction.progress < 0.5 ? destruction.progress * 2 : 1 - (destruction.progress - 0.5) * 2,
+                }}
+              />
+              {/* Frost crystals */}
+              {destruction.progress < 0.6 && Array.from({ length: 6 }).map((_, i) => (
+                <motion.div
+                  key={i}
+                  className="absolute text-cyan-200"
+                  style={{
+                    left: `${15 + (i % 3) * 30}%`,
+                    top: `${20 + Math.floor(i / 3) * 40}%`,
+                    fontSize: `${12 + destruction.progress * 20}px`,
+                    opacity: destruction.progress * 1.5,
+                  }}
+                >
+                  ❄
+                </motion.div>
+              ))}
+              {/* Crack lines during shatter */}
+              {destruction.progress > 0.5 && destruction.freezeCracks?.map((crack, i) => (
+                <motion.div
+                  key={i}
+                  className="absolute bg-white/80"
+                  style={{
+                    left: `${crack.x}%`,
+                    top: `${crack.y}%`,
+                    width: `${30 + (destruction.progress - 0.5) * 100}px`,
+                    height: '2px',
+                    transform: `rotate(${crack.angle}deg)`,
+                    transformOrigin: 'left center',
+                    opacity: (destruction.progress - 0.5) * 2,
+                  }}
+                />
+              ))}
+            </motion.div>
+          )}
+
+          {/* Black hole effect - swirling into void */}
+          {destruction.type === "blackhole" && (
+            <motion.div className="absolute inset-0 pointer-events-none overflow-hidden rounded-2xl">
+              {/* Void center */}
+              <motion.div
+                className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-black"
+                style={{
+                  width: `${destruction.progress * 150}%`,
+                  height: `${destruction.progress * 150}%`,
+                  boxShadow: `0 0 ${destruction.progress * 60}px ${destruction.progress * 30}px rgba(99,102,241,0.5), inset 0 0 ${destruction.progress * 40}px rgba(0,0,0,1)`,
+                }}
+              />
+              {/* Spiral effect */}
+              {Array.from({ length: 8 }).map((_, i) => (
+                <motion.div
+                  key={i}
+                  className="absolute left-1/2 top-1/2 w-1 bg-gradient-to-r from-indigo-500 to-purple-500"
+                  style={{
+                    height: `${20 - destruction.progress * 18}%`,
+                    transform: `translate(-50%, -50%) rotate(${i * 45 + destruction.progress * 720}deg) translateY(-${30 - destruction.progress * 28}%)`,
+                    opacity: Math.max(0, 1 - destruction.progress * 1.2),
+                  }}
+                />
+              ))}
+            </motion.div>
           )}
 
           {/* Letter content */}
           <div className={cn(
             "transition-opacity duration-300",
-            destruction.progress > 0.5 && "opacity-30"
+            destruction.progress > 0.5 && "opacity-30",
+            destruction.type === "blackhole" && destruction.progress > 0.3 && "opacity-0",
+            destruction.type === "crumple" && destruction.progress > 0.4 && "opacity-20"
           )}>
             {/* Decorative header */}
             <div className="flex justify-center mb-3">
@@ -4404,70 +4916,298 @@ const RejectLettersGame = memo(function RejectLettersGame({ onComplete }: { onCo
           </div>
         </motion.div>
 
-        {/* Destruction buttons */}
+        {/* Premium Destruction Buttons - Scrollable Grid */}
         {!destruction.type && (
           <motion.div
             initial={{ y: 50, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             transition={{ delay: 0.3 }}
-            className="flex gap-4 mt-6"
+            className="w-full max-w-md mt-4 px-2"
           >
-            <motion.button
-              onClick={handleBurn}
-              className="flex flex-col items-center gap-2 bg-gradient-to-br from-orange-500 to-red-600 text-white px-8 py-4 rounded-2xl shadow-xl"
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
+            {/* Section label */}
+            <motion.p
+              className="text-center text-rose-600/80 text-xs font-medium mb-2"
+              animate={{ opacity: [0.6, 1, 0.6] }}
+              transition={{ duration: 2, repeat: Infinity }}
             >
-              <motion.span
-                className="text-4xl"
-                animate={{ scale: [1, 1.2, 1], rotate: [0, 5, -5, 0] }}
-                transition={{ duration: 0.5, repeat: Infinity }}
-              >
-                🔥
-              </motion.span>
-              <span className="font-bold">BURN IT</span>
-              <span className="text-xs opacity-80">+{openLetter.isGold ? 40 : 25} pts</span>
-            </motion.button>
+              ✨ Choose your destruction method ✨
+            </motion.p>
 
-            <motion.button
-              onClick={handleRip}
-              className="flex flex-col items-center gap-2 bg-gradient-to-br from-slate-500 to-slate-700 text-white px-8 py-4 rounded-2xl shadow-xl"
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
+            {/* Scrollable button container */}
+            <div className="overflow-x-auto pb-2 -mx-2 px-2 scrollbar-hide">
+              <div className="flex gap-2 min-w-max">
+                {/* BURN */}
+                <motion.button
+                  onClick={handleBurn}
+                  className="flex flex-col items-center gap-1 bg-gradient-to-br from-orange-500 to-red-600 text-white px-4 py-3 rounded-xl shadow-lg min-w-[72px] border border-orange-400/30"
+                  whileHover={{ scale: 1.05, y: -2 }}
+                  whileTap={{ scale: 0.95 }}
+                >
+                  <motion.span
+                    className="text-2xl"
+                    animate={{ scale: [1, 1.15, 1] }}
+                    transition={{ duration: 0.6, repeat: Infinity }}
+                  >
+                    🔥
+                  </motion.span>
+                  <span className="font-bold text-xs">BURN</span>
+                  <span className="text-[10px] opacity-80 bg-black/20 px-1.5 rounded">+{openLetter.isGold ? 40 : 25}</span>
+                </motion.button>
+
+                {/* RIP/TEAR */}
+                <motion.button
+                  onClick={handleRip}
+                  className="flex flex-col items-center gap-1 bg-gradient-to-br from-slate-500 to-slate-700 text-white px-4 py-3 rounded-xl shadow-lg min-w-[72px] border border-slate-400/30"
+                  whileHover={{ scale: 1.05, y: -2 }}
+                  whileTap={{ scale: 0.95 }}
+                >
+                  <motion.span
+                    className="text-2xl"
+                    animate={{ rotate: [-8, 8, -8] }}
+                    transition={{ duration: 0.4, repeat: Infinity }}
+                  >
+                    ✂️
+                  </motion.span>
+                  <span className="font-bold text-xs">TEAR</span>
+                  <span className="text-[10px] opacity-80 bg-black/20 px-1.5 rounded">+{openLetter.isGold ? 25 : 12}</span>
+                </motion.button>
+
+                {/* SHRED */}
+                <motion.button
+                  onClick={handleShred}
+                  className="flex flex-col items-center gap-1 bg-gradient-to-br from-emerald-500 to-teal-600 text-white px-4 py-3 rounded-xl shadow-lg min-w-[72px] border border-emerald-400/30"
+                  whileHover={{ scale: 1.05, y: -2 }}
+                  whileTap={{ scale: 0.95 }}
+                >
+                  <motion.span
+                    className="text-2xl"
+                    animate={{ y: [0, -3, 0] }}
+                    transition={{ duration: 0.3, repeat: Infinity }}
+                  >
+                    📄
+                  </motion.span>
+                  <span className="font-bold text-xs">SHRED</span>
+                  <span className="text-[10px] opacity-80 bg-black/20 px-1.5 rounded">+{openLetter.isGold ? 50 : 35}</span>
+                </motion.button>
+
+                {/* CRUMPLE */}
+                <motion.button
+                  onClick={handleCrumple}
+                  className="flex flex-col items-center gap-1 bg-gradient-to-br from-amber-500 to-yellow-600 text-white px-4 py-3 rounded-xl shadow-lg min-w-[72px] border border-amber-400/30"
+                  whileHover={{ scale: 1.05, y: -2 }}
+                  whileTap={{ scale: 0.95 }}
+                >
+                  <motion.span
+                    className="text-2xl"
+                    animate={{ scale: [1, 0.85, 1], rotate: [0, 10, 0] }}
+                    transition={{ duration: 0.5, repeat: Infinity }}
+                  >
+                    🗑️
+                  </motion.span>
+                  <span className="font-bold text-xs">CRUMPLE</span>
+                  <span className="text-[10px] opacity-80 bg-black/20 px-1.5 rounded">+{openLetter.isGold ? 30 : 18}</span>
+                </motion.button>
+
+                {/* DISSOLVE */}
+                <motion.button
+                  onClick={handleDissolve}
+                  className="flex flex-col items-center gap-1 bg-gradient-to-br from-purple-500 to-violet-600 text-white px-4 py-3 rounded-xl shadow-lg min-w-[72px] border border-purple-400/30"
+                  whileHover={{ scale: 1.05, y: -2 }}
+                  whileTap={{ scale: 0.95 }}
+                >
+                  <motion.span
+                    className="text-2xl"
+                    animate={{ opacity: [1, 0.7, 1], scale: [1, 1.1, 1] }}
+                    transition={{ duration: 0.8, repeat: Infinity }}
+                  >
+                    🧪
+                  </motion.span>
+                  <span className="font-bold text-xs">DISSOLVE</span>
+                  <span className="text-[10px] opacity-80 bg-black/20 px-1.5 rounded">+{openLetter.isGold ? 60 : 45}</span>
+                </motion.button>
+
+                {/* FREEZE */}
+                <motion.button
+                  onClick={handleFreeze}
+                  className="flex flex-col items-center gap-1 bg-gradient-to-br from-cyan-400 to-blue-500 text-white px-4 py-3 rounded-xl shadow-lg min-w-[72px] border border-cyan-300/30"
+                  whileHover={{ scale: 1.05, y: -2 }}
+                  whileTap={{ scale: 0.95 }}
+                >
+                  <motion.span
+                    className="text-2xl"
+                    animate={{ rotate: [0, 15, -15, 0] }}
+                    transition={{ duration: 1, repeat: Infinity }}
+                  >
+                    ❄️
+                  </motion.span>
+                  <span className="font-bold text-xs">FREEZE</span>
+                  <span className="text-[10px] opacity-80 bg-black/20 px-1.5 rounded">+{openLetter.isGold ? 70 : 53}</span>
+                </motion.button>
+
+                {/* BLACK HOLE */}
+                <motion.button
+                  onClick={handleBlackHole}
+                  className="flex flex-col items-center gap-1 bg-gradient-to-br from-indigo-600 to-purple-900 text-white px-4 py-3 rounded-xl shadow-lg min-w-[72px] border border-indigo-400/30 relative overflow-hidden"
+                  whileHover={{ scale: 1.05, y: -2 }}
+                  whileTap={{ scale: 0.95 }}
+                >
+                  {/* Sparkle effect for premium feel */}
+                  <motion.div
+                    className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -skew-x-12"
+                    animate={{ x: ["-100%", "200%"] }}
+                    transition={{ duration: 2, repeat: Infinity, repeatDelay: 1 }}
+                  />
+                  <motion.span
+                    className="text-2xl relative"
+                    animate={{ scale: [1, 1.2, 1], rotate: [0, 180, 360] }}
+                    transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
+                  >
+                    🕳️
+                  </motion.span>
+                  <span className="font-bold text-xs relative">VOID</span>
+                  <span className="text-[10px] opacity-80 bg-black/20 px-1.5 rounded relative">+{openLetter.isGold ? 80 : 60}</span>
+                </motion.button>
+              </div>
+            </div>
+
+            {/* Scroll hint */}
+            <motion.p
+              className="text-center text-rose-400/60 text-[10px] mt-1"
+              animate={{ opacity: [0.4, 0.8, 0.4] }}
+              transition={{ duration: 1.5, repeat: Infinity }}
             >
-              <motion.span
-                className="text-4xl"
-                animate={{ rotate: [-10, 10, -10] }}
-                transition={{ duration: 0.3, repeat: Infinity }}
-              >
-                ✂️
-              </motion.span>
-              <span className="font-bold">RIP IT</span>
-              <span className="text-xs opacity-80">+{openLetter.isGold ? 25 : 10} pts</span>
-            </motion.button>
+              ← swipe for more →
+            </motion.p>
           </motion.div>
         )}
 
-        {/* Particles */}
-        {particles.map(p => (
-          <motion.div
-            key={p.id}
-            className="absolute pointer-events-none z-40"
-            style={{
-              left: `${p.x}%`,
-              top: `${p.y}%`,
-              width: p.size,
-              height: p.size,
-              backgroundColor: p.color,
-              borderRadius: p.type === "fire" || p.type === "ember" ? "50%" : "2px",
-              opacity: p.life,
-              transform: `rotate(${p.rotation}deg)`,
-              boxShadow: p.type === "fire" || p.type === "ember"
-                ? `0 0 ${p.size}px ${p.color}`
-                : undefined,
-            }}
-          />
-        ))}
+        {/* Enhanced Particles with unique styles per type */}
+        {particles.map(p => {
+          // Shred particles are thin rectangles (paper strips)
+          if (p.type === "shred") {
+            return (
+              <motion.div
+                key={p.id}
+                className="absolute pointer-events-none z-40"
+                style={{
+                  left: `${p.x}%`,
+                  top: `${p.y}%`,
+                  width: p.width || 4,
+                  height: p.height || 20,
+                  backgroundColor: p.color,
+                  borderRadius: "1px",
+                  opacity: p.life,
+                  transform: `rotate(${p.rotation}deg)`,
+                  boxShadow: `0 1px 2px rgba(0,0,0,0.1)`,
+                }}
+              />
+            );
+          }
+
+          // Ice particles have crystalline shape
+          if (p.type === "ice") {
+            return (
+              <motion.div
+                key={p.id}
+                className="absolute pointer-events-none z-40"
+                style={{
+                  left: `${p.x}%`,
+                  top: `${p.y}%`,
+                  width: p.size,
+                  height: p.size,
+                  backgroundColor: p.color,
+                  clipPath: "polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%)",
+                  opacity: p.life,
+                  transform: `rotate(${p.rotation}deg)`,
+                  boxShadow: `0 0 ${p.size * 0.5}px ${p.color}, inset 0 0 ${p.size * 0.3}px rgba(255,255,255,0.5)`,
+                }}
+              />
+            );
+          }
+
+          // Bubble particles are circular with gradient
+          if (p.type === "bubble") {
+            return (
+              <motion.div
+                key={p.id}
+                className="absolute pointer-events-none z-40 rounded-full"
+                style={{
+                  left: `${p.x}%`,
+                  top: `${p.y}%`,
+                  width: p.size,
+                  height: p.size,
+                  background: `radial-gradient(circle at 30% 30%, rgba(255,255,255,0.8), ${p.color})`,
+                  opacity: p.life * 0.8,
+                  transform: `rotate(${p.rotation}deg) scale(${0.8 + p.life * 0.4})`,
+                  boxShadow: `0 0 ${p.size * 0.3}px ${p.color}`,
+                }}
+              />
+            );
+          }
+
+          // Void particles have dark glow
+          if (p.type === "void") {
+            return (
+              <motion.div
+                key={p.id}
+                className="absolute pointer-events-none z-40 rounded-full"
+                style={{
+                  left: `${p.x}%`,
+                  top: `${p.y}%`,
+                  width: p.size,
+                  height: p.size,
+                  backgroundColor: p.color,
+                  opacity: p.life,
+                  transform: `rotate(${p.rotation}deg)`,
+                  boxShadow: `0 0 ${p.size}px ${p.color}, 0 0 ${p.size * 2}px rgba(99,102,241,0.5)`,
+                }}
+              />
+            );
+          }
+
+          // Confetti particles are colorful rectangles
+          if (p.type === "confetti") {
+            return (
+              <motion.div
+                key={p.id}
+                className="absolute pointer-events-none z-40"
+                style={{
+                  left: `${p.x}%`,
+                  top: `${p.y}%`,
+                  width: p.size * 0.6,
+                  height: p.size * 1.2,
+                  backgroundColor: p.color,
+                  borderRadius: "1px",
+                  opacity: p.life,
+                  transform: `rotate(${p.rotation}deg)`,
+                }}
+              />
+            );
+          }
+
+          // Default particle rendering for fire, ember, paper, ash, sparkle
+          return (
+            <motion.div
+              key={p.id}
+              className="absolute pointer-events-none z-40"
+              style={{
+                left: `${p.x}%`,
+                top: `${p.y}%`,
+                width: p.size,
+                height: p.size,
+                backgroundColor: p.color,
+                borderRadius: p.type === "fire" || p.type === "ember" || p.type === "sparkle" ? "50%" : "2px",
+                opacity: p.life,
+                transform: `rotate(${p.rotation}deg)`,
+                boxShadow: p.type === "fire" || p.type === "ember"
+                  ? `0 0 ${p.size}px ${p.color}`
+                  : p.type === "sparkle"
+                    ? `0 0 ${p.size * 0.5}px ${p.color}`
+                    : undefined,
+              }}
+            />
+          );
+        })}
 
         {/* Score popups */}
         <AnimatePresence>
@@ -6977,17 +7717,17 @@ export default function ValentineCat() {
               key={i}
               className="absolute w-1 h-1 bg-white rounded-full"
               style={{
-                left: `${Math.random() * 100}%`,
-                top: `${Math.random() * 100}%`,
+                left: `${(i * 3.5) % 100}%`,
+                top: `${(i * 7 + 5) % 100}%`,
               }}
               animate={{
                 opacity: [0.2, 1, 0.2],
                 scale: [0.5, 1, 0.5],
               }}
               transition={{
-                duration: 2 + Math.random() * 2,
+                duration: 2 + (i % 4) * 0.5,
                 repeat: Infinity,
-                delay: Math.random() * 2,
+                delay: (i % 5) * 0.4,
               }}
             />
           ))}
