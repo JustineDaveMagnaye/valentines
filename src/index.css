@@ -38,6 +38,36 @@ button, [role="button"] {
   }
 }
 
+/* Performance-optimized CSS animations */
+@keyframes float {
+  0%, 100% { transform: translateY(0) rotate(0deg); opacity: 0.2; }
+  50% { transform: translateY(-15px) rotate(5deg); opacity: 0.3; }
+}
+
+@keyframes floatUp {
+  0%, 100% { transform: translateY(0) scale(1); opacity: 0; }
+  50% { transform: translateY(-30px) scale(1.2); opacity: 1; }
+}
+
+@keyframes floatDown {
+  0%, 100% { transform: translateY(0); opacity: 0.3; }
+  50% { transform: translateY(15px); opacity: 0; }
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* Hide scrollbars for button containers */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
 /* Card and foreground colors for shadcn/ui compatibility */
 :root {
   --background: 0 0% 100%;

@@ -15,6 +15,535 @@ const pick = <T,>(arr: T[]): T => arr[Math.floor(rand(0, arr.length))];
 const now = () => performance.now();
 
 // ============================================================================
+// SOUND SYSTEM - Web Audio API based synthesizer
+// ============================================================================
+
+class SoundManager {
+  private audioContext: AudioContext | null = null;
+  private masterGain: GainNode | null = null;
+  private musicGain: GainNode | null = null;
+  private sfxGain: GainNode | null = null;
+  private enabled: boolean = true;
+  private musicEnabled: boolean = true;
+  private currentMusic: OscillatorNode[] = [];
+  private musicInterval: number | null = null;
+
+  init() {
+    if (this.audioContext) return;
+    try {
+      this.audioContext = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
+      this.masterGain = this.audioContext.createGain();
+      this.masterGain.gain.value = 0.3;
+      this.masterGain.connect(this.audioContext.destination);
+
+      this.musicGain = this.audioContext.createGain();
+      this.musicGain.gain.value = 0.15;
+      this.musicGain.connect(this.masterGain);
+
+      this.sfxGain = this.audioContext.createGain();
+      this.sfxGain.gain.value = 0.5;
+      this.sfxGain.connect(this.masterGain);
+    } catch {
+      console.warn("Web Audio API not supported");
+    }
+  }
+
+  setEnabled(enabled: boolean) {
+    this.enabled = enabled;
+    if (this.masterGain) {
+      this.masterGain.gain.value = enabled ? 0.3 : 0;
+    }
+  }
+
+  setMusicEnabled(enabled: boolean) {
+    this.musicEnabled = enabled;
+    if (this.musicGain) {
+      this.musicGain.gain.value = enabled ? 0.15 : 0;
+    }
+  }
+
+  isEnabled() { return this.enabled; }
+  isMusicEnabled() { return this.musicEnabled; }
+
+  private playTone(freq: number, duration: number, type: OscillatorType = "sine", gainValue = 0.3, delay = 0) {
+    if (!this.audioContext || !this.sfxGain || !this.enabled) return;
+
+    const osc = this.audioContext.createOscillator();
+    const gain = this.audioContext.createGain();
+
+    osc.type = type;
+    osc.frequency.value = freq;
+
+    gain.gain.value = 0;
+    gain.gain.setValueAtTime(0, this.audioContext.currentTime + delay);
+    gain.gain.linearRampToValueAtTime(gainValue, this.audioContext.currentTime + delay + 0.01);
+    gain.gain.linearRampToValueAtTime(0, this.audioContext.currentTime + delay + duration);
+
+    osc.connect(gain);
+    gain.connect(this.sfxGain);
+
+    osc.start(this.audioContext.currentTime + delay);
+    osc.stop(this.audioContext.currentTime + delay + duration + 0.1);
+  }
+
+  private playNoise(duration: number, gainValue = 0.1) {
+    if (!this.audioContext || !this.sfxGain || !this.enabled) return;
+
+    const bufferSize = this.audioContext.sampleRate * duration;
+    const buffer = this.audioContext.createBuffer(1, bufferSize, this.audioContext.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) {
+      data[i] = Math.random() * 2 - 1;
+    }
+
+    const noise = this.audioContext.createBufferSource();
+    const gain = this.audioContext.createGain();
+    const filter = this.audioContext.createBiquadFilter();
+
+    noise.buffer = buffer;
+    filter.type = "lowpass";
+    filter.frequency.value = 2000;
+
+    gain.gain.setValueAtTime(gainValue, this.audioContext.currentTime);
+    gain.gain.linearRampToValueAtTime(0, this.audioContext.currentTime + duration);
+
+    noise.connect(filter);
+    filter.connect(gain);
+    gain.connect(this.sfxGain);
+
+    noise.start();
+    noise.stop(this.audioContext.currentTime + duration);
+  }
+
+  // === UI SOUNDS ===
+  click() {
+    this.playTone(800, 0.08, "sine", 0.2);
+    this.playTone(1200, 0.05, "sine", 0.1, 0.02);
+  }
+
+  hover() {
+    this.playTone(600, 0.05, "sine", 0.1);
+  }
+
+  buttonPress() {
+    this.playTone(400, 0.1, "square", 0.15);
+    this.playTone(600, 0.08, "square", 0.1, 0.05);
+  }
+
+  // === POSITIVE SOUNDS ===
+  success() {
+    this.playTone(523, 0.15, "sine", 0.25); // C5
+    this.playTone(659, 0.15, "sine", 0.25, 0.1); // E5
+    this.playTone(784, 0.2, "sine", 0.3, 0.2); // G5
+  }
+
+  collect() {
+    this.playTone(880, 0.1, "sine", 0.2);
+    this.playTone(1100, 0.1, "sine", 0.15, 0.05);
+  }
+
+  powerUp() {
+    for (let i = 0; i < 5; i++) {
+      this.playTone(400 + i * 100, 0.1, "sawtooth", 0.15, i * 0.05);
+    }
+  }
+
+  levelUp() {
+    this.playTone(523, 0.15, "square", 0.2);
+    this.playTone(659, 0.15, "square", 0.2, 0.12);
+    this.playTone(784, 0.15, "square", 0.2, 0.24);
+    this.playTone(1047, 0.25, "square", 0.25, 0.36);
+  }
+
+  victory() {
+    const notes = [523, 659, 784, 1047, 784, 1047, 1319];
+    notes.forEach((freq, i) => {
+      this.playTone(freq, 0.2, "sine", 0.25, i * 0.12);
+      this.playTone(freq * 1.5, 0.15, "sine", 0.1, i * 0.12);
+    });
+  }
+
+  // === NEGATIVE SOUNDS ===
+  hit() {
+    this.playTone(200, 0.15, "sawtooth", 0.3);
+    this.playNoise(0.1, 0.15);
+  }
+
+  damage() {
+    this.playTone(150, 0.2, "square", 0.25);
+    this.playTone(100, 0.15, "square", 0.2, 0.1);
+    this.playNoise(0.15, 0.1);
+  }
+
+  fail() {
+    this.playTone(300, 0.2, "sawtooth", 0.2);
+    this.playTone(200, 0.3, "sawtooth", 0.25, 0.15);
+  }
+
+  gameOver() {
+    this.playTone(400, 0.3, "sawtooth", 0.2);
+    this.playTone(300, 0.3, "sawtooth", 0.2, 0.25);
+    this.playTone(200, 0.4, "sawtooth", 0.25, 0.5);
+    this.playTone(150, 0.5, "sawtooth", 0.2, 0.8);
+  }
+
+  // === ACTION SOUNDS ===
+  jump() {
+    if (!this.audioContext || !this.sfxGain || !this.enabled) return;
+    const osc = this.audioContext.createOscillator();
+    const gain = this.audioContext.createGain();
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(300, this.audioContext.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(600, this.audioContext.currentTime + 0.1);
+    gain.gain.setValueAtTime(0.2, this.audioContext.currentTime);
+    gain.gain.linearRampToValueAtTime(0, this.audioContext.currentTime + 0.15);
+    osc.connect(gain);
+    gain.connect(this.sfxGain);
+    osc.start();
+    osc.stop(this.audioContext.currentTime + 0.15);
+  }
+
+  swoosh() {
+    this.playNoise(0.15, 0.15);
+    this.playTone(800, 0.1, "sine", 0.1);
+  }
+
+  pop() {
+    this.playTone(600, 0.05, "sine", 0.3);
+    this.playTone(900, 0.03, "sine", 0.2, 0.02);
+  }
+
+  // === DESTRUCTION SOUNDS ===
+  smash() {
+    this.playTone(150, 0.2, "square", 0.3);
+    this.playNoise(0.2, 0.25);
+    this.playTone(80, 0.15, "sawtooth", 0.2, 0.05);
+  }
+
+  burn() {
+    this.playNoise(0.4, 0.2);
+    this.playTone(200, 0.3, "sawtooth", 0.15);
+    for (let i = 0; i < 4; i++) {
+      this.playTone(100 + Math.random() * 100, 0.15, "sawtooth", 0.1, i * 0.1);
+    }
+  }
+
+  shred() {
+    for (let i = 0; i < 6; i++) {
+      this.playNoise(0.08, 0.15);
+      this.playTone(800 + i * 50, 0.05, "square", 0.1, i * 0.05);
+    }
+  }
+
+  crumple() {
+    this.playNoise(0.25, 0.2);
+    this.playTone(300, 0.1, "sine", 0.1);
+    this.playTone(250, 0.1, "sine", 0.1, 0.1);
+  }
+
+  dissolve() {
+    for (let i = 0; i < 8; i++) {
+      this.playTone(800 - i * 80, 0.15, "sine", 0.1, i * 0.08);
+    }
+    this.playNoise(0.3, 0.1);
+  }
+
+  freeze() {
+    this.playTone(2000, 0.3, "sine", 0.15);
+    this.playTone(1800, 0.25, "sine", 0.1, 0.1);
+    this.playTone(2200, 0.2, "triangle", 0.15, 0.15);
+  }
+
+  shatter() {
+    this.playNoise(0.3, 0.3);
+    this.playTone(1500, 0.1, "square", 0.2);
+    this.playTone(1200, 0.1, "square", 0.15, 0.05);
+    this.playTone(800, 0.15, "square", 0.2, 0.1);
+  }
+
+  blackHole() {
+    if (!this.audioContext || !this.sfxGain || !this.enabled) return;
+    const osc = this.audioContext.createOscillator();
+    const gain = this.audioContext.createGain();
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(400, this.audioContext.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(50, this.audioContext.currentTime + 0.8);
+    gain.gain.setValueAtTime(0.25, this.audioContext.currentTime);
+    gain.gain.linearRampToValueAtTime(0, this.audioContext.currentTime + 0.8);
+    osc.connect(gain);
+    gain.connect(this.sfxGain);
+    osc.start();
+    osc.stop(this.audioContext.currentTime + 0.85);
+  }
+
+  // === BOSS BATTLE SOUNDS ===
+  bossAttack() {
+    this.playTone(200, 0.2, "sawtooth", 0.25);
+    this.playTone(150, 0.25, "square", 0.2, 0.1);
+    this.playNoise(0.15, 0.15);
+  }
+
+  bossHit() {
+    this.playTone(100, 0.15, "square", 0.3);
+    this.playTone(80, 0.2, "sawtooth", 0.25, 0.05);
+  }
+
+  parry() {
+    this.playTone(1000, 0.1, "sine", 0.3);
+    this.playTone(1500, 0.15, "sine", 0.25, 0.05);
+    this.playTone(2000, 0.1, "triangle", 0.2, 0.1);
+  }
+
+  shield() {
+    this.playTone(500, 0.15, "triangle", 0.2);
+    this.playTone(700, 0.1, "triangle", 0.15, 0.08);
+  }
+
+  criticalHit() {
+    this.playTone(800, 0.1, "sawtooth", 0.25);
+    this.playTone(1200, 0.15, "sawtooth", 0.3, 0.05);
+    this.playTone(1600, 0.1, "sine", 0.2, 0.12);
+  }
+
+  specialAttack() {
+    for (let i = 0; i < 6; i++) {
+      this.playTone(400 + i * 150, 0.15, "sawtooth", 0.2, i * 0.08);
+    }
+    this.playNoise(0.3, 0.15);
+  }
+
+  bossPhaseChange() {
+    this.playTone(200, 0.3, "sawtooth", 0.3);
+    this.playTone(250, 0.25, "sawtooth", 0.25, 0.2);
+    this.playTone(300, 0.3, "sawtooth", 0.3, 0.4);
+    this.playNoise(0.2, 0.2);
+  }
+
+  // === CAT SOUNDS ===
+  meow() {
+    if (!this.audioContext || !this.sfxGain || !this.enabled) return;
+    const osc = this.audioContext.createOscillator();
+    const gain = this.audioContext.createGain();
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(700, this.audioContext.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(500, this.audioContext.currentTime + 0.15);
+    osc.frequency.exponentialRampToValueAtTime(900, this.audioContext.currentTime + 0.25);
+    osc.frequency.exponentialRampToValueAtTime(600, this.audioContext.currentTime + 0.35);
+    gain.gain.setValueAtTime(0.2, this.audioContext.currentTime);
+    gain.gain.linearRampToValueAtTime(0, this.audioContext.currentTime + 0.4);
+    osc.connect(gain);
+    gain.connect(this.sfxGain);
+    osc.start();
+    osc.stop(this.audioContext.currentTime + 0.45);
+  }
+
+  purr() {
+    if (!this.audioContext || !this.sfxGain || !this.enabled) return;
+    for (let i = 0; i < 4; i++) {
+      this.playTone(80 + Math.random() * 20, 0.15, "sine", 0.1, i * 0.12);
+    }
+  }
+
+  hiss() {
+    this.playNoise(0.3, 0.2);
+    this.playTone(2000, 0.2, "sawtooth", 0.1);
+  }
+
+  sadMeow() {
+    if (!this.audioContext || !this.sfxGain || !this.enabled) return;
+    const osc = this.audioContext.createOscillator();
+    const gain = this.audioContext.createGain();
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(600, this.audioContext.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(300, this.audioContext.currentTime + 0.4);
+    gain.gain.setValueAtTime(0.2, this.audioContext.currentTime);
+    gain.gain.linearRampToValueAtTime(0, this.audioContext.currentTime + 0.5);
+    osc.connect(gain);
+    gain.connect(this.sfxGain);
+    osc.start();
+    osc.stop(this.audioContext.currentTime + 0.55);
+  }
+
+  // === COUNTDOWN ===
+  countdown() {
+    this.playTone(440, 0.15, "square", 0.2);
+  }
+
+  countdownGo() {
+    this.playTone(880, 0.2, "square", 0.25);
+    this.playTone(880, 0.15, "sine", 0.15, 0.1);
+  }
+
+  // === TYPING/TEXT ===
+  typewriter() {
+    this.playTone(800 + Math.random() * 200, 0.03, "square", 0.1);
+  }
+
+  dialogAdvance() {
+    this.playTone(600, 0.08, "sine", 0.15);
+    this.playTone(800, 0.06, "sine", 0.1, 0.04);
+  }
+
+  // === ACHIEVEMENT ===
+  achievement() {
+    const notes = [523, 659, 784, 1047];
+    notes.forEach((freq, i) => {
+      this.playTone(freq, 0.2, "sine", 0.2, i * 0.1);
+      this.playTone(freq * 2, 0.15, "sine", 0.1, i * 0.1);
+    });
+  }
+
+  // === HEART EFFECTS ===
+  heartBeat() {
+    this.playTone(80, 0.15, "sine", 0.2);
+    this.playTone(100, 0.1, "sine", 0.15, 0.12);
+  }
+
+  heartBreak() {
+    this.playTone(400, 0.1, "sawtooth", 0.2);
+    this.playTone(300, 0.15, "sawtooth", 0.25, 0.08);
+    this.playTone(200, 0.2, "sawtooth", 0.2, 0.18);
+    this.playNoise(0.15, 0.1);
+  }
+
+  heartCollect() {
+    this.playTone(800, 0.1, "sine", 0.2);
+    this.playTone(1000, 0.08, "sine", 0.15, 0.05);
+    this.playTone(1200, 0.1, "sine", 0.2, 0.1);
+  }
+
+  // === LETTER EFFECTS ===
+  letterOpen() {
+    this.playTone(600, 0.1, "sine", 0.15);
+    this.playTone(800, 0.08, "sine", 0.1, 0.05);
+    this.playNoise(0.05, 0.1);
+  }
+
+  letterClose() {
+    this.playTone(500, 0.1, "sine", 0.15);
+    this.playTone(400, 0.08, "sine", 0.1, 0.05);
+  }
+
+  // === TRANSITION SOUNDS ===
+  whoosh() {
+    if (!this.audioContext || !this.sfxGain || !this.enabled) return;
+    const osc = this.audioContext.createOscillator();
+    const gain = this.audioContext.createGain();
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(200, this.audioContext.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(800, this.audioContext.currentTime + 0.2);
+    gain.gain.setValueAtTime(0.15, this.audioContext.currentTime);
+    gain.gain.linearRampToValueAtTime(0, this.audioContext.currentTime + 0.25);
+    osc.connect(gain);
+    gain.connect(this.sfxGain);
+    osc.start();
+    osc.stop(this.audioContext.currentTime + 0.3);
+    this.playNoise(0.15, 0.1);
+  }
+
+  sceneTransition() {
+    this.playTone(300, 0.2, "sine", 0.15);
+    this.playTone(400, 0.15, "sine", 0.1, 0.15);
+    this.playTone(500, 0.2, "sine", 0.15, 0.25);
+  }
+
+  // === MUSIC SYSTEM ===
+  startTitleMusic() {
+    this.stopMusic();
+    if (!this.audioContext || !this.musicGain || !this.musicEnabled) return;
+
+    const playNote = (freq: number, duration: number, delay: number) => {
+      if (!this.audioContext || !this.musicGain) return;
+      const osc = this.audioContext.createOscillator();
+      const gain = this.audioContext.createGain();
+      osc.type = "sine";
+      osc.frequency.value = freq;
+      gain.gain.setValueAtTime(0, this.audioContext.currentTime + delay);
+      gain.gain.linearRampToValueAtTime(0.15, this.audioContext.currentTime + delay + 0.05);
+      gain.gain.linearRampToValueAtTime(0, this.audioContext.currentTime + delay + duration);
+      osc.connect(gain);
+      gain.connect(this.musicGain);
+      osc.start(this.audioContext.currentTime + delay);
+      osc.stop(this.audioContext.currentTime + delay + duration + 0.1);
+    };
+
+    // Simple cute melody that loops
+    const melody = [
+      { freq: 523, dur: 0.3 }, { freq: 659, dur: 0.3 }, { freq: 784, dur: 0.4 },
+      { freq: 659, dur: 0.3 }, { freq: 523, dur: 0.3 }, { freq: 392, dur: 0.4 },
+      { freq: 440, dur: 0.3 }, { freq: 523, dur: 0.3 }, { freq: 659, dur: 0.5 },
+      { freq: 0, dur: 0.3 },
+    ];
+
+    let time = 0;
+    const playMelody = () => {
+      melody.forEach(note => {
+        if (note.freq > 0) playNote(note.freq, note.dur, time);
+        time += note.dur + 0.05;
+      });
+    };
+
+    playMelody();
+    this.musicInterval = window.setInterval(() => {
+      time = 0;
+      playMelody();
+    }, 3500);
+  }
+
+  startBattleMusic() {
+    this.stopMusic();
+    if (!this.audioContext || !this.musicGain || !this.musicEnabled) return;
+
+    const playNote = (freq: number, duration: number, delay: number, type: OscillatorType = "square") => {
+      if (!this.audioContext || !this.musicGain) return;
+      const osc = this.audioContext.createOscillator();
+      const gain = this.audioContext.createGain();
+      osc.type = type;
+      osc.frequency.value = freq;
+      gain.gain.setValueAtTime(0, this.audioContext.currentTime + delay);
+      gain.gain.linearRampToValueAtTime(0.12, this.audioContext.currentTime + delay + 0.02);
+      gain.gain.linearRampToValueAtTime(0, this.audioContext.currentTime + delay + duration);
+      osc.connect(gain);
+      gain.connect(this.musicGain);
+      osc.start(this.audioContext.currentTime + delay);
+      osc.stop(this.audioContext.currentTime + delay + duration + 0.1);
+    };
+
+    // Intense battle beat
+    const playBeat = () => {
+      let time = 0;
+      for (let i = 0; i < 8; i++) {
+        playNote(i % 2 === 0 ? 100 : 80, 0.15, time, "square");
+        if (i % 4 === 0) playNote(200, 0.1, time, "sawtooth");
+        time += 0.25;
+      }
+      // Add melody notes
+      playNote(330, 0.2, 0, "sawtooth");
+      playNote(392, 0.2, 0.5, "sawtooth");
+      playNote(440, 0.2, 1.0, "sawtooth");
+      playNote(392, 0.2, 1.5, "sawtooth");
+    };
+
+    playBeat();
+    this.musicInterval = window.setInterval(playBeat, 2000);
+  }
+
+  stopMusic() {
+    if (this.musicInterval) {
+      clearInterval(this.musicInterval);
+      this.musicInterval = null;
+    }
+    this.currentMusic.forEach(osc => {
+      try { osc.stop(); } catch { /* ignore */ }
+    });
+    this.currentMusic = [];
+  }
+}
+
+// Global sound manager instance
+const soundManager = new SoundManager();
+
+// ============================================================================
 // GAME SCENES & TYPES
 // ============================================================================
 
@@ -397,14 +926,16 @@ const CatchTheNoGame = memo(function CatchTheNoGame({ onComplete }: { onComplete
   }, [noLetters]);
 
   const startCountdown = useCallback(() => {
+    soundManager.buttonPress();
     setPhase("countdown");
     setCountdownNum(3);
   }, []);
 
-  // Countdown effect
+  // Countdown effect with sounds
   useEffect(() => {
     if (phase !== "countdown") return;
     if (countdownNum === 0) {
+      soundManager.countdownGo();
       gameEndedRef.current = false;
       setNoLetters(0);
       noRef.current = 0;
@@ -418,6 +949,7 @@ const CatchTheNoGame = memo(function CatchTheNoGame({ onComplete }: { onComplete
       setPhase("playing");
       return;
     }
+    soundManager.countdown();
     const timer = setTimeout(() => setCountdownNum(c => c - 1), 800);
     return () => clearTimeout(timer);
   }, [phase, countdownNum]);
@@ -434,6 +966,11 @@ const CatchTheNoGame = memo(function CatchTheNoGame({ onComplete }: { onComplete
           clearInterval(timer);
           if (!gameEndedRef.current) {
             gameEndedRef.current = true;
+            if (noRef.current >= 5) {
+              soundManager.levelUp();
+            } else {
+              soundManager.fail();
+            }
             setPhase("done");
             setTimeout(() => onCompleteRef.current(noRef.current), 2000);
           }
@@ -499,6 +1036,8 @@ const CatchTheNoGame = memo(function CatchTheNoGame({ onComplete }: { onComplete
               const isPerfect = dist < 4; // Perfect catch zone
               if (item.type === "heart") {
                 // Heart caught - bad!
+                soundManager.heartBreak();
+                soundManager.meow();
                 setCombo(0);
                 comboRef.current = 0;
                 setScreenShake(true);
@@ -517,6 +1056,7 @@ const CatchTheNoGame = memo(function CatchTheNoGame({ onComplete }: { onComplete
                 setTimeout(() => setCatchParticles(prev => prev.filter(p => !heartParticles.includes(p))), 600);
               } else if (item.type === "star") {
                 // Star bonus - adds 2 letters!
+                soundManager.powerUp();
                 setNoLetters(n => Math.min(n + 2, 10));
                 setCombo(c => c + 1);
                 comboRef.current += 1;
@@ -536,6 +1076,8 @@ const CatchTheNoGame = memo(function CatchTheNoGame({ onComplete }: { onComplete
                 setTimeout(() => setCatchParticles(prev => prev.filter(p => !starParticles.includes(p))), 700);
               } else {
                 // N or O caught - good!
+                soundManager.collect();
+                if (isPerfect) soundManager.success();
                 setNoLetters(n => n + 1);
                 setCombo(c => c + 1);
                 comboRef.current += 1;
@@ -1306,14 +1848,16 @@ const SmashTheHeartsGame = memo(function SmashTheHeartsGame({ onComplete }: { on
   }, []);
 
   const startCountdown = useCallback(() => {
+    soundManager.buttonPress();
     setPhase("countdown");
     setCountdownNum(3);
   }, []);
 
-  // Countdown effect
+  // Countdown effect with sounds
   useEffect(() => {
     if (phase !== "countdown") return;
     if (countdownNum === 0) {
+      soundManager.countdownGo();
       gameEndedRef.current = false;
       setScore(0);
       scoreRef.current = 0;
@@ -1327,6 +1871,7 @@ const SmashTheHeartsGame = memo(function SmashTheHeartsGame({ onComplete }: { on
       setPhase("playing");
       return;
     }
+    soundManager.countdown();
     const timer = setTimeout(() => setCountdownNum(c => c - 1), 800);
     return () => clearTimeout(timer);
   }, [phase, countdownNum, generateHearts]);
@@ -1340,6 +1885,7 @@ const SmashTheHeartsGame = memo(function SmashTheHeartsGame({ onComplete }: { on
           clearInterval(timer);
           if (!gameEndedRef.current) {
             gameEndedRef.current = true;
+            soundManager.levelUp();
             setPhase("done");
             setTimeout(() => onCompleteRef.current(scoreRef.current), 2000);
           }
@@ -1417,6 +1963,8 @@ const SmashTheHeartsGame = memo(function SmashTheHeartsGame({ onComplete }: { on
 
     if (heart.type === "cat") {
       // Hit the cat - bad!
+      soundManager.hiss();
+      soundManager.damage();
       setScore(s => Math.max(0, s - 30));
       setCombo(0);
       setScreenShake(true);
@@ -1430,6 +1978,8 @@ const SmashTheHeartsGame = memo(function SmashTheHeartsGame({ onComplete }: { on
       }, 500);
     } else if (heart.type === "bomb") {
       // Bomb - clears entire row!
+      soundManager.smash();
+      soundManager.specialAttack();
       setScreenShake(true);
       setTimeout(() => setScreenShake(false), 200);
       createParticles(x, y, "bomb");
@@ -1457,6 +2007,8 @@ const SmashTheHeartsGame = memo(function SmashTheHeartsGame({ onComplete }: { on
       ));
     } else {
       // Regular heart smash
+      soundManager.smash();
+      if (heart.type === "gold") soundManager.powerUp();
       const points = heart.type === "gold" ? 25 : heart.type === "red" ? 15 : 10;
       const comboBonus = Math.floor(combo / 3) * 5;
 
@@ -2164,14 +2716,16 @@ const DodgeTheLoveGame = memo(function DodgeTheLoveGame({ onComplete }: { onComp
   }, []);
 
   const startCountdown = useCallback(() => {
+    soundManager.buttonPress();
     setPhase("countdown");
     setCountdownNum(3);
   }, []);
 
-  // Countdown
+  // Countdown with sounds
   useEffect(() => {
     if (phase !== "countdown") return;
     if (countdownNum === 0) {
+      soundManager.countdownGo();
       gameEndedRef.current = false;
       setPlayerX(50);
       setPlayerY(70);
@@ -2203,6 +2757,7 @@ const DodgeTheLoveGame = memo(function DodgeTheLoveGame({ onComplete }: { onComp
       setPhase("playing");
       return;
     }
+    soundManager.countdown();
     const timer = setTimeout(() => setCountdownNum(c => c - 1), 700);
     return () => clearTimeout(timer);
   }, [phase, countdownNum]);
@@ -2216,6 +2771,11 @@ const DodgeTheLoveGame = memo(function DodgeTheLoveGame({ onComplete }: { onComp
           clearInterval(timer);
           if (!gameEndedRef.current) {
             gameEndedRef.current = true;
+            if (healthRef.current > 0) {
+              soundManager.levelUp();
+            } else {
+              soundManager.gameOver();
+            }
             setPhase("done");
             setTimeout(() => onCompleteRef.current(scoreRef.current), 2000);
           }
@@ -2462,6 +3022,8 @@ const DodgeTheLoveGame = memo(function DodgeTheLoveGame({ onComplete }: { onComp
 
             if (dist < playerSize + projectileSize - 5) {
               if (shieldRef.current) {
+                soundManager.shield();
+                soundManager.parry();
                 setShield(false);
                 shieldRef.current = false;
                 p.y = 200;
@@ -2471,10 +3033,13 @@ const DodgeTheLoveGame = memo(function DodgeTheLoveGame({ onComplete }: { onComp
                 spawnParticles(playerXRef.current, playerYRef.current, "shield", 12);
                 spawnScorePopup(playerXRef.current, playerYRef.current - 5, 15, "powerup");
               } else {
+                soundManager.hit();
+                soundManager.damage();
                 setHealth(h => {
                   const newHealth = h - 1;
                   healthRef.current = newHealth;
                   if (newHealth <= 0 && !gameEndedRef.current) {
+                    soundManager.gameOver();
                     gameEndedRef.current = true;
                     setPhase("done");
                     setTimeout(() => onCompleteRef.current(scoreRef.current), 2000);
@@ -2529,12 +3094,15 @@ const DodgeTheLoveGame = memo(function DodgeTheLoveGame({ onComplete }: { onComp
           const dist = Math.sqrt(dx * dx + dy * dy);
 
           if (dist < 10) {
+            soundManager.powerUp();
             if (pu.type === "shield") {
+              soundManager.shield();
               setShield(true);
               shieldRef.current = true;
               setCatMessage("A shield?! No fair! 😾");
               spawnParticles(pu.x, pu.y, "shield", 10);
             } else if (pu.type === "heal") {
+              soundManager.heartCollect();
               setHealth(h => Math.min(h + 1, 5));
               healthRef.current = Math.min(healthRef.current + 1, 5);
               setCatMessage("Healing?! 🙀");
@@ -3712,14 +4280,16 @@ const RejectLettersGame = memo(function RejectLettersGame({ onComplete }: { onCo
   }, []);
 
   const startCountdown = useCallback(() => {
+    soundManager.buttonPress();
     setPhase("countdown");
     setCountdownNum(3);
   }, []);
 
-  // Countdown
+  // Countdown with sounds
   useEffect(() => {
     if (phase !== "countdown") return;
     if (countdownNum === 0) {
+      soundManager.countdownGo();
       gameEndedRef.current = false;
       setScore(0);
       scoreRef.current = 0;
@@ -3736,6 +4306,7 @@ const RejectLettersGame = memo(function RejectLettersGame({ onComplete }: { onCo
       setPhase("playing");
       return;
     }
+    soundManager.countdown();
     const timer = setTimeout(() => setCountdownNum(c => c - 1), 600);
     return () => clearTimeout(timer);
   }, [phase, countdownNum]);
@@ -3749,6 +4320,7 @@ const RejectLettersGame = memo(function RejectLettersGame({ onComplete }: { onCo
           clearInterval(timer);
           if (!gameEndedRef.current) {
             gameEndedRef.current = true;
+            soundManager.levelUp();
             setPhase("done");
             setTimeout(() => onCompleteRef.current(scoreRef.current), 2500);
           }
@@ -3813,6 +4385,7 @@ const RejectLettersGame = memo(function RejectLettersGame({ onComplete }: { onCo
 
   // Open a letter
   const handleOpenLetter = useCallback((letter: typeof letterQueue[0]) => {
+    soundManager.letterOpen();
     setLetterQueue(prev => prev.filter(l => l.id !== letter.id));
     setOpenLetter({
       id: letter.id,
@@ -3828,6 +4401,7 @@ const RejectLettersGame = memo(function RejectLettersGame({ onComplete }: { onCo
   const handleBurn = useCallback(() => {
     if (!openLetter || destruction.type) return;
 
+    soundManager.burn();
     setDestruction({ type: "burn", progress: 0 });
 
     // Animate burn progress
@@ -3884,6 +4458,7 @@ const RejectLettersGame = memo(function RejectLettersGame({ onComplete }: { onCo
   const handleRip = useCallback(() => {
     if (!openLetter || destruction.type) return;
 
+    soundManager.shred();
     setDestruction({ type: "rip", progress: 0 });
 
     // Animate rip progress with more dramatic tearing
@@ -3951,6 +4526,7 @@ const RejectLettersGame = memo(function RejectLettersGame({ onComplete }: { onCo
   const handleShred = useCallback(() => {
     if (!openLetter || destruction.type) return;
 
+    soundManager.shred();
     // Generate shred line positions
     const shredLines = Array.from({ length: 12 }, (_, i) => 8 + i * 7 + (i % 2) * 2);
     setDestruction({ type: "shred", progress: 0, shredLines });
@@ -4013,6 +4589,7 @@ const RejectLettersGame = memo(function RejectLettersGame({ onComplete }: { onCo
   const handleCrumple = useCallback(() => {
     if (!openLetter || destruction.type) return;
 
+    soundManager.crumple();
     const crumpleAngle = (Math.random() - 0.5) * 60;
     setDestruction({ type: "crumple", progress: 0, crumpleAngle });
 
@@ -4060,6 +4637,7 @@ const RejectLettersGame = memo(function RejectLettersGame({ onComplete }: { onCo
   const handleDissolve = useCallback(() => {
     if (!openLetter || destruction.type) return;
 
+    soundManager.dissolve();
     setDestruction({ type: "dissolve", progress: 0 });
 
     let progress = 0;
@@ -4111,6 +4689,7 @@ const RejectLettersGame = memo(function RejectLettersGame({ onComplete }: { onCo
   const handleFreeze = useCallback(() => {
     if (!openLetter || destruction.type) return;
 
+    soundManager.freeze();
     // Generate crack positions
     const freezeCracks = Array.from({ length: 8 }, () => ({
       x: 20 + Math.random() * 60,
@@ -4134,6 +4713,7 @@ const RejectLettersGame = memo(function RejectLettersGame({ onComplete }: { onCo
 
         if (progress >= 0.5) {
           phase = "shattering";
+          soundManager.shatter();
           setScreenShake(15);
           setTimeout(() => setScreenShake(0), 100);
         }
@@ -4182,6 +4762,7 @@ const RejectLettersGame = memo(function RejectLettersGame({ onComplete }: { onCo
   const handleBlackHole = useCallback(() => {
     if (!openLetter || destruction.type) return;
 
+    soundManager.blackHole();
     setDestruction({ type: "blackhole", progress: 0 });
 
     let progress = 0;
@@ -5735,7 +6316,7 @@ const DramaKingBattle = memo(function DramaKingBattle({ onComplete }: { onComple
       fire: ["#ff5722", "#ff9800", "#ffeb3b", "#f44336"],
       poison: ["#4caf50", "#8bc34a", "#cddc39", "#00e676"],
     };
-    const newParticles = Array.from({ length: count }, (_, i) => ({
+    const newParticles = Array.from({ length: Math.min(count, 8) }, (_, i) => ({
       id: performance.now() + i + Math.random() * 1000,
       x, y,
       vx: (Math.random() - 0.5) * 14 * spread,
@@ -5746,19 +6327,19 @@ const DramaKingBattle = memo(function DramaKingBattle({ onComplete }: { onComple
       color: colors[type][Math.floor(Math.random() * colors[type].length)],
       rotation: Math.random() * 360,
     }));
-    setParticles(prev => [...prev.slice(-80), ...newParticles]);
+    setParticles(prev => [...prev.slice(-40), ...newParticles]);
   }, []);
 
-  // Spawn floating text - enhanced
+  // Spawn floating text - optimized
   const spawnFloatingText = useCallback((x: number, y: number, text: string, color: string, size: "sm" | "md" | "lg" | "xl" = "md") => {
-    setFloatingTexts(prev => [...prev.slice(-10), { id: performance.now() + Math.random(), x, y, text, color, size }]);
-    setTimeout(() => setFloatingTexts(prev => prev.slice(1)), 1800);
+    setFloatingTexts(prev => [...prev.slice(-5), { id: performance.now() + Math.random(), x, y, text, color, size }]);
+    setTimeout(() => setFloatingTexts(prev => prev.slice(1)), 1200);
   }, []);
 
-  // Spawn score popup
+  // Spawn score popup - optimized
   const spawnScorePopup = useCallback((x: number, y: number, value: number, type: "damage" | "parry" | "combo" | "heal" | "crit") => {
-    setScorePopups(prev => [...prev.slice(-8), { id: performance.now() + Math.random(), x, y, value, type }]);
-    setTimeout(() => setScorePopups(prev => prev.slice(1)), 1200);
+    setScorePopups(prev => [...prev.slice(-4), { id: performance.now() + Math.random(), x, y, value, type }]);
+    setTimeout(() => setScorePopups(prev => prev.slice(1)), 800);
   }, []);
 
   // Screen shake helper
@@ -5781,14 +6362,17 @@ const DramaKingBattle = memo(function DramaKingBattle({ onComplete }: { onComple
 
   // Start countdown
   const startCountdown = useCallback(() => {
+    soundManager.buttonPress();
+    soundManager.startBattleMusic();
     setPhase("countdown");
     setCountdownNum(3);
   }, []);
 
-  // Countdown effect
+  // Countdown effect with sounds
   useEffect(() => {
     if (phase !== "countdown") return;
     if (countdownNum === 0) {
+      soundManager.countdownGo();
       gameEndedRef.current = false;
       setBossHP(100);
       bossHPRef.current = 100;
@@ -5828,34 +6412,42 @@ const DramaKingBattle = memo(function DramaKingBattle({ onComplete }: { onComple
       setPhase("battle");
       return;
     }
+    soundManager.countdown();
     const timer = setTimeout(() => setCountdownNum(c => c - 1), 700);
     return () => clearTimeout(timer);
   }, [phase, countdownNum]);
 
-  // Main game loop using RAF for smooth updates
+  // Main game loop using RAF for smooth updates - optimized
   useEffect(() => {
     if (phase !== "battle") return;
 
     let lastTime = performance.now();
+    let frameCount = 0;
 
     const gameLoop = (currentTime: number) => {
       if (gameEndedRef.current) return;
 
       const deltaTime = (currentTime - lastTime) / 1000;
       lastTime = currentTime;
+      frameCount++;
 
-      // Update battle time
+      // Update battle time every frame
       setBattleTime(t => t + deltaTime);
 
-      // Update particles smoothly
-      setParticles(prev => prev.map(p => ({
-        ...p,
-        x: p.x + p.vx * deltaTime * 30,
-        y: p.y + p.vy * deltaTime * 30,
-        vy: p.vy + 15 * deltaTime,
-        life: p.life - deltaTime * 1.5,
-        rotation: p.rotation + p.vx * deltaTime * 100,
-      })).filter(p => p.life > 0));
+      // Update particles every 2nd frame for better performance
+      if (frameCount % 2 === 0) {
+        setParticles(prev => {
+          if (prev.length === 0) return prev;
+          return prev.map(p => ({
+            ...p,
+            x: p.x + p.vx * deltaTime * 60,
+            y: p.y + p.vy * deltaTime * 60,
+            vy: p.vy + 30 * deltaTime,
+            life: p.life - deltaTime * 2,
+            rotation: p.rotation + p.vx * deltaTime * 100,
+          })).filter(p => p.life > 0);
+        });
+      }
 
       // Update projectiles
       setProjectiles(prev => {
@@ -5933,6 +6525,7 @@ const DramaKingBattle = memo(function DramaKingBattle({ onComplete }: { onComple
     const hpPercent = (bossHP / bossMaxHP) * 100;
 
     if (hpPercent <= 15 && !rageMode) {
+      soundManager.bossPhaseChange();
       setRageMode(true);
       setBossPhase("rage");
       bossPhaseRef.current = "rage";
@@ -5945,6 +6538,7 @@ const DramaKingBattle = memo(function DramaKingBattle({ onComplete }: { onComple
       spawnFloatingText(50, 30, "RAGE MODE! 🔥👿🔥", "#ff0000", "xl");
       showBossMessage(pick(RAGE_TAUNTS));
     } else if (hpPercent <= 35 && hpPercent > 15 && bossPhase !== "phase3" && bossPhase !== "rage") {
+      soundManager.bossPhaseChange();
       setBossPhase("phase3");
       bossPhaseRef.current = "phase3";
       setBossEmotion("angry");
@@ -5955,6 +6549,7 @@ const DramaKingBattle = memo(function DramaKingBattle({ onComplete }: { onComple
       spawnFloatingText(50, 30, "FINAL FORM! 👑", "#ffd700", "lg");
       showBossMessage("THIS IS MY FINAL FORM! 😾");
     } else if (hpPercent <= 65 && hpPercent > 35 && bossPhase === "phase1") {
+      soundManager.bossPhaseChange();
       setBossPhase("phase2");
       bossPhaseRef.current = "phase2";
       setBossEmotion("angry");
@@ -6036,6 +6631,7 @@ const DramaKingBattle = memo(function DramaKingBattle({ onComplete }: { onComple
           parryWindowRef.current = false;
 
           // Execute attack based on type
+          soundManager.bossAttack();
           setBossAction("attacking");
           setBossEmotion("angry");
           triggerShake(attackData.damage > 20 ? 15 : 8);
@@ -6069,12 +6665,15 @@ const DramaKingBattle = memo(function DramaKingBattle({ onComplete }: { onComple
           // Check if player blocked
           if (!shieldActiveRef.current) {
             // Player takes damage
+            soundManager.damage();
             const damage = bossPhaseRef.current === "rage" ? Math.floor(attackData.damage * 1.3) : attackData.damage;
             setPlayerHP(hp => {
               const newHP = Math.max(0, hp - damage);
               playerHPRef.current = newHP;
               if (newHP <= 0 && !gameEndedRef.current) {
                 gameEndedRef.current = true;
+                soundManager.gameOver();
+                soundManager.stopMusic();
                 setPhase("defeat");
                 setTimeout(() => onCompleteRef.current(false), 2500);
               }
@@ -6179,12 +6778,14 @@ const DramaKingBattle = memo(function DramaKingBattle({ onComplete }: { onComple
     // Floating love text
     const textX = 50 + (Math.random() - 0.5) * 30;
     if (isCritical) {
+      soundManager.criticalHit();
       setCriticalHits(c => c + 1);
       spawnFloatingText(textX, 38, pick(CRITICAL_MESSAGES), "#ffd700", "lg");
       spawnFloatingText(textX, 45, loveAttack.text, "#ff4081", "sm");
       triggerShake(5);
       setHitFlash("crit");
     } else {
+      soundManager.bossHit();
       spawnFloatingText(textX, 40, loveAttack.text, "#ff4081", "sm");
       setHitFlash("boss");
     }
@@ -6196,6 +6797,8 @@ const DramaKingBattle = memo(function DramaKingBattle({ onComplete }: { onComple
       bossHPRef.current = newHP;
       if (newHP <= 0 && !gameEndedRef.current) {
         gameEndedRef.current = true;
+        soundManager.victory();
+        soundManager.stopMusic();
         triggerShake(25);
         triggerLightning();
         spawnParticles(50, 25, "star", 40, 2.5);
@@ -6237,6 +6840,7 @@ const DramaKingBattle = memo(function DramaKingBattle({ onComplete }: { onComple
   const useSpecialAttack = useCallback(() => {
     if (!specialReady || gameEndedRef.current || playerStunned) return;
 
+    soundManager.specialAttack();
     setSpecialReady(false);
     setSpecialCooldown(10);
 
@@ -6285,6 +6889,7 @@ const DramaKingBattle = memo(function DramaKingBattle({ onComplete }: { onComple
     // Check for perfect parry
     if (parryWindowRef.current && bossAction === "charging") {
       // Perfect parry!
+      soundManager.parry();
       setParrySuccess(true);
       setPerfectParries(p => p + 1);
 
@@ -6328,6 +6933,7 @@ const DramaKingBattle = memo(function DramaKingBattle({ onComplete }: { onComple
       setShieldCooldown(1.5);
     } else {
       // Normal shield
+      soundManager.shield();
       setShieldActive(true);
       shieldActiveRef.current = true;
       spawnParticles(50, 60, "shield", 10, 0.5);
@@ -6358,22 +6964,21 @@ const DramaKingBattle = memo(function DramaKingBattle({ onComplete }: { onComple
   if (phase === "tutorial") {
     return (
       <div className="fixed inset-0 bg-gradient-to-b from-slate-900 via-purple-900 to-slate-900 flex flex-col items-center justify-center p-4 overflow-hidden">
-        {/* Animated background */}
+        {/* Animated background - reduced for performance */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          {Array.from({ length: 20 }).map((_, i) => (
-            <motion.div
+          {Array.from({ length: 8 }).map((_, i) => (
+            <div
               key={i}
               className="absolute text-3xl opacity-20"
-              style={{ left: `${(i * 12) % 100}%`, top: `${(i * 15) % 100}%` }}
-              animate={{
-                y: [0, -30, 0],
-                rotate: [-10, 10, -10],
-                scale: [1, 1.2, 1],
+              style={{
+                left: `${(i * 12 + 5) % 100}%`,
+                top: `${(i * 15 + 5) % 100}%`,
+                animation: `float ${3 + (i % 3)}s ease-in-out infinite`,
+                animationDelay: `${i * 0.3}s`,
               }}
-              transition={{ duration: 3 + (i % 3), repeat: Infinity, delay: i * 0.2 }}
             >
               {["💔", "😾", "👑", "⚡", "💥"][i % 5]}
-            </motion.div>
+            </div>
           ))}
         </div>
 
@@ -6505,23 +7110,21 @@ const DramaKingBattle = memo(function DramaKingBattle({ onComplete }: { onComple
 
     return (
       <div className="fixed inset-0 bg-gradient-to-b from-pink-500 via-rose-600 to-purple-700 flex flex-col items-center justify-center p-4 overflow-hidden">
-        {/* Victory particles */}
+        {/* Victory particles - reduced for performance */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          {Array.from({ length: 30 }).map((_, i) => (
-            <motion.div
+          {Array.from({ length: 12 }).map((_, i) => (
+            <div
               key={i}
-              className="absolute text-3xl"
-              style={{ left: `${Math.random() * 100}%`, top: `${Math.random() * 100}%` }}
-              initial={{ opacity: 0, scale: 0 }}
-              animate={{
-                opacity: [0, 1, 0],
-                scale: [0, 1.5, 0],
-                y: [0, -50],
+              className="absolute text-2xl"
+              style={{
+                left: `${(i * 8 + 5) % 100}%`,
+                top: `${(i * 12 + 10) % 100}%`,
+                animation: `floatUp ${2 + (i % 3)}s ease-in-out infinite`,
+                animationDelay: `${i * 0.15}s`,
               }}
-              transition={{ duration: 2, repeat: Infinity, delay: i * 0.1 }}
             >
               {["💖", "✨", "🌟", "💕", "👑"][i % 5]}
-            </motion.div>
+            </div>
           ))}
         </div>
 
@@ -6607,18 +7210,21 @@ const DramaKingBattle = memo(function DramaKingBattle({ onComplete }: { onComple
   if (phase === "defeat") {
     return (
       <div className="fixed inset-0 bg-gradient-to-b from-slate-800 via-slate-900 to-black flex flex-col items-center justify-center p-4 overflow-hidden">
-        {/* Defeat particles */}
+        {/* Defeat particles - reduced for performance */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          {Array.from({ length: 15 }).map((_, i) => (
-            <motion.div
+          {Array.from({ length: 8 }).map((_, i) => (
+            <div
               key={i}
               className="absolute text-2xl opacity-30"
-              style={{ left: `${Math.random() * 100}%`, top: `${Math.random() * 100}%` }}
-              animate={{ y: [0, 20], opacity: [0.3, 0] }}
-              transition={{ duration: 3, repeat: Infinity, delay: i * 0.2 }}
+              style={{
+                left: `${(i * 12 + 5) % 100}%`,
+                top: `${(i * 15 + 10) % 100}%`,
+                animation: `floatDown ${3 + (i % 2)}s ease-in-out infinite`,
+                animationDelay: `${i * 0.25}s`,
+              }}
             >
               💔
-            </motion.div>
+            </div>
           ))}
         </div>
 
@@ -6690,21 +7296,20 @@ const DramaKingBattle = memo(function DramaKingBattle({ onComplete }: { onComple
       {hitFlash === "player" && <div className="absolute inset-0 bg-red-500/30 z-40 pointer-events-none" />}
       {hitFlash === "boss" && <div className="absolute inset-0 bg-pink-500/20 z-40 pointer-events-none" />}
 
-      {/* Animated background particles */}
+      {/* Animated background particles - reduced for performance */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        {Array.from({ length: 12 }).map((_, i) => (
-          <motion.div
+        {Array.from({ length: 5 }).map((_, i) => (
+          <div
             key={i}
             className="absolute text-2xl opacity-10"
-            style={{ left: `${(i * 15) % 100}%`, top: `${(i * 20) % 100}%` }}
-            animate={{
-              y: [0, -20, 0],
-              opacity: [0.1, 0.2, 0.1],
+            style={{
+              left: `${(i * 20) % 100}%`,
+              top: `${(i * 25) % 100}%`,
+              animation: `float ${4 + i}s ease-in-out infinite`,
             }}
-            transition={{ duration: 4 + i % 3, repeat: Infinity, delay: i * 0.3 }}
           >
             {bossPhase === "phase3" ? "👑" : bossPhase === "phase2" ? "💢" : "💔"}
-          </motion.div>
+          </div>
         ))}
       </div>
 
@@ -6925,38 +7530,37 @@ const DramaKingBattle = memo(function DramaKingBattle({ onComplete }: { onComple
         </motion.div>
       )}
 
-      {/* Particles */}
+      {/* Particles - optimized with colored divs instead of emoji */}
       {particles.map(p => (
         <div
           key={p.id}
-          className="absolute pointer-events-none text-lg"
+          className="absolute pointer-events-none rounded-full"
           style={{
             left: `${p.x}%`,
             top: `${p.y}%`,
+            width: p.size,
+            height: p.size,
             opacity: p.life,
-            transform: `rotate(${p.rotation}deg) scale(${p.size / 10})`,
-            color: p.color,
+            transform: `rotate(${p.rotation}deg)`,
+            backgroundColor: p.color,
+            boxShadow: (p.type === "star" || p.type === "spark" || p.type === "crown") ? `0 0 ${p.size}px ${p.color}` : undefined,
           }}
-        >
-          {p.type === "heart" ? "💖" : p.type === "star" ? "⭐" : p.type === "spark" ? "✨" :
-           p.type === "drama" ? "💢" : p.type === "crown" ? "👑" : p.type === "shield" ? "🛡️" : "💚"}
-        </div>
+        />
       ))}
 
-      {/* Projectiles */}
+      {/* Projectiles - CSS animation for better performance */}
       {projectiles.map(proj => (
-        <motion.div
+        <div
           key={proj.id}
           className="absolute pointer-events-none text-2xl z-20"
           style={{
             left: `${proj.x}%`,
             top: `${proj.y}%`,
+            animation: "spin 0.5s linear infinite",
           }}
-          animate={{ rotate: [0, 360] }}
-          transition={{ duration: 0.5, repeat: Infinity, ease: "linear" }}
         >
           {proj.type === "heart" ? "💔" : proj.type === "jealousy" ? "💚" : "💢"}
-        </motion.div>
+        </div>
       ))}
 
       {/* Floating texts */}
@@ -7572,24 +8176,42 @@ export default function ValentineCat() {
   const [stats, setStats] = useState({ noCount: 0, yesTime: 0, petCount: 0, totalScore: 0 });
   const [catMood, setCatMood] = useState<keyof typeof CAT_EMOTIONS>("happy");
   const [catMessage, setCatMessage] = useState("");
+  const [soundEnabled, setSoundEnabled] = useState(true);
   const gameStartRef = useRef(0);
+
+  // Toggle sound handler
+  const toggleSound = useCallback(() => {
+    setSoundEnabled(prev => {
+      const newState = !prev;
+      soundManager.setEnabled(newState);
+      if (newState) {
+        soundManager.click();
+      }
+      return newState;
+    });
+  }, []);
 
   const unlockAchievement = useCallback((id: string) => {
     if (unlockedAchievements.has(id)) return;
     const achievement = ACHIEVEMENTS.find(a => a.id === id);
     if (achievement) {
+      soundManager.achievement();
       setUnlockedAchievements(prev => new Set([...prev, id]));
       setShowAchievement({ ...achievement, unlocked: true });
     }
   }, [unlockedAchievements]);
 
   const startGame = useCallback(() => {
+    soundManager.init();
+    soundManager.buttonPress();
+    soundManager.startTitleMusic();
     gameStartRef.current = now();
     setScene("intro_cutscene");
     setDialogIndex(0);
   }, []);
 
   const nextScene = useCallback((next: GameScene) => {
+    soundManager.sceneTransition();
     if (next in CHAPTER_TITLES) {
       setPendingScene(next);
       setShowChapterTitle(true);
@@ -7604,6 +8226,7 @@ export default function ValentineCat() {
   }, []);
 
   const advanceDialog = useCallback(() => {
+    soundManager.dialogAdvance();
     if (dialogIndex < INTRO_DIALOG.length - 1) {
       setDialogIndex(i => i + 1);
     } else {
@@ -7612,6 +8235,8 @@ export default function ValentineCat() {
   }, [dialogIndex, nextScene]);
 
   const handleYes = useCallback(() => {
+    soundManager.victory();
+    soundManager.stopMusic();
     const elapsed = now() - gameStartRef.current;
     setStats(s => ({ ...s, yesTime: elapsed }));
 
@@ -7629,6 +8254,7 @@ export default function ValentineCat() {
   }, [stats.noCount, stats.petCount, unlockAchievement, nextScene]);
 
   const petCat = useCallback(() => {
+    soundManager.purr();
     setStats(s => {
       const newCount = s.petCount + 1;
       if (newCount >= 20) unlockAchievement("cat_whisperer");
@@ -7643,9 +8269,26 @@ export default function ValentineCat() {
   // RENDER SCENES
   // ============================================================================
 
+  // Sound toggle button component - appears on every scene
+  const SoundToggleButton = (
+    <motion.button
+      onClick={toggleSound}
+      className="fixed top-4 right-4 z-50 w-10 h-10 rounded-full bg-white/80 backdrop-blur-sm shadow-lg flex items-center justify-center hover:bg-white transition-colors"
+      whileHover={{ scale: 1.1 }}
+      whileTap={{ scale: 0.9 }}
+      initial={{ opacity: 0, y: -20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 0.5 }}
+      title={soundEnabled ? "Mute sounds" : "Unmute sounds"}
+    >
+      <span className="text-xl">{soundEnabled ? "🔊" : "🔇"}</span>
+    </motion.button>
+  );
+
   if (scene === "title") {
     return (
       <div className="fixed inset-0 bg-gradient-to-b from-pink-200 via-rose-300 to-pink-400 flex flex-col items-center justify-center p-4 overflow-hidden">
+        {SoundToggleButton}
         {/* Animated background hearts */}
         <div className="absolute inset-0 pointer-events-none overflow-hidden">
           {Array.from({ length: 20 }).map((_, i) => (
@@ -7772,6 +8415,9 @@ export default function ValentineCat() {
             </motion.button>
             <motion.button
               onClick={() => {
+                soundManager.init();
+                soundManager.click();
+                soundManager.whoosh();
                 gameStartRef.current = now();
                 setScene("chapter1_chase");
               }}
@@ -7825,6 +8471,7 @@ export default function ValentineCat() {
   if (scene === "intro_cutscene") {
     return (
       <div className="fixed inset-0 bg-gradient-to-b from-indigo-950 via-purple-900 to-pink-900 flex items-center justify-center p-4 overflow-hidden">
+        {SoundToggleButton}
         {/* Starfield background */}
         <div className="absolute inset-0 pointer-events-none">
           {Array.from({ length: 30 }).map((_, i) => (
@@ -7894,7 +8541,10 @@ export default function ValentineCat() {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 1 }}
-          onClick={() => nextScene("chapter1_chase")}
+          onClick={() => {
+            soundManager.whoosh();
+            nextScene("chapter1_chase");
+          }}
           className="absolute bottom-6 right-6 text-white/50 hover:text-white/80 text-sm transition-colors"
         >
           Skip →
@@ -7910,6 +8560,7 @@ export default function ValentineCat() {
   if (scene === "chapter1_chase") {
     return (
       <div className="fixed inset-0 bg-gradient-to-br from-pink-100 via-rose-200 to-pink-300 overflow-hidden flex items-center justify-center p-4">
+        {SoundToggleButton}
         {/* Animated background */}
         <div className="absolute inset-0 pointer-events-none overflow-hidden">
           {Array.from({ length: 15 }).map((_, i) => (
@@ -8137,6 +8788,7 @@ export default function ValentineCat() {
   if (scene === "ending_good") {
     return (
       <div className="fixed inset-0 bg-gradient-to-b from-pink-300 via-rose-400 to-pink-500 flex items-center justify-center p-4 overflow-hidden">
+        {SoundToggleButton}
         {/* Floating hearts */}
         <div className="absolute inset-0 pointer-events-none">
           {Array.from({ length: 20 }).map((_, i) => (
@@ -8260,6 +8912,7 @@ export default function ValentineCat() {
   if (scene === "ending_perfect") {
     return (
       <div className="fixed inset-0 bg-gradient-to-b from-amber-300 via-yellow-400 to-orange-400 flex items-center justify-center p-4 overflow-hidden">
+        {SoundToggleButton}
         {/* Floating stars and crowns */}
         <div className="absolute inset-0 pointer-events-none">
           {Array.from({ length: 25 }).map((_, i) => (
