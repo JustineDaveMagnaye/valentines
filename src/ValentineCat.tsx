@@ -176,49 +176,6 @@ const Button = memo(function Button({
   );
 });
 
-// Optimized Particles - Pure CSS animations, minimal JS
-const Particles = memo(function Particles({ emojis, count = 20 }: { emojis: string[]; count?: number }) {
-  const particles = useMemo(() =>
-    Array.from({ length: Math.min(count, 15) }).map((_, i) => ({
-      id: i,
-      emoji: emojis[i % emojis.length],
-      x: (i * 100 / Math.min(count, 15)) + rand(-5, 5),
-      delay: i * 0.4,
-      duration: rand(8, 14),
-    })), [emojis, count]);
-
-  return (
-    <>
-      <style>{`
-        @keyframes particle-fall {
-          0% { transform: translateY(-5vh) rotate(0deg); opacity: 0; }
-          10% { opacity: 0.5; }
-          90% { opacity: 0.5; }
-          100% { transform: translateY(105vh) rotate(360deg); opacity: 0; }
-        }
-        .particle {
-          will-change: transform, opacity;
-          contain: strict;
-        }
-      `}</style>
-      <div className="fixed inset-0 pointer-events-none overflow-hidden z-0" aria-hidden="true">
-        {particles.map(p => (
-          <div
-            key={p.id}
-            className="particle absolute text-xl"
-            style={{
-              left: `${p.x}%`,
-              animation: `particle-fall ${p.duration}s linear ${p.delay}s infinite`,
-            }}
-          >
-            {p.emoji}
-          </div>
-        ))}
-      </div>
-    </>
-  );
-});
-
 const TypeWriter = memo(function TypeWriter({ text, speed = 50, onComplete }: { text: string; speed?: number; onComplete?: () => void }) {
   const [displayed, setDisplayed] = useState("");
   const [done, setDone] = useState(false);
@@ -386,22 +343,6 @@ const AchievementPopup = memo(function AchievementPopup({ achievement, onClose }
   );
 });
 
-const CatSprite = memo(function CatSprite({ emotion = "happy", size = "md", className, animate = false }: { emotion?: keyof typeof CAT_EMOTIONS; size?: "sm" | "md" | "lg" | "xl"; className?: string; animate?: boolean }) {
-  const sizes = { sm: "text-4xl", md: "text-6xl", lg: "text-8xl", xl: "text-[120px]" };
-  if (animate) {
-    return (
-      <motion.div
-        className={cn(sizes[size], className)}
-        animate={{ y: [0, -8, 0] }}
-        transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
-      >
-        {CAT_EMOTIONS[emotion]}
-      </motion.div>
-    );
-  }
-  return <div className={cn(sizes[size], className)}>{CAT_EMOTIONS[emotion]}</div>;
-});
-
 // ============================================================================
 // MINI-GAMES - Optimized with requestAnimationFrame
 // ============================================================================
@@ -420,14 +361,18 @@ const CatchTheNoGame = memo(function CatchTheNoGame({ onComplete }: { onComplete
     rotation: number;
     scale: number;
     caught?: boolean;
+    glowing?: boolean;
   }>>([]);
   const [catMessage, setCatMessage] = useState("");
   const [basketX, setBasketX] = useState(50);
   const [combo, setCombo] = useState(0);
-  const [lastCatch, setLastCatch] = useState<{ x: number; y: number; type: string } | null>(null);
+  const [lastCatch, setLastCatch] = useState<{ x: number; y: number; type: string; combo: number } | null>(null);
   const [countdownNum, setCountdownNum] = useState(3);
   const [screenShake, setScreenShake] = useState(false);
   const [catEmotion, setCatEmotion] = useState<"happy" | "angry" | "worried">("happy");
+  const [catchParticles, setCatchParticles] = useState<Array<{ id: number; x: number; y: number; emoji: string; angle: number }>>([]);
+  const [basketGlow, setBasketGlow] = useState(false);
+  const [perfectCatch, setPerfectCatch] = useState(false);
 
   // Refs for RAF loop
   const onCompleteRef = useRef(onComplete);
@@ -551,6 +496,7 @@ const CatchTheNoGame = memo(function CatchTheNoGame({ onComplete }: { onComplete
           if (item.y >= 72 && item.y <= 88) {
             const dist = Math.abs(item.x - basketXRef.current);
             if (dist < 12) {
+              const isPerfect = dist < 4; // Perfect catch zone
               if (item.type === "heart") {
                 // Heart caught - bad!
                 setCombo(0);
@@ -559,20 +505,58 @@ const CatchTheNoGame = memo(function CatchTheNoGame({ onComplete }: { onComplete
                 setTimeout(() => setScreenShake(false), 300);
                 setCatMessage(CAT_TAUNTS_CATCH[Math.floor(Math.random() * CAT_TAUNTS_CATCH.length)]);
                 setTimeout(() => setCatMessage(""), 1200);
+                // Add broken heart particles
+                const heartParticles = Array.from({ length: 6 }).map((_, i) => ({
+                  id: performance.now() + i,
+                  x: item.x,
+                  y: item.y,
+                  emoji: "💔",
+                  angle: (i * 60) + Math.random() * 30,
+                }));
+                setCatchParticles(prev => [...prev, ...heartParticles]);
+                setTimeout(() => setCatchParticles(prev => prev.filter(p => !heartParticles.includes(p))), 600);
               } else if (item.type === "star") {
                 // Star bonus - adds 2 letters!
                 setNoLetters(n => Math.min(n + 2, 10));
                 setCombo(c => c + 1);
                 comboRef.current += 1;
-                setLastCatch({ x: item.x, y: item.y, type: "star" });
-                setTimeout(() => setLastCatch(null), 600);
+                setLastCatch({ x: item.x, y: item.y, type: "star", combo: comboRef.current });
+                setTimeout(() => setLastCatch(null), 800);
+                setBasketGlow(true);
+                setTimeout(() => setBasketGlow(false), 500);
+                // Add star burst particles
+                const starParticles = Array.from({ length: 8 }).map((_, i) => ({
+                  id: performance.now() + i,
+                  x: item.x,
+                  y: item.y,
+                  emoji: ["⭐", "✨", "🌟"][i % 3],
+                  angle: i * 45,
+                }));
+                setCatchParticles(prev => [...prev, ...starParticles]);
+                setTimeout(() => setCatchParticles(prev => prev.filter(p => !starParticles.includes(p))), 700);
               } else {
                 // N or O caught - good!
                 setNoLetters(n => n + 1);
                 setCombo(c => c + 1);
                 comboRef.current += 1;
-                setLastCatch({ x: item.x, y: item.y, type: item.type });
+                setLastCatch({ x: item.x, y: item.y, type: item.type, combo: comboRef.current });
                 setTimeout(() => setLastCatch(null), 600);
+                if (isPerfect) {
+                  setPerfectCatch(true);
+                  setTimeout(() => setPerfectCatch(false), 400);
+                }
+                setBasketGlow(true);
+                setTimeout(() => setBasketGlow(false), 300);
+                // Add letter catch particles
+                const letterParticles = Array.from({ length: 5 }).map((_, i) => ({
+                  id: performance.now() + i,
+                  x: item.x,
+                  y: item.y,
+                  emoji: "✓",
+                  angle: -90 + (i - 2) * 30,
+                }));
+                setCatchParticles(prev => [...prev, ...letterParticles]);
+                setTimeout(() => setCatchParticles(prev => prev.filter(p => !letterParticles.includes(p))), 500);
               }
               item.caught = true;
             }
@@ -619,153 +603,372 @@ const CatchTheNoGame = memo(function CatchTheNoGame({ onComplete }: { onComplete
     targetBasketXRef.current = Math.max(8, Math.min(92, x));
   }, []);
 
-  // Tutorial screen with better styling
+  // Tutorial screen with enhanced styling
   if (phase === "tutorial") {
     return (
       <div className="fixed inset-0 bg-gradient-to-b from-indigo-600 via-purple-600 to-fuchsia-700 flex flex-col items-center justify-center p-4 overflow-hidden">
-        {/* Animated background particles */}
+        {/* Enhanced animated background with falling letters */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          {Array.from({ length: 20 }).map((_, i) => (
+          {Array.from({ length: 24 }).map((_, i) => (
             <motion.div
               key={i}
-              className="absolute text-2xl opacity-20"
-              initial={{ y: "110vh", x: `${Math.random() * 100}%` }}
-              animate={{ y: "-10vh" }}
-              transition={{ duration: 8 + Math.random() * 4, repeat: Infinity, delay: Math.random() * 5 }}
+              className="absolute text-3xl"
+              style={{
+                left: `${(i % 8) * 12.5 + Math.random() * 5}%`,
+                opacity: 0.15 + Math.random() * 0.15,
+              }}
+              initial={{ y: "-10%", rotate: 0 }}
+              animate={{ y: "110%", rotate: 360 }}
+              transition={{
+                duration: 6 + Math.random() * 4,
+                repeat: Infinity,
+                delay: Math.random() * 3,
+                ease: "linear"
+              }}
             >
-              {["N", "O", "💕", "✨"][i % 4]}
+              {["N", "O", "💕", "⭐", "✨", "🧺"][i % 6]}
             </motion.div>
           ))}
         </div>
 
+        {/* Radial glow effect */}
+        <div className="absolute inset-0 pointer-events-none">
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-white/10 rounded-full blur-3xl" />
+        </div>
+
         <motion.div
-          initial={{ scale: 0.8, opacity: 0, y: 20 }}
+          initial={{ scale: 0.8, opacity: 0, y: 30 }}
           animate={{ scale: 1, opacity: 1, y: 0 }}
           transition={{ type: "spring", stiffness: 200, damping: 20 }}
-          className="bg-white/95 backdrop-blur-xl rounded-3xl p-8 max-w-sm text-center shadow-2xl border border-white/20 relative z-10"
+          className="bg-white/95 backdrop-blur-xl rounded-3xl p-6 sm:p-8 max-w-sm w-full text-center shadow-2xl border border-white/30 relative z-10"
         >
-          <motion.div
-            className="text-7xl mb-4"
-            animate={{ rotate: [0, -10, 10, 0], scale: [1, 1.1, 1] }}
-            transition={{ duration: 2, repeat: Infinity }}
+          {/* Animated icon with glow */}
+          <div className="relative mb-4">
+            <div className="absolute inset-0 flex items-center justify-center">
+              <motion.div
+                className="w-20 h-20 bg-indigo-400/30 rounded-full blur-xl"
+                animate={{ scale: [1, 1.3, 1] }}
+                transition={{ duration: 2, repeat: Infinity }}
+              />
+            </div>
+            <motion.div
+              className="text-7xl relative"
+              animate={{
+                rotate: [0, -10, 10, -5, 5, 0],
+                scale: [1, 1.1, 1, 1.05, 1]
+              }}
+              transition={{ duration: 2.5, repeat: Infinity }}
+            >
+              🚫
+            </motion.div>
+          </div>
+
+          <motion.h2
+            className="text-3xl font-black mb-3"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
           >
-            🚫
+            <span className="bg-gradient-to-r from-indigo-600 via-purple-600 to-fuchsia-600 bg-clip-text text-transparent">
+              Catch the NO!
+            </span>
+          </motion.h2>
+
+          <motion.p
+            className="text-slate-600 mb-5 leading-relaxed"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.3 }}
+          >
+            Collect the falling <span className="font-black text-red-500 text-lg mx-1">N</span> and <span className="font-black text-red-500 text-lg mx-1">O</span> letters to spell your rejection!
+          </motion.p>
+
+          {/* Enhanced item guide */}
+          <motion.div
+            className="flex justify-center gap-3 sm:gap-4 my-5"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.4 }}
+          >
+            <motion.div
+              className="text-center bg-gradient-to-br from-green-50 to-emerald-100 rounded-2xl p-3 border-2 border-green-300 shadow-lg flex-1"
+              whileHover={{ scale: 1.05, y: -2 }}
+              animate={{ y: [0, -3, 0] }}
+              transition={{ duration: 2, repeat: Infinity, delay: 0 }}
+            >
+              <div className="text-3xl font-black text-red-500 drop-shadow-lg tracking-wider">N O</div>
+              <div className="text-xs text-green-700 font-bold mt-1 flex items-center justify-center gap-1">
+                <span className="text-green-500">✓</span> CATCH
+              </div>
+            </motion.div>
+            <motion.div
+              className="text-center bg-gradient-to-br from-red-50 to-rose-100 rounded-2xl p-3 border-2 border-red-300 shadow-lg flex-1"
+              whileHover={{ scale: 1.05, y: -2 }}
+              animate={{ y: [0, -3, 0] }}
+              transition={{ duration: 2, repeat: Infinity, delay: 0.3 }}
+            >
+              <div className="text-3xl">💕</div>
+              <div className="text-xs text-red-700 font-bold mt-1 flex items-center justify-center gap-1">
+                <span className="text-red-500">✗</span> AVOID
+              </div>
+            </motion.div>
+            <motion.div
+              className="text-center bg-gradient-to-br from-yellow-50 to-amber-100 rounded-2xl p-3 border-2 border-amber-300 shadow-lg flex-1"
+              whileHover={{ scale: 1.05, y: -2 }}
+              animate={{ y: [0, -3, 0], rotate: [0, 5, -5, 0] }}
+              transition={{ duration: 2, repeat: Infinity, delay: 0.6 }}
+            >
+              <div className="text-3xl">⭐</div>
+              <div className="text-xs text-amber-700 font-bold mt-1 flex items-center justify-center gap-1">
+                <span className="text-amber-500">★</span> +2!
+              </div>
+            </motion.div>
           </motion.div>
-          <h2 className="text-3xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent mb-4">
-            Catch the NO!
-          </h2>
-          <p className="text-slate-600 mb-6 leading-relaxed">
-            Catch the falling <span className="font-bold text-red-500 text-lg">N</span> and <span className="font-bold text-red-500 text-lg">O</span> letters to spell your rejection!
-          </p>
 
-          <div className="flex justify-center gap-6 my-6">
-            <motion.div
-              className="text-center bg-green-50 rounded-2xl p-4 border-2 border-green-200"
-              whileHover={{ scale: 1.05 }}
-            >
-              <div className="text-4xl font-black text-red-500 drop-shadow-lg">N O</div>
-              <div className="text-xs text-green-600 font-bold mt-2">✓ CATCH!</div>
-            </motion.div>
-            <motion.div
-              className="text-center bg-red-50 rounded-2xl p-4 border-2 border-red-200"
-              whileHover={{ scale: 1.05 }}
-            >
-              <div className="text-4xl">💕</div>
-              <div className="text-xs text-red-600 font-bold mt-2">✗ AVOID!</div>
-            </motion.div>
-            <motion.div
-              className="text-center bg-yellow-50 rounded-2xl p-4 border-2 border-yellow-200"
-              whileHover={{ scale: 1.05 }}
-            >
-              <div className="text-4xl">⭐</div>
-              <div className="text-xs text-amber-600 font-bold mt-2">★ BONUS!</div>
-            </motion.div>
-          </div>
-
-          <div className="bg-indigo-50 rounded-xl p-3 mb-6">
-            <p className="text-indigo-600 text-sm">
-              👆 <span className="font-semibold">Slide your finger</span> to move the basket!
-            </p>
-          </div>
+          {/* Control hint with animated basket */}
+          <motion.div
+            className="bg-gradient-to-r from-indigo-50 to-purple-50 rounded-xl p-3 mb-5 border border-indigo-200"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.5 }}
+          >
+            <div className="flex items-center justify-center gap-3">
+              <motion.span
+                className="text-2xl"
+                animate={{ x: [-10, 10, -10] }}
+                transition={{ duration: 1.5, repeat: Infinity }}
+              >
+                🧺
+              </motion.span>
+              <p className="text-indigo-700 text-sm">
+                <span className="font-bold">Slide</span> to move the basket!
+              </p>
+            </div>
+          </motion.div>
 
           <motion.button
             onClick={startCountdown}
-            className="w-full py-4 bg-gradient-to-r from-indigo-500 via-purple-500 to-fuchsia-500 text-white rounded-2xl font-bold text-xl shadow-xl relative overflow-hidden"
-            whileHover={{ scale: 1.02 }}
+            className="w-full py-4 bg-gradient-to-r from-indigo-500 via-purple-500 to-fuchsia-500 text-white rounded-2xl font-bold text-xl shadow-xl shadow-purple-500/30 relative overflow-hidden"
+            whileHover={{ scale: 1.02, boxShadow: "0 20px 40px -10px rgba(168, 85, 247, 0.4)" }}
             whileTap={{ scale: 0.98 }}
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.6 }}
           >
             <motion.div
-              className="absolute inset-0 bg-white/20"
+              className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent"
               initial={{ x: "-100%" }}
               animate={{ x: "200%" }}
-              transition={{ duration: 1.5, repeat: Infinity, repeatDelay: 1 }}
+              transition={{ duration: 1.5, repeat: Infinity, repeatDelay: 0.5 }}
             />
-            <span className="relative">Start Game! 🎮</span>
+            <span className="relative flex items-center justify-center gap-2">
+              <span>Start Game!</span>
+              <motion.span
+                animate={{ rotate: [0, 15, -15, 0] }}
+                transition={{ duration: 0.5, repeat: Infinity, repeatDelay: 1 }}
+              >
+                🎮
+              </motion.span>
+            </span>
           </motion.button>
         </motion.div>
       </div>
     );
   }
 
-  // Countdown screen
+  // Countdown screen with enhanced visuals
   if (phase === "countdown") {
     return (
-      <div className="fixed inset-0 bg-gradient-to-b from-indigo-600 via-purple-600 to-fuchsia-700 flex items-center justify-center">
+      <div className="fixed inset-0 bg-gradient-to-b from-indigo-600 via-purple-600 to-fuchsia-700 flex items-center justify-center overflow-hidden">
+        {/* Radial pulse background */}
         <motion.div
-          key={countdownNum}
-          initial={{ scale: 0, rotate: -180 }}
-          animate={{ scale: 1, rotate: 0 }}
-          exit={{ scale: 2, opacity: 0 }}
-          transition={{ type: "spring", stiffness: 300, damping: 15 }}
-          className="text-[150px] font-black text-white drop-shadow-2xl"
+          className="absolute inset-0 flex items-center justify-center"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
         >
-          {countdownNum || "GO!"}
+          <motion.div
+            className="w-96 h-96 rounded-full bg-white/10"
+            animate={{ scale: [0, 3], opacity: [0.3, 0] }}
+            transition={{ duration: 0.8, repeat: Infinity }}
+          />
         </motion.div>
+
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={countdownNum}
+            initial={{ scale: 0, rotate: -180, opacity: 0 }}
+            animate={{ scale: 1, rotate: 0, opacity: 1 }}
+            exit={{ scale: 2, opacity: 0, y: -50 }}
+            transition={{ type: "spring", stiffness: 300, damping: 15 }}
+            className="relative"
+          >
+            {/* Glow effect behind number */}
+            <div className="absolute inset-0 flex items-center justify-center blur-2xl">
+              <div className="text-[200px] font-black text-white/50">
+                {countdownNum || "GO!"}
+              </div>
+            </div>
+            <div className="text-[150px] font-black text-white drop-shadow-2xl relative">
+              {countdownNum || "GO!"}
+            </div>
+          </motion.div>
+        </AnimatePresence>
+
+        {/* Floating particles during countdown */}
+        <div className="absolute inset-0 pointer-events-none">
+          {Array.from({ length: 12 }).map((_, i) => (
+            <motion.div
+              key={i}
+              className="absolute text-4xl opacity-40"
+              style={{ left: `${10 + (i * 7)}%`, bottom: "-10%" }}
+              animate={{ y: "-120vh", rotate: 360 }}
+              transition={{
+                duration: 2 + Math.random(),
+                repeat: Infinity,
+                delay: i * 0.2,
+                ease: "linear"
+              }}
+            >
+              {["N", "O", "⭐", "✨"][i % 4]}
+            </motion.div>
+          ))}
+        </div>
       </div>
     );
   }
 
-  // Done screen with better styling
+  // Done screen with enhanced styling
   if (phase === "done") {
     const won = noLetters >= 5;
     return (
-      <div className="fixed inset-0 bg-gradient-to-b from-indigo-600 via-purple-600 to-fuchsia-700 flex flex-col items-center justify-center p-4">
+      <div className="fixed inset-0 bg-gradient-to-b from-indigo-600 via-purple-600 to-fuchsia-700 flex flex-col items-center justify-center p-4 overflow-hidden">
+        {/* Celebration particles for winning */}
+        {won && (
+          <div className="absolute inset-0 pointer-events-none">
+            {Array.from({ length: 20 }).map((_, i) => (
+              <motion.div
+                key={i}
+                className="absolute text-3xl"
+                style={{ left: `${5 + (i * 5)}%`, top: "-5%" }}
+                initial={{ y: 0, opacity: 1 }}
+                animate={{ y: "120vh", opacity: 0.5, rotate: 360 }}
+                transition={{
+                  duration: 3 + Math.random() * 2,
+                  repeat: Infinity,
+                  delay: i * 0.15,
+                }}
+              >
+                {["🎉", "✨", "⭐", "🌟", "💫"][i % 5]}
+              </motion.div>
+            ))}
+          </div>
+        )}
+
         <motion.div
           initial={{ scale: 0, rotate: -20 }}
           animate={{ scale: 1, rotate: 0 }}
           transition={{ type: "spring", stiffness: 200 }}
-          className="bg-white/95 backdrop-blur-xl rounded-3xl p-8 max-w-sm text-center shadow-2xl"
+          className="bg-white/95 backdrop-blur-xl rounded-3xl p-6 sm:p-8 max-w-sm w-full text-center shadow-2xl relative overflow-hidden"
         >
+          {/* Background shimmer */}
           <motion.div
-            className="text-8xl mb-4"
-            animate={won ? { rotate: [0, -10, 10, 0] } : { y: [0, -10, 0] }}
-            transition={{ duration: 1, repeat: Infinity }}
-          >
-            {won ? "😾" : "😹"}
-          </motion.div>
-          <h2 className="text-3xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent mb-3">
-            {won ? "You spelled NO!" : "Cat blocked you!"}
-          </h2>
-          <div className="bg-indigo-50 rounded-2xl p-4 mb-4">
-            <p className="text-4xl font-black text-indigo-600">{noLetters}</p>
-            <p className="text-indigo-400 text-sm">letters caught</p>
+            className="absolute inset-0 bg-gradient-to-r from-transparent via-indigo-100/50 to-transparent -skew-x-12"
+            initial={{ x: "-100%" }}
+            animate={{ x: "200%" }}
+            transition={{ duration: 2, repeat: Infinity, repeatDelay: 1 }}
+          />
+
+          <div className="relative">
+            <motion.div
+              className="text-8xl mb-4"
+              animate={won
+                ? { rotate: [0, -15, 15, -10, 10, 0], scale: [1, 1.1, 1] }
+                : { y: [0, -10, 0], scale: [1, 1.05, 1] }
+              }
+              transition={{ duration: 1.5, repeat: Infinity }}
+            >
+              {won ? "😾" : "😹"}
+            </motion.div>
+
+            <motion.h2
+              className="text-3xl font-black mb-3"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.2 }}
+            >
+              <span className={cn(
+                "bg-clip-text text-transparent",
+                won
+                  ? "bg-gradient-to-r from-green-500 via-emerald-500 to-teal-500"
+                  : "bg-gradient-to-r from-indigo-600 to-purple-600"
+              )}>
+                {won ? "You spelled NO!" : "Cat blocked you!"}
+              </span>
+            </motion.h2>
+
+            <motion.div
+              className={cn(
+                "rounded-2xl p-4 mb-4",
+                won ? "bg-gradient-to-br from-green-50 to-emerald-100" : "bg-indigo-50"
+              )}
+              initial={{ scale: 0.8, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ delay: 0.3 }}
+            >
+              <div className="flex items-center justify-center gap-3">
+                <motion.p
+                  className={cn("text-5xl font-black", won ? "text-green-600" : "text-indigo-600")}
+                  animate={{ scale: [1, 1.1, 1] }}
+                  transition={{ duration: 0.5, repeat: 3, delay: 0.5 }}
+                >
+                  {noLetters}
+                </motion.p>
+                <div className="text-left">
+                  <p className={cn("text-sm font-bold", won ? "text-green-600" : "text-indigo-500")}>
+                    letters
+                  </p>
+                  <p className={cn("text-xs", won ? "text-green-400" : "text-indigo-400")}>
+                    collected
+                  </p>
+                </div>
+              </div>
+            </motion.div>
+
+            <motion.div
+              className="bg-slate-50 rounded-xl p-3 mb-4"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.5 }}
+            >
+              <p className="text-slate-600 italic">
+                {won ? '"Fine, but I\'m not giving up!" 😾' : '"You can\'t reject ME!" 😹'}
+              </p>
+            </motion.div>
+
+            <motion.div
+              className="flex items-center justify-center gap-2 text-indigo-400 text-sm"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.8 }}
+            >
+              <motion.div
+                className="w-2 h-2 bg-indigo-400 rounded-full"
+                animate={{ scale: [1, 1.5, 1] }}
+                transition={{ duration: 0.6, repeat: Infinity, delay: 0 }}
+              />
+              <motion.div
+                className="w-2 h-2 bg-indigo-400 rounded-full"
+                animate={{ scale: [1, 1.5, 1] }}
+                transition={{ duration: 0.6, repeat: Infinity, delay: 0.2 }}
+              />
+              <motion.div
+                className="w-2 h-2 bg-indigo-400 rounded-full"
+                animate={{ scale: [1, 1.5, 1] }}
+                transition={{ duration: 0.6, repeat: Infinity, delay: 0.4 }}
+              />
+              <span className="ml-2">Next challenge loading</span>
+            </motion.div>
           </div>
-          <motion.p
-            className="text-slate-600 italic text-lg"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.5 }}
-          >
-            {won ? '"Fine, but I\'m not giving up!" 😾' : '"You can\'t reject ME!" 😹'}
-          </motion.p>
-          <motion.p
-            className="text-indigo-400 mt-4 text-sm"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 1 }}
-          >
-            Loading next challenge...
-          </motion.p>
         </motion.div>
       </div>
     );
@@ -861,21 +1064,64 @@ const CatchTheNoGame = memo(function CatchTheNoGame({ onComplete }: { onComplete
         Skip →
       </button>
 
-      {/* Catch effect */}
+      {/* Perfect catch indicator */}
+      <AnimatePresence>
+        {perfectCatch && (
+          <motion.div
+            initial={{ scale: 0, opacity: 1, y: 0 }}
+            animate={{ scale: 1.5, opacity: 0, y: -30 }}
+            exit={{ opacity: 0 }}
+            className="absolute left-1/2 -translate-x-1/2 bottom-36 z-40 pointer-events-none"
+          >
+            <span className="text-2xl font-black text-yellow-300 drop-shadow-lg">PERFECT!</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Catch particles burst */}
+      <AnimatePresence>
+        {catchParticles.map(particle => (
+          <motion.div
+            key={particle.id}
+            className="absolute pointer-events-none z-30"
+            style={{ left: `${particle.x}%`, top: `${particle.y}%` }}
+            initial={{ scale: 1, opacity: 1, x: 0, y: 0 }}
+            animate={{
+              x: Math.cos(particle.angle * Math.PI / 180) * 60,
+              y: Math.sin(particle.angle * Math.PI / 180) * 60,
+              scale: 0,
+              opacity: 0
+            }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.5, ease: "easeOut" }}
+          >
+            <span className="text-2xl">{particle.emoji}</span>
+          </motion.div>
+        ))}
+      </AnimatePresence>
+
+      {/* Catch effect with combo display */}
       <AnimatePresence>
         {lastCatch && (
           <motion.div
-            initial={{ scale: 0, opacity: 1 }}
-            animate={{ scale: 2, opacity: 0 }}
+            initial={{ scale: 0, opacity: 1, y: 0 }}
+            animate={{ scale: 1.5, opacity: 0, y: -40 }}
             exit={{ opacity: 0 }}
             className="absolute pointer-events-none z-30"
             style={{ left: `${lastCatch.x}%`, top: `${lastCatch.y}%` }}
           >
-            <div className={cn(
-              "text-4xl font-black",
-              lastCatch.type === "star" ? "text-yellow-300" : "text-green-400"
-            )}>
-              {lastCatch.type === "star" ? "+2! ⭐" : "+1!"}
+            <div className="text-center">
+              <div className={cn(
+                "text-4xl font-black drop-shadow-lg",
+                lastCatch.type === "star" ? "text-yellow-300" : "text-green-400"
+              )}>
+                {lastCatch.type === "star" ? "+2!" : "+1!"}
+              </div>
+              {lastCatch.combo >= 3 && (
+                <div className="text-xl font-bold text-orange-300 mt-1">
+                  x{lastCatch.combo}!
+                </div>
+              )}
             </div>
           </motion.div>
         )}
@@ -914,7 +1160,7 @@ const CatchTheNoGame = memo(function CatchTheNoGame({ onComplete }: { onComplete
         </motion.div>
       ))}
 
-      {/* Basket with glow effect */}
+      {/* Basket with dynamic glow effect */}
       <motion.div
         className="absolute bottom-24"
         style={{
@@ -926,32 +1172,67 @@ const CatchTheNoGame = memo(function CatchTheNoGame({ onComplete }: { onComplete
         transition={{ duration: 1.5, repeat: Infinity }}
       >
         <div className="relative">
-          <div className="absolute inset-0 bg-amber-400/30 blur-xl rounded-full scale-150" />
-          <span className="text-6xl drop-shadow-lg relative">🧺</span>
+          {/* Dynamic glow based on basket state */}
+          <motion.div
+            className={cn(
+              "absolute inset-0 blur-xl rounded-full",
+              basketGlow ? "bg-green-400/60" : "bg-amber-400/30"
+            )}
+            animate={basketGlow
+              ? { scale: [1.5, 2, 1.5], opacity: [0.6, 1, 0.6] }
+              : { scale: 1.5 }
+            }
+            transition={{ duration: 0.3 }}
+            style={{ width: "100%", height: "100%" }}
+          />
+          {/* Catch zone indicator ring */}
+          <motion.div
+            className="absolute -inset-3 border-2 border-white/20 rounded-full"
+            animate={{ scale: [1, 1.1, 1], opacity: [0.3, 0.5, 0.3] }}
+            transition={{ duration: 2, repeat: Infinity }}
+          />
+          <motion.span
+            className="text-6xl drop-shadow-lg relative"
+            animate={basketGlow ? { scale: [1, 1.2, 1] } : {}}
+            transition={{ duration: 0.2 }}
+          >
+            🧺
+          </motion.span>
         </div>
       </motion.div>
 
-      {/* Progress bar */}
+      {/* Enhanced progress bar */}
       <div className="absolute bottom-8 left-4 right-4 z-10">
-        <div className="bg-white/20 backdrop-blur rounded-full p-1">
-          <div className="flex gap-1">
-            {[0, 1, 2, 3, 4].map(i => (
+        <div className="bg-white/15 backdrop-blur-md rounded-2xl p-2 shadow-lg">
+          <div className="flex gap-1.5 items-center">
+            {["N", "O", " ", "N", "O"].map((letter, i) => (
               <motion.div
                 key={i}
                 className={cn(
-                  "flex-1 h-3 rounded-full transition-all duration-300",
+                  "flex-1 h-8 rounded-xl flex items-center justify-center font-black text-lg transition-all duration-300",
                   i < noLetters
-                    ? "bg-gradient-to-r from-green-400 to-emerald-500"
-                    : "bg-white/20"
+                    ? "bg-gradient-to-r from-green-400 to-emerald-500 text-white shadow-lg shadow-green-500/30"
+                    : "bg-white/20 text-white/40"
                 )}
                 animate={i < noLetters ? { scale: [1, 1.1, 1] } : {}}
-              />
+                transition={{ duration: 0.3 }}
+              >
+                {letter !== " " ? (i < noLetters ? letter : "?") : ""}
+              </motion.div>
             ))}
           </div>
+          <motion.p
+            className="text-white/70 text-sm mt-2 text-center font-medium"
+            animate={noLetters >= 5 ? { scale: [1, 1.05, 1] } : {}}
+            transition={{ duration: 0.5, repeat: noLetters >= 5 ? Infinity : 0 }}
+          >
+            {noLetters < 5 ? (
+              <>Collect <span className="text-green-300 font-bold">{5 - noLetters}</span> more letters!</>
+            ) : (
+              <span className="text-green-300">You spelled NO! 🎉</span>
+            )}
+          </motion.p>
         </div>
-        <p className="text-white/60 text-sm mt-2 text-center">
-          {noLetters < 5 ? `Collect ${5 - noLetters} more to spell "NO"!` : "You spelled NO! 🎉"}
-        </p>
       </div>
     </motion.div>
   );
@@ -1199,166 +1480,361 @@ const SmashTheHeartsGame = memo(function SmashTheHeartsGame({ onComplete }: { on
     }
   }, [combo, hearts, createParticles]);
 
-  // Tutorial screen
+  // Tutorial screen with enhanced visuals
   if (phase === "tutorial") {
     return (
       <div className="fixed inset-0 bg-gradient-to-b from-rose-600 via-red-600 to-pink-700 flex flex-col items-center justify-center p-4 overflow-hidden">
-        {/* Background hearts */}
-        <div className="absolute inset-0 overflow-hidden pointer-events-none opacity-20">
-          {Array.from({ length: 15 }).map((_, i) => (
+        {/* Animated background hearts floating up */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          {Array.from({ length: 20 }).map((_, i) => (
             <motion.div
               key={i}
-              className="absolute text-4xl"
-              initial={{ scale: 0, rotate: 0 }}
-              animate={{ scale: [0, 1, 0], rotate: 360 }}
-              transition={{ duration: 3, repeat: Infinity, delay: i * 0.3 }}
-              style={{ left: `${10 + (i % 5) * 20}%`, top: `${10 + Math.floor(i / 5) * 30}%` }}
+              className="absolute text-3xl opacity-20"
+              style={{ left: `${(i * 5) % 100}%`, bottom: "-10%" }}
+              animate={{ y: "-120vh", rotate: 360, scale: [1, 1.2, 1] }}
+              transition={{
+                duration: 6 + Math.random() * 3,
+                repeat: Infinity,
+                delay: i * 0.3,
+                ease: "linear"
+              }}
             >
-              💕
+              {["💕", "❤️", "💛", "💗", "💖"][i % 5]}
             </motion.div>
           ))}
         </div>
 
+        {/* Radial glow */}
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+          <div className="w-96 h-96 bg-white/10 rounded-full blur-3xl" />
+        </div>
+
         <motion.div
-          initial={{ scale: 0.8, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          className="bg-white/95 backdrop-blur-xl rounded-3xl p-6 max-w-sm text-center shadow-2xl relative z-10"
+          initial={{ scale: 0.8, opacity: 0, y: 30 }}
+          animate={{ scale: 1, opacity: 1, y: 0 }}
+          transition={{ type: "spring", stiffness: 200 }}
+          className="bg-white/95 backdrop-blur-xl rounded-3xl p-6 max-w-sm w-full text-center shadow-2xl relative z-10 border border-white/30"
         >
-          <motion.div
-            className="text-7xl mb-4"
-            animate={{ scale: [1, 1.2, 1], rotate: [0, -10, 10, 0] }}
-            transition={{ duration: 1.5, repeat: Infinity }}
+          {/* Animated breaking heart icon */}
+          <div className="relative mb-4">
+            <motion.div
+              className="absolute inset-0 flex items-center justify-center"
+            >
+              <motion.div
+                className="w-20 h-20 bg-red-400/30 rounded-full blur-xl"
+                animate={{ scale: [1, 1.4, 1] }}
+                transition={{ duration: 1.5, repeat: Infinity }}
+              />
+            </motion.div>
+            <motion.div
+              className="text-7xl relative"
+              animate={{
+                scale: [1, 1.2, 1],
+                rotate: [0, -10, 10, 0]
+              }}
+              transition={{ duration: 1.5, repeat: Infinity }}
+            >
+              💔
+            </motion.div>
+          </div>
+
+          <motion.h2
+            className="text-3xl font-black mb-3"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
           >
-            💔
-          </motion.div>
-          <h2 className="text-3xl font-bold bg-gradient-to-r from-red-600 to-pink-600 bg-clip-text text-transparent mb-3">
-            Smash the Hearts!
-          </h2>
-          <p className="text-slate-600 mb-4">
+            <span className="bg-gradient-to-r from-red-600 via-rose-600 to-pink-600 bg-clip-text text-transparent">
+              Smash the Hearts!
+            </span>
+          </motion.h2>
+
+          <motion.p
+            className="text-slate-600 mb-5"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.3 }}
+          >
             The cat covered everything with hearts!<br/>
-            <span className="font-bold text-red-500">TAP to SMASH them!</span>
-          </p>
+            <span className="font-bold text-red-500 text-lg">TAP to SMASH them!</span>
+          </motion.p>
 
-          <div className="grid grid-cols-5 gap-2 my-4 text-center">
-            <div className="bg-pink-50 rounded-xl p-2">
-              <div className="text-2xl">💕</div>
-              <div className="text-[10px] text-pink-600 font-bold">+10</div>
-            </div>
-            <div className="bg-red-50 rounded-xl p-2">
-              <div className="text-2xl">❤️</div>
-              <div className="text-[10px] text-red-600 font-bold">+15</div>
-            </div>
-            <div className="bg-yellow-50 rounded-xl p-2">
-              <div className="text-2xl">💛</div>
-              <div className="text-[10px] text-amber-600 font-bold">+25</div>
-            </div>
-            <div className="bg-orange-50 rounded-xl p-2">
-              <div className="text-2xl">💣</div>
-              <div className="text-[10px] text-orange-600 font-bold">ROW!</div>
-            </div>
-            <div className="bg-slate-50 rounded-xl p-2">
-              <div className="text-2xl">😺</div>
-              <div className="text-[10px] text-slate-600 font-bold">-30!</div>
-            </div>
-          </div>
+          {/* Enhanced item guide with animations */}
+          <motion.div
+            className="grid grid-cols-5 gap-2 my-5"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.4 }}
+          >
+            {[
+              { emoji: "💕", points: "+10", bg: "from-pink-50 to-pink-100", border: "border-pink-300", text: "text-pink-600" },
+              { emoji: "❤️", points: "+15", bg: "from-red-50 to-red-100", border: "border-red-300", text: "text-red-600" },
+              { emoji: "💛", points: "+25", bg: "from-yellow-50 to-amber-100", border: "border-amber-300", text: "text-amber-600" },
+              { emoji: "💣", points: "ROW!", bg: "from-orange-50 to-orange-100", border: "border-orange-300", text: "text-orange-600" },
+              { emoji: "😺", points: "-30!", bg: "from-slate-50 to-slate-100", border: "border-slate-300", text: "text-slate-600" },
+            ].map((item, i) => (
+              <motion.div
+                key={i}
+                className={cn("rounded-xl p-2 border-2 shadow-sm bg-gradient-to-br", item.bg, item.border)}
+                whileHover={{ scale: 1.1, y: -2 }}
+                animate={{ y: [0, -2, 0] }}
+                transition={{ duration: 2, repeat: Infinity, delay: i * 0.2 }}
+              >
+                <div className="text-2xl">{item.emoji}</div>
+                <div className={cn("text-[10px] font-bold mt-1", item.text)}>{item.points}</div>
+              </motion.div>
+            ))}
+          </motion.div>
 
-          <div className="bg-gradient-to-r from-amber-50 to-orange-50 rounded-xl p-3 mb-4">
-            <p className="text-amber-700 text-sm font-medium">
-              🔥 Build combos for bonus points!
-            </p>
-          </div>
+          {/* Combo hint */}
+          <motion.div
+            className="bg-gradient-to-r from-amber-50 to-orange-50 rounded-xl p-3 mb-5 border border-amber-200"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.5 }}
+          >
+            <div className="flex items-center justify-center gap-2">
+              <motion.span
+                className="text-xl"
+                animate={{ scale: [1, 1.3, 1] }}
+                transition={{ duration: 0.5, repeat: Infinity }}
+              >
+                🔥
+              </motion.span>
+              <p className="text-amber-700 text-sm font-medium">
+                Build <span className="font-bold">combos</span> for bonus points!
+              </p>
+            </div>
+          </motion.div>
 
           <motion.button
             onClick={startCountdown}
-            className="w-full py-4 bg-gradient-to-r from-red-500 via-rose-500 to-pink-500 text-white rounded-2xl font-bold text-xl shadow-xl"
-            whileHover={{ scale: 1.02 }}
+            className="w-full py-4 bg-gradient-to-r from-red-500 via-rose-500 to-pink-500 text-white rounded-2xl font-bold text-xl shadow-xl shadow-red-500/30 relative overflow-hidden"
+            whileHover={{ scale: 1.02, boxShadow: "0 20px 40px -10px rgba(239, 68, 68, 0.4)" }}
             whileTap={{ scale: 0.98 }}
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.6 }}
           >
-            <motion.span
-              animate={{ scale: [1, 1.1, 1] }}
-              transition={{ duration: 0.5, repeat: Infinity }}
-            >
-              Start Smashing! 👊
-            </motion.span>
+            <motion.div
+              className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent"
+              initial={{ x: "-100%" }}
+              animate={{ x: "200%" }}
+              transition={{ duration: 1.5, repeat: Infinity, repeatDelay: 0.5 }}
+            />
+            <span className="relative flex items-center justify-center gap-2">
+              <span>Start Smashing!</span>
+              <motion.span
+                animate={{ rotate: [0, -20, 20, 0], scale: [1, 1.2, 1] }}
+                transition={{ duration: 0.5, repeat: Infinity, repeatDelay: 0.5 }}
+              >
+                👊
+              </motion.span>
+            </span>
           </motion.button>
         </motion.div>
       </div>
     );
   }
 
-  // Countdown
+  // Countdown with enhanced visuals
   if (phase === "countdown") {
     return (
-      <div className="fixed inset-0 bg-gradient-to-b from-rose-600 via-red-600 to-pink-700 flex items-center justify-center">
+      <div className="fixed inset-0 bg-gradient-to-b from-rose-600 via-red-600 to-pink-700 flex items-center justify-center overflow-hidden">
+        {/* Pulse effect */}
         <motion.div
-          key={countdownNum}
-          initial={{ scale: 0, rotate: -180 }}
-          animate={{ scale: 1, rotate: 0 }}
-          transition={{ type: "spring", stiffness: 300 }}
-          className="text-[150px] font-black text-white drop-shadow-2xl"
+          className="absolute inset-0 flex items-center justify-center"
         >
-          {countdownNum || "SMASH!"}
+          <motion.div
+            className="w-96 h-96 rounded-full bg-white/10"
+            animate={{ scale: [0, 3], opacity: [0.3, 0] }}
+            transition={{ duration: 0.8, repeat: Infinity }}
+          />
         </motion.div>
+
+        {/* Floating hearts during countdown */}
+        <div className="absolute inset-0 pointer-events-none">
+          {Array.from({ length: 12 }).map((_, i) => (
+            <motion.div
+              key={i}
+              className="absolute text-4xl opacity-30"
+              style={{ left: `${10 + (i * 7)}%`, bottom: "-10%" }}
+              animate={{ y: "-120vh", rotate: 360 }}
+              transition={{
+                duration: 2 + Math.random(),
+                repeat: Infinity,
+                delay: i * 0.15,
+                ease: "linear"
+              }}
+            >
+              {["💕", "❤️", "💛", "💣"][i % 4]}
+            </motion.div>
+          ))}
+        </div>
+
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={countdownNum}
+            initial={{ scale: 0, rotate: -180, opacity: 0 }}
+            animate={{ scale: 1, rotate: 0, opacity: 1 }}
+            exit={{ scale: 2, opacity: 0, y: -50 }}
+            transition={{ type: "spring", stiffness: 300 }}
+            className="relative"
+          >
+            <div className="absolute inset-0 flex items-center justify-center blur-2xl">
+              <div className="text-[200px] font-black text-white/50">
+                {countdownNum || "SMASH!"}
+              </div>
+            </div>
+            <div className="text-[150px] font-black text-white drop-shadow-2xl relative">
+              {countdownNum || "SMASH!"}
+            </div>
+          </motion.div>
+        </AnimatePresence>
       </div>
     );
   }
 
-  // Done screen
+  // Done screen with enhanced visuals
   if (phase === "done") {
     const won = score >= 80;
     const smashedCount = hearts.filter(h => h.smashed).length;
 
     return (
-      <div className="fixed inset-0 bg-gradient-to-b from-rose-600 via-red-600 to-pink-700 flex flex-col items-center justify-center p-4">
+      <div className="fixed inset-0 bg-gradient-to-b from-rose-600 via-red-600 to-pink-700 flex flex-col items-center justify-center p-4 overflow-hidden">
+        {/* Celebration/destruction particles */}
+        {won && (
+          <div className="absolute inset-0 pointer-events-none">
+            {Array.from({ length: 20 }).map((_, i) => (
+              <motion.div
+                key={i}
+                className="absolute text-3xl"
+                style={{ left: `${5 + (i * 5)}%`, top: "-5%" }}
+                initial={{ y: 0, opacity: 1 }}
+                animate={{ y: "120vh", opacity: 0.5, rotate: 360 }}
+                transition={{
+                  duration: 3 + Math.random() * 2,
+                  repeat: Infinity,
+                  delay: i * 0.15,
+                }}
+              >
+                {["💔", "✨", "💥", "💫", "🔥"][i % 5]}
+              </motion.div>
+            ))}
+          </div>
+        )}
+
         <motion.div
           initial={{ scale: 0, rotate: -20 }}
           animate={{ scale: 1, rotate: 0 }}
-          className="bg-white/95 backdrop-blur-xl rounded-3xl p-8 max-w-sm text-center shadow-2xl"
+          transition={{ type: "spring", stiffness: 200 }}
+          className="bg-white/95 backdrop-blur-xl rounded-3xl p-6 sm:p-8 max-w-sm w-full text-center shadow-2xl relative overflow-hidden"
         >
+          {/* Shimmer effect */}
           <motion.div
-            className="text-8xl mb-4"
-            animate={won ? { rotate: [0, -15, 15, 0] } : { y: [0, -10, 0] }}
-            transition={{ duration: 1, repeat: Infinity }}
-          >
-            {won ? "💔" : "😿"}
-          </motion.div>
-          <h2 className="text-3xl font-bold bg-gradient-to-r from-red-600 to-pink-600 bg-clip-text text-transparent mb-3">
-            {won ? "Hearts Destroyed!" : "Cat Protected Them!"}
-          </h2>
+            className="absolute inset-0 bg-gradient-to-r from-transparent via-red-100/50 to-transparent -skew-x-12"
+            initial={{ x: "-100%" }}
+            animate={{ x: "200%" }}
+            transition={{ duration: 2, repeat: Infinity, repeatDelay: 1 }}
+          />
 
-          <div className="grid grid-cols-2 gap-3 mb-4">
-            <div className="bg-red-50 rounded-2xl p-3">
-              <p className="text-3xl font-black text-red-600">{score}</p>
-              <p className="text-red-400 text-xs">points</p>
-            </div>
-            <div className="bg-orange-50 rounded-2xl p-3">
-              <p className="text-3xl font-black text-orange-600">x{maxCombo}</p>
-              <p className="text-orange-400 text-xs">max combo</p>
-            </div>
+          <div className="relative">
+            <motion.div
+              className="text-8xl mb-4"
+              animate={won
+                ? { rotate: [0, -15, 15, -10, 10, 0], scale: [1, 1.15, 1] }
+                : { y: [0, -10, 0], scale: [1, 1.05, 1] }
+              }
+              transition={{ duration: 1.5, repeat: Infinity }}
+            >
+              {won ? "💔" : "😿"}
+            </motion.div>
+
+            <motion.h2
+              className="text-3xl font-black mb-3"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.2 }}
+            >
+              <span className={cn(
+                "bg-clip-text text-transparent",
+                won
+                  ? "bg-gradient-to-r from-red-500 via-rose-500 to-pink-500"
+                  : "bg-gradient-to-r from-slate-500 to-slate-600"
+              )}>
+                {won ? "Hearts Destroyed!" : "Cat Protected Them!"}
+              </span>
+            </motion.h2>
+
+            <motion.div
+              className="grid grid-cols-2 gap-3 mb-4"
+              initial={{ scale: 0.8, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ delay: 0.3 }}
+            >
+              <div className="bg-gradient-to-br from-red-50 to-rose-100 rounded-2xl p-4 border border-red-200">
+                <motion.p
+                  className="text-4xl font-black text-red-600"
+                  animate={{ scale: [1, 1.1, 1] }}
+                  transition={{ duration: 0.5, repeat: 3, delay: 0.5 }}
+                >
+                  {score}
+                </motion.p>
+                <p className="text-red-400 text-xs font-medium">points</p>
+              </div>
+              <div className="bg-gradient-to-br from-orange-50 to-amber-100 rounded-2xl p-4 border border-orange-200">
+                <p className="text-4xl font-black text-orange-600">x{maxCombo}</p>
+                <p className="text-orange-400 text-xs font-medium">max combo</p>
+              </div>
+            </motion.div>
+
+            <motion.div
+              className="bg-pink-50 rounded-xl p-3 mb-4 flex items-center justify-center gap-2"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.4 }}
+            >
+              <span className="text-lg">💔</span>
+              <p className="text-pink-600 text-sm font-medium">
+                {smashedCount} hearts smashed
+              </p>
+            </motion.div>
+
+            <motion.div
+              className="bg-slate-50 rounded-xl p-3 mb-4"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.5 }}
+            >
+              <p className="text-slate-600 italic">
+                {won ? '"My beautiful decorations... 😿"' : '"Ha! You missed! 😹"'}
+              </p>
+            </motion.div>
+
+            <motion.div
+              className="flex items-center justify-center gap-2 text-red-400 text-sm"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.8 }}
+            >
+              <motion.div
+                className="w-2 h-2 bg-red-400 rounded-full"
+                animate={{ scale: [1, 1.5, 1] }}
+                transition={{ duration: 0.6, repeat: Infinity, delay: 0 }}
+              />
+              <motion.div
+                className="w-2 h-2 bg-red-400 rounded-full"
+                animate={{ scale: [1, 1.5, 1] }}
+                transition={{ duration: 0.6, repeat: Infinity, delay: 0.2 }}
+              />
+              <motion.div
+                className="w-2 h-2 bg-red-400 rounded-full"
+                animate={{ scale: [1, 1.5, 1] }}
+                transition={{ duration: 0.6, repeat: Infinity, delay: 0.4 }}
+              />
+              <span className="ml-2">Next challenge loading</span>
+            </motion.div>
           </div>
-
-          <div className="bg-pink-50 rounded-xl p-3 mb-4">
-            <p className="text-pink-600 text-sm">
-              💔 {smashedCount} hearts smashed
-            </p>
-          </div>
-
-          <motion.p
-            className="text-slate-600 italic"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.5 }}
-          >
-            {won ? '"My beautiful decorations... 😿"' : '"Ha! You missed! 😹"'}
-          </motion.p>
-          <motion.p
-            className="text-red-400 mt-4 text-sm"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 1 }}
-          >
-            Loading next challenge...
-          </motion.p>
         </motion.div>
       </div>
     );
@@ -2107,179 +2583,403 @@ const DodgeTheLoveGame = memo(function DodgeTheLoveGame({ onComplete }: { onComp
     targetYRef.current = Math.max(28, Math.min(92, y));
   }, []);
 
-  // Tutorial
+  // Tutorial with enhanced visuals
   if (phase === "tutorial") {
     return (
       <div className="fixed inset-0 bg-gradient-to-b from-slate-900 via-purple-900 to-violet-900 flex flex-col items-center justify-center p-4 overflow-hidden">
-        {/* Animated stars background */}
+        {/* Enhanced animated stars background */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          {Array.from({ length: 30 }).map((_, i) => (
+          {Array.from({ length: 40 }).map((_, i) => (
             <motion.div
               key={i}
-              className="absolute w-1 h-1 bg-white rounded-full"
-              style={{ left: `${Math.random() * 100}%`, top: `${Math.random() * 100}%` }}
-              animate={{ opacity: [0.2, 1, 0.2], scale: [0.5, 1, 0.5] }}
+              className="absolute rounded-full bg-white"
+              style={{
+                left: `${(i * 2.5) % 100}%`,
+                top: `${(i * 7 + 3) % 100}%`,
+                width: i % 4 === 0 ? "3px" : i % 2 === 0 ? "2px" : "1px",
+                height: i % 4 === 0 ? "3px" : i % 2 === 0 ? "2px" : "1px",
+              }}
+              animate={{
+                opacity: [0.2, 0.9, 0.2],
+                scale: i % 5 === 0 ? [1, 1.8, 1] : [1, 1.3, 1]
+              }}
               transition={{ duration: 2 + Math.random() * 2, repeat: Infinity, delay: Math.random() * 2 }}
             />
           ))}
+        </div>
+
+        {/* Floating projectile preview */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          {Array.from({ length: 10 }).map((_, i) => (
+            <motion.div
+              key={`projectile-${i}`}
+              className="absolute text-2xl opacity-20"
+              style={{ left: `${10 + (i * 10)}%`, top: "-10%" }}
+              animate={{ y: "120vh", rotate: 360 }}
+              transition={{
+                duration: 5 + Math.random() * 3,
+                repeat: Infinity,
+                delay: i * 0.5,
+                ease: "linear"
+              }}
+            >
+              {["💕", "💋", "✨", "💗"][i % 4]}
+            </motion.div>
+          ))}
+        </div>
+
+        {/* Radial glow */}
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+          <motion.div
+            className="w-80 h-80 bg-purple-500/10 rounded-full blur-3xl"
+            animate={{ scale: [1, 1.2, 1], opacity: [0.3, 0.5, 0.3] }}
+            transition={{ duration: 3, repeat: Infinity }}
+          />
         </div>
 
         <motion.div
           initial={{ scale: 0.8, opacity: 0, y: 30 }}
           animate={{ scale: 1, opacity: 1, y: 0 }}
           transition={{ type: "spring", stiffness: 200 }}
-          className="bg-white/95 backdrop-blur-xl rounded-3xl p-6 max-w-sm text-center shadow-2xl relative z-10 border border-purple-200"
+          className="bg-white/95 backdrop-blur-xl rounded-3xl p-6 max-w-sm w-full text-center shadow-2xl relative z-10 border border-purple-300/50"
         >
-          <motion.div
-            className="text-7xl mb-2"
-            animate={{ y: [0, -8, 0] }}
-            transition={{ duration: 1.5, repeat: Infinity }}
+          {/* Animated cat icon with glow */}
+          <div className="relative mb-3">
+            <motion.div
+              className="absolute inset-0 flex items-center justify-center"
+            >
+              <motion.div
+                className="w-20 h-20 bg-purple-500/30 rounded-full blur-xl"
+                animate={{ scale: [1, 1.4, 1] }}
+                transition={{ duration: 1.5, repeat: Infinity }}
+              />
+            </motion.div>
+            <motion.div
+              className="text-7xl relative"
+              animate={{ y: [0, -10, 0], rotate: [0, 5, -5, 0] }}
+              transition={{ duration: 2, repeat: Infinity }}
+            >
+              😻
+            </motion.div>
+          </div>
+
+          <motion.h2
+            className="text-3xl font-black mb-2"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
           >
-            😻
-          </motion.div>
-          <h2 className="text-3xl font-black bg-gradient-to-r from-purple-600 via-pink-500 to-rose-500 bg-clip-text text-transparent mb-2">
-            Dodge the Love!
-          </h2>
-          <p className="text-slate-600 mb-4 text-sm">
+            <span className="bg-gradient-to-r from-purple-600 via-pink-500 to-rose-500 bg-clip-text text-transparent">
+              Dodge the Love!
+            </span>
+          </motion.h2>
+
+          <motion.p
+            className="text-slate-600 mb-4 text-sm"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.3 }}
+          >
             The cat won't stop throwing love at you!<br/>
             <span className="font-bold text-purple-600">Survive the attack patterns!</span>
-          </p>
+          </motion.p>
 
-          <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-2xl p-3 mb-4">
+          {/* Projectile types with animation */}
+          <motion.div
+            className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-2xl p-3 mb-4 border border-purple-100"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.4 }}
+          >
             <div className="grid grid-cols-4 gap-2 mb-2">
-              <div className="text-center">
-                <div className="text-xl">💕</div>
-              </div>
-              <div className="text-center">
-                <div className="text-xl">💋</div>
-              </div>
-              <div className="text-center">
-                <div className="text-xl">✨</div>
-              </div>
-              <div className="text-center">
-                <div className="text-xl">💗</div>
-              </div>
+              {[
+                { emoji: "💕", label: "Hearts" },
+                { emoji: "💋", label: "Kisses" },
+                { emoji: "✨", label: "Sparkles" },
+                { emoji: "💗", label: "Big!" },
+              ].map((item, i) => (
+                <motion.div
+                  key={i}
+                  className="text-center"
+                  animate={{ y: [0, -3, 0] }}
+                  transition={{ duration: 1.5, repeat: Infinity, delay: i * 0.2 }}
+                >
+                  <div className="text-2xl">{item.emoji}</div>
+                  <div className="text-[8px] text-purple-500 font-medium">{item.label}</div>
+                </motion.div>
+              ))}
             </div>
-            <p className="text-purple-600 text-xs">Dodge all the love projectiles!</p>
-          </div>
+            <p className="text-purple-600 text-xs font-medium">Dodge all the love projectiles!</p>
+          </motion.div>
 
-          <div className="grid grid-cols-3 gap-2 mb-4">
-            <div className="bg-blue-50 rounded-xl p-2 text-center border border-blue-100">
-              <div className="text-xl">🛡️</div>
-              <div className="text-[9px] text-blue-600 font-medium">Block 1 hit</div>
-            </div>
-            <div className="bg-green-50 rounded-xl p-2 text-center border border-green-100">
-              <div className="text-xl">💚</div>
-              <div className="text-[9px] text-green-600 font-medium">+1 Health</div>
-            </div>
-            <div className="bg-amber-50 rounded-xl p-2 text-center border border-amber-100">
-              <div className="text-xl">⏰</div>
-              <div className="text-[9px] text-amber-600 font-medium">Slow time</div>
-            </div>
-          </div>
+          {/* Power-ups with animation */}
+          <motion.div
+            className="grid grid-cols-3 gap-2 mb-4"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.5 }}
+          >
+            {[
+              { emoji: "🛡️", label: "Block 1 hit", bg: "from-blue-50 to-blue-100", border: "border-blue-200", text: "text-blue-600" },
+              { emoji: "💚", label: "+1 Health", bg: "from-green-50 to-green-100", border: "border-green-200", text: "text-green-600" },
+              { emoji: "⏰", label: "Slow time", bg: "from-amber-50 to-amber-100", border: "border-amber-200", text: "text-amber-600" },
+            ].map((item, i) => (
+              <motion.div
+                key={i}
+                className={cn("rounded-xl p-2 text-center border-2 bg-gradient-to-br shadow-sm", item.bg, item.border)}
+                whileHover={{ scale: 1.05, y: -2 }}
+                animate={{ y: [0, -2, 0] }}
+                transition={{ duration: 2, repeat: Infinity, delay: i * 0.3 }}
+              >
+                <div className="text-xl">{item.emoji}</div>
+                <div className={cn("text-[9px] font-bold", item.text)}>{item.label}</div>
+              </motion.div>
+            ))}
+          </motion.div>
 
-          <div className="bg-slate-100 rounded-xl p-3 mb-4">
-            <p className="text-slate-700 text-sm font-medium">
-              👆 Drag to move your character!
-            </p>
-          </div>
+          {/* Control hint */}
+          <motion.div
+            className="bg-gradient-to-r from-slate-100 to-slate-50 rounded-xl p-3 mb-4 border border-slate-200"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.6 }}
+          >
+            <div className="flex items-center justify-center gap-3">
+              <motion.span
+                className="text-2xl"
+                animate={{ x: [-8, 8, -8], y: [-3, 3, -3] }}
+                transition={{ duration: 2, repeat: Infinity }}
+              >
+                👆
+              </motion.span>
+              <p className="text-slate-700 text-sm font-medium">
+                <span className="font-bold">Drag</span> to move your character!
+              </p>
+            </div>
+          </motion.div>
 
           <motion.button
             onClick={startCountdown}
-            className="w-full py-4 bg-gradient-to-r from-purple-500 via-pink-500 to-rose-500 text-white rounded-2xl font-bold text-lg shadow-xl"
-            whileHover={{ scale: 1.02 }}
+            className="w-full py-4 bg-gradient-to-r from-purple-500 via-pink-500 to-rose-500 text-white rounded-2xl font-bold text-lg shadow-xl shadow-purple-500/30 relative overflow-hidden"
+            whileHover={{ scale: 1.02, boxShadow: "0 20px 40px -10px rgba(168, 85, 247, 0.4)" }}
             whileTap={{ scale: 0.98 }}
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.7 }}
           >
-            <motion.span
-              animate={{ scale: [1, 1.05, 1] }}
-              transition={{ duration: 1, repeat: Infinity }}
-            >
-              Ready to Dodge! ⚡
-            </motion.span>
+            <motion.div
+              className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent"
+              initial={{ x: "-100%" }}
+              animate={{ x: "200%" }}
+              transition={{ duration: 1.5, repeat: Infinity, repeatDelay: 0.5 }}
+            />
+            <span className="relative flex items-center justify-center gap-2">
+              <span>Ready to Dodge!</span>
+              <motion.span
+                animate={{ scale: [1, 1.3, 1], rotate: [0, 10, -10, 0] }}
+                transition={{ duration: 0.6, repeat: Infinity }}
+              >
+                ⚡
+              </motion.span>
+            </span>
           </motion.button>
         </motion.div>
       </div>
     );
   }
 
-  // Countdown
+  // Countdown with enhanced visuals
   if (phase === "countdown") {
     return (
-      <div className="fixed inset-0 bg-gradient-to-b from-slate-900 via-purple-900 to-violet-900 flex items-center justify-center">
-        <motion.div
-          key={countdownNum}
-          initial={{ scale: 3, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          exit={{ scale: 0, opacity: 0 }}
-          transition={{ type: "spring", stiffness: 300, damping: 20 }}
-          className="text-[140px] font-black text-white drop-shadow-[0_0_30px_rgba(168,85,247,0.8)]"
-        >
-          {countdownNum || "GO!"}
+      <div className="fixed inset-0 bg-gradient-to-b from-slate-900 via-purple-900 to-violet-900 flex items-center justify-center overflow-hidden">
+        {/* Pulsing rings */}
+        <motion.div className="absolute inset-0 flex items-center justify-center">
+          <motion.div
+            className="w-96 h-96 rounded-full border-2 border-purple-400/30"
+            animate={{ scale: [0, 2], opacity: [0.5, 0] }}
+            transition={{ duration: 0.8, repeat: Infinity }}
+          />
         </motion.div>
+
+        {/* Stars during countdown */}
+        <div className="absolute inset-0 pointer-events-none">
+          {Array.from({ length: 20 }).map((_, i) => (
+            <motion.div
+              key={i}
+              className="absolute rounded-full bg-white"
+              style={{
+                left: `${(i * 5 + 2) % 100}%`,
+                top: `${(i * 7 + 5) % 100}%`,
+                width: i % 3 === 0 ? "3px" : "2px",
+                height: i % 3 === 0 ? "3px" : "2px",
+              }}
+              animate={{ opacity: [0.2, 1, 0.2], scale: [1, 1.5, 1] }}
+              transition={{ duration: 1.5, repeat: Infinity, delay: i * 0.1 }}
+            />
+          ))}
+        </div>
+
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={countdownNum}
+            initial={{ scale: 3, opacity: 0, rotate: 180 }}
+            animate={{ scale: 1, opacity: 1, rotate: 0 }}
+            exit={{ scale: 0, opacity: 0, y: -50 }}
+            transition={{ type: "spring", stiffness: 300, damping: 20 }}
+            className="relative"
+          >
+            <div className="absolute inset-0 flex items-center justify-center blur-2xl">
+              <div className="text-[180px] font-black text-purple-400/50">
+                {countdownNum || "GO!"}
+              </div>
+            </div>
+            <div className="text-[140px] font-black text-white drop-shadow-[0_0_30px_rgba(168,85,247,0.8)] relative">
+              {countdownNum || "GO!"}
+            </div>
+          </motion.div>
+        </AnimatePresence>
       </div>
     );
   }
 
-  // Done
+  // Done screen with enhanced visuals
   if (phase === "done") {
     const survived = health > 0;
     return (
-      <div className="fixed inset-0 bg-gradient-to-b from-slate-900 via-purple-900 to-violet-900 flex flex-col items-center justify-center p-4">
+      <div className="fixed inset-0 bg-gradient-to-b from-slate-900 via-purple-900 to-violet-900 flex flex-col items-center justify-center p-4 overflow-hidden">
+        {/* Celebration/defeat particles */}
+        <div className="absolute inset-0 pointer-events-none">
+          {Array.from({ length: 20 }).map((_, i) => (
+            <motion.div
+              key={i}
+              className="absolute text-2xl"
+              style={{ left: `${5 + (i * 5)}%`, top: survived ? "-5%" : "50%" }}
+              initial={{ y: 0, opacity: 1 }}
+              animate={{
+                y: survived ? "120vh" : [-20, 20],
+                opacity: survived ? [1, 0.5] : [0.3, 0.6, 0.3],
+                rotate: survived ? 360 : [0, 10, -10, 0],
+              }}
+              transition={{
+                duration: survived ? (3 + Math.random() * 2) : 3,
+                repeat: Infinity,
+                delay: i * 0.1,
+              }}
+            >
+              {survived ? ["🎉", "✨", "⭐", "🌟", "💫"][i % 5] : ["💕", "💗", "💋", "✨"][i % 4]}
+            </motion.div>
+          ))}
+        </div>
+
         <motion.div
           initial={{ scale: 0, y: 50 }}
           animate={{ scale: 1, y: 0 }}
           transition={{ type: "spring", stiffness: 200 }}
-          className="bg-white/95 backdrop-blur-xl rounded-3xl p-8 max-w-sm text-center shadow-2xl border border-purple-200"
+          className="bg-white/95 backdrop-blur-xl rounded-3xl p-6 sm:p-8 max-w-sm w-full text-center shadow-2xl border border-purple-300/50 relative overflow-hidden"
         >
+          {/* Shimmer */}
           <motion.div
-            className="text-8xl mb-4"
-            animate={survived ? { y: [0, -15, 0], rotate: [0, 5, -5, 0] } : { scale: [1, 1.1, 1] }}
-            transition={{ duration: 1.5, repeat: Infinity }}
-          >
-            {survived ? "🎉" : "😻"}
-          </motion.div>
-          <h2 className="text-3xl font-black bg-gradient-to-r from-purple-600 to-pink-500 bg-clip-text text-transparent mb-3">
-            {survived ? "You Survived!" : "Caught by Love!"}
-          </h2>
+            className="absolute inset-0 bg-gradient-to-r from-transparent via-purple-100/50 to-transparent -skew-x-12"
+            initial={{ x: "-100%" }}
+            animate={{ x: "200%" }}
+            transition={{ duration: 2, repeat: Infinity, repeatDelay: 1 }}
+          />
 
-          <div className="grid grid-cols-3 gap-2 mb-4">
-            <div className="bg-purple-50 rounded-2xl p-3 border border-purple-100">
-              <p className="text-2xl font-black text-purple-600">{score}</p>
-              <p className="text-purple-400 text-[10px]">POINTS</p>
-            </div>
-            <div className="bg-pink-50 rounded-2xl p-3 border border-pink-100">
-              <p className="text-2xl font-black text-pink-600">x{maxCombo}</p>
-              <p className="text-pink-400 text-[10px]">COMBO</p>
-            </div>
-            <div className="bg-rose-50 rounded-2xl p-3 border border-rose-100">
-              <p className="text-2xl font-black text-rose-600">{health}</p>
-              <p className="text-rose-400 text-[10px]">HP LEFT</p>
-            </div>
-          </div>
-
-          <motion.p
-            className="text-slate-500 italic"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.5 }}
-          >
-            {survived ? '"You got lucky this time!" 😾' : '"You can\'t resist my love!" 😻'}
-          </motion.p>
-          <motion.div
-            className="mt-4 flex justify-center gap-1"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 1 }}
-          >
-            <span className="text-purple-300 text-sm">Next challenge</span>
-            <motion.span
-              animate={{ x: [0, 5, 0] }}
-              transition={{ duration: 1, repeat: Infinity }}
-              className="text-purple-300"
+          <div className="relative">
+            <motion.div
+              className="text-8xl mb-4"
+              animate={survived
+                ? { y: [0, -15, 0], rotate: [0, 5, -5, 0], scale: [1, 1.1, 1] }
+                : { scale: [1, 1.15, 1], rotate: [0, -5, 5, 0] }
+              }
+              transition={{ duration: 1.5, repeat: Infinity }}
             >
-              →
-            </motion.span>
-          </motion.div>
+              {survived ? "🎉" : "😻"}
+            </motion.div>
+
+            <motion.h2
+              className="text-3xl font-black mb-3"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.2 }}
+            >
+              <span className={cn(
+                "bg-clip-text text-transparent",
+                survived
+                  ? "bg-gradient-to-r from-green-500 via-emerald-500 to-teal-500"
+                  : "bg-gradient-to-r from-purple-600 to-pink-500"
+              )}>
+                {survived ? "You Survived!" : "Caught by Love!"}
+              </span>
+            </motion.h2>
+
+            <motion.div
+              className="grid grid-cols-3 gap-2 mb-4"
+              initial={{ scale: 0.8, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ delay: 0.3 }}
+            >
+              <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-2xl p-3 border border-purple-200">
+                <motion.p
+                  className="text-3xl font-black text-purple-600"
+                  animate={{ scale: [1, 1.1, 1] }}
+                  transition={{ duration: 0.5, repeat: 3, delay: 0.5 }}
+                >
+                  {score}
+                </motion.p>
+                <p className="text-purple-400 text-[10px] font-medium">POINTS</p>
+              </div>
+              <div className="bg-gradient-to-br from-pink-50 to-pink-100 rounded-2xl p-3 border border-pink-200">
+                <p className="text-3xl font-black text-pink-600">x{maxCombo}</p>
+                <p className="text-pink-400 text-[10px] font-medium">COMBO</p>
+              </div>
+              <div className="bg-gradient-to-br from-rose-50 to-rose-100 rounded-2xl p-3 border border-rose-200">
+                <div className="flex items-center justify-center gap-0.5">
+                  {[...Array(5)].map((_, i) => (
+                    <span key={i} className={cn("text-sm", i < health ? "" : "opacity-30")}>
+                      {i < health ? "❤️" : "🖤"}
+                    </span>
+                  ))}
+                </div>
+                <p className="text-rose-400 text-[10px] font-medium">HP LEFT</p>
+              </div>
+            </motion.div>
+
+            <motion.div
+              className="bg-slate-50 rounded-xl p-3 mb-4"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.5 }}
+            >
+              <p className="text-slate-600 italic">
+                {survived ? '"You got lucky this time!" 😾' : '"You can\'t resist my love!" 😻'}
+              </p>
+            </motion.div>
+
+            <motion.div
+              className="flex items-center justify-center gap-2 text-purple-400 text-sm"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.8 }}
+            >
+              <motion.div
+                className="w-2 h-2 bg-purple-400 rounded-full"
+                animate={{ scale: [1, 1.5, 1] }}
+                transition={{ duration: 0.6, repeat: Infinity, delay: 0 }}
+              />
+              <motion.div
+                className="w-2 h-2 bg-purple-400 rounded-full"
+                animate={{ scale: [1, 1.5, 1] }}
+                transition={{ duration: 0.6, repeat: Infinity, delay: 0.2 }}
+              />
+              <motion.div
+                className="w-2 h-2 bg-purple-400 rounded-full"
+                animate={{ scale: [1, 1.5, 1] }}
+                transition={{ duration: 0.6, repeat: Infinity, delay: 0.4 }}
+              />
+              <span className="ml-2">Next challenge loading</span>
+            </motion.div>
+          </div>
         </motion.div>
       </div>
     );
@@ -3198,133 +3898,254 @@ const RejectLettersGame = memo(function RejectLettersGame({ onComplete }: { onCo
     }, 25);
   }, [openLetter, destruction.type, spawnParticles, spawnScorePopup]);
 
-  // Tutorial screen
+  // Tutorial screen with enhanced visuals
   if (phase === "tutorial") {
     return (
       <div className="fixed inset-0 bg-gradient-to-b from-amber-100 via-rose-100 to-pink-200 flex flex-col items-center justify-center p-4 overflow-hidden">
-        {/* Floating letters background */}
+        {/* Enhanced floating letters background */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          {Array.from({ length: 12 }).map((_, i) => (
+          {Array.from({ length: 15 }).map((_, i) => (
             <motion.div
               key={i}
-              className="absolute"
-              style={{ left: `${(i * 15 + 5) % 100}%`, top: `${(i * 20 + 10) % 100}%` }}
-              animate={{
-                y: [0, -20, 0],
-                rotate: [-5, 5, -5],
-                scale: [1, 1.05, 1],
+              className="absolute text-4xl opacity-25"
+              style={{ left: `${(i * 7) % 100}%`, top: "-10%" }}
+              animate={{ y: "120vh", rotate: [-10, 10, -10], x: [0, 10, -10, 0] }}
+              transition={{
+                duration: 8 + Math.random() * 4,
+                repeat: Infinity,
+                delay: i * 0.5,
+                ease: "linear"
               }}
-              transition={{ duration: 3 + i % 2, repeat: Infinity, delay: i * 0.3 }}
             >
-              <div className="text-5xl opacity-30">💌</div>
+              {["💌", "💕", "✉️", "📬", "💝"][i % 5]}
             </motion.div>
           ))}
+        </div>
+
+        {/* Radial glow */}
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+          <motion.div
+            className="w-80 h-80 bg-rose-400/20 rounded-full blur-3xl"
+            animate={{ scale: [1, 1.2, 1], opacity: [0.3, 0.5, 0.3] }}
+            transition={{ duration: 3, repeat: Infinity }}
+          />
         </div>
 
         <motion.div
           initial={{ scale: 0.8, opacity: 0, y: 30 }}
           animate={{ scale: 1, opacity: 1, y: 0 }}
           transition={{ type: "spring", stiffness: 200 }}
-          className="bg-white/95 backdrop-blur-xl rounded-3xl p-6 max-w-sm text-center shadow-2xl relative z-10 border-2 border-rose-200"
+          className="bg-white/95 backdrop-blur-xl rounded-3xl p-6 max-w-sm w-full text-center shadow-2xl relative z-10 border border-rose-300/50"
         >
           {/* Wax seal decoration */}
           <motion.div
-            className="absolute -top-6 left-1/2 -translate-x-1/2 w-12 h-12 bg-gradient-to-br from-red-500 to-red-700 rounded-full shadow-lg flex items-center justify-center"
-            animate={{ rotate: [0, 5, -5, 0] }}
+            className="absolute -top-6 left-1/2 -translate-x-1/2 w-14 h-14 bg-gradient-to-br from-red-500 to-red-700 rounded-full shadow-xl flex items-center justify-center border-2 border-red-400"
+            animate={{ rotate: [0, 5, -5, 0], scale: [1, 1.05, 1] }}
             transition={{ duration: 2, repeat: Infinity }}
           >
-            <span className="text-2xl">💕</span>
+            <span className="text-2xl drop-shadow">💕</span>
           </motion.div>
 
-          <div className="mt-4 mb-3">
+          {/* Animated letter icon with glow */}
+          <div className="relative mt-6 mb-3">
+            <motion.div className="absolute inset-0 flex items-center justify-center">
+              <motion.div
+                className="w-20 h-20 bg-rose-400/30 rounded-full blur-xl"
+                animate={{ scale: [1, 1.4, 1] }}
+                transition={{ duration: 1.5, repeat: Infinity }}
+              />
+            </motion.div>
             <motion.div
-              className="text-6xl mb-2"
-              animate={{ rotate: [-3, 3, -3], y: [0, -5, 0] }}
+              className="text-7xl relative"
+              animate={{ rotate: [-5, 5, -5], y: [0, -8, 0], scale: [1, 1.05, 1] }}
               transition={{ duration: 2, repeat: Infinity }}
             >
               💌
             </motion.div>
           </div>
 
-          <h2 className="text-2xl font-black bg-gradient-to-r from-rose-600 via-pink-600 to-red-500 bg-clip-text text-transparent mb-2">
-            Reject Love Letters!
-          </h2>
-          <p className="text-slate-600 mb-4 text-sm">
+          <motion.h2
+            className="text-2xl font-black mb-2"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+          >
+            <span className="bg-gradient-to-r from-rose-600 via-pink-600 to-red-500 bg-clip-text text-transparent">
+              Reject Love Letters!
+            </span>
+          </motion.h2>
+
+          <motion.p
+            className="text-slate-600 mb-4 text-sm"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.3 }}
+          >
             The cat sent you love letters!<br/>
             <span className="font-bold text-rose-600">Open them, read them, then DESTROY them!</span>
-          </p>
+          </motion.p>
 
-          <div className="bg-gradient-to-r from-rose-50 to-amber-50 rounded-2xl p-4 mb-4">
+          {/* Destruction methods with animation */}
+          <motion.div
+            className="bg-gradient-to-r from-rose-50 to-amber-50 rounded-2xl p-4 mb-4 border border-rose-200"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.4 }}
+          >
             <p className="text-slate-700 text-sm font-medium mb-3">Choose how to reject:</p>
             <div className="flex justify-center gap-6">
-              <div className="text-center">
+              <motion.div
+                className="text-center"
+                whileHover={{ scale: 1.1, y: -3 }}
+                animate={{ y: [0, -3, 0] }}
+                transition={{ duration: 2, repeat: Infinity }}
+              >
                 <motion.div
-                  className="w-14 h-14 bg-gradient-to-br from-orange-400 to-red-500 rounded-xl flex items-center justify-center shadow-lg mb-1"
+                  className="w-14 h-14 bg-gradient-to-br from-orange-400 to-red-500 rounded-xl flex items-center justify-center shadow-lg shadow-orange-500/30 mb-1 border border-orange-300"
                   animate={{ scale: [1, 1.1, 1] }}
                   transition={{ duration: 1.5, repeat: Infinity }}
                 >
                   <span className="text-2xl">🔥</span>
                 </motion.div>
                 <div className="text-xs font-bold text-orange-600">BURN IT</div>
-                <div className="text-[10px] text-orange-500">+15 pts</div>
-              </div>
-              <div className="text-center">
+                <div className="text-[10px] text-orange-500 font-medium">+25 pts</div>
+              </motion.div>
+              <motion.div
+                className="text-center"
+                whileHover={{ scale: 1.1, y: -3 }}
+                animate={{ y: [0, -3, 0] }}
+                transition={{ duration: 2, repeat: Infinity, delay: 0.3 }}
+              >
                 <motion.div
-                  className="w-14 h-14 bg-gradient-to-br from-slate-400 to-slate-600 rounded-xl flex items-center justify-center shadow-lg mb-1"
+                  className="w-14 h-14 bg-gradient-to-br from-slate-400 to-slate-600 rounded-xl flex items-center justify-center shadow-lg shadow-slate-500/30 mb-1 border border-slate-300"
                   animate={{ rotate: [-5, 5, -5] }}
                   transition={{ duration: 0.5, repeat: Infinity }}
                 >
                   <span className="text-2xl">✂️</span>
                 </motion.div>
                 <div className="text-xs font-bold text-slate-600">RIP IT</div>
-                <div className="text-[10px] text-slate-500">+10 pts</div>
-              </div>
+                <div className="text-[10px] text-slate-500 font-medium">+10 pts</div>
+              </motion.div>
             </div>
-          </div>
+          </motion.div>
 
-          <div className="flex gap-2 mb-4">
-            <div className="flex-1 bg-amber-100 rounded-xl p-2 border border-amber-200">
-              <div className="text-xl">✨💌</div>
-              <div className="text-[9px] text-amber-700 font-medium">Gold = More pts!</div>
-            </div>
-            <div className="flex-1 bg-rose-100 rounded-xl p-2 border border-rose-200">
-              <div className="text-xl">🔥</div>
-              <div className="text-[9px] text-rose-700 font-medium">Burn bonus!</div>
-            </div>
-          </div>
+          {/* Bonus info */}
+          <motion.div
+            className="flex gap-2 mb-4"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.5 }}
+          >
+            <motion.div
+              className="flex-1 bg-gradient-to-br from-amber-50 to-amber-100 rounded-xl p-2 border-2 border-amber-300 shadow-sm"
+              whileHover={{ scale: 1.05 }}
+            >
+              <motion.div
+                className="text-xl"
+                animate={{ rotate: [0, 5, -5, 0] }}
+                transition={{ duration: 2, repeat: Infinity }}
+              >
+                ✨💌
+              </motion.div>
+              <div className="text-[9px] text-amber-700 font-bold">Gold = 2x pts!</div>
+            </motion.div>
+            <motion.div
+              className="flex-1 bg-gradient-to-br from-rose-50 to-rose-100 rounded-xl p-2 border-2 border-rose-300 shadow-sm"
+              whileHover={{ scale: 1.05 }}
+            >
+              <motion.div
+                className="text-xl"
+                animate={{ scale: [1, 1.2, 1] }}
+                transition={{ duration: 0.5, repeat: Infinity }}
+              >
+                🔥
+              </motion.div>
+              <div className="text-[9px] text-rose-700 font-bold">Burn = +10 bonus!</div>
+            </motion.div>
+          </motion.div>
 
           <motion.button
             onClick={startCountdown}
-            className="w-full py-4 bg-gradient-to-r from-rose-500 via-red-500 to-orange-500 text-white rounded-2xl font-bold text-lg shadow-xl"
-            whileHover={{ scale: 1.02 }}
+            className="w-full py-4 bg-gradient-to-r from-rose-500 via-red-500 to-orange-500 text-white rounded-2xl font-bold text-lg shadow-xl shadow-rose-500/30 relative overflow-hidden"
+            whileHover={{ scale: 1.02, boxShadow: "0 20px 40px -10px rgba(244, 63, 94, 0.4)" }}
             whileTap={{ scale: 0.98 }}
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.6 }}
           >
-            <motion.span
-              animate={{ scale: [1, 1.05, 1] }}
-              transition={{ duration: 1, repeat: Infinity }}
-            >
-              Open the Letters! 💔
-            </motion.span>
+            <motion.div
+              className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent"
+              initial={{ x: "-100%" }}
+              animate={{ x: "200%" }}
+              transition={{ duration: 1.5, repeat: Infinity, repeatDelay: 0.5 }}
+            />
+            <span className="relative flex items-center justify-center gap-2">
+              <span>Open the Letters!</span>
+              <motion.span
+                animate={{ scale: [1, 1.3, 1], rotate: [0, 10, -10, 0] }}
+                transition={{ duration: 0.6, repeat: Infinity }}
+              >
+                💔
+              </motion.span>
+            </span>
           </motion.button>
         </motion.div>
       </div>
     );
   }
 
-  // Countdown
+  // Countdown with enhanced visuals
   if (phase === "countdown") {
     return (
-      <div className="fixed inset-0 bg-gradient-to-b from-amber-100 via-rose-100 to-pink-200 flex items-center justify-center">
-        <motion.div
-          key={countdownNum}
-          initial={{ scale: 3, opacity: 0, rotate: -20 }}
-          animate={{ scale: 1, opacity: 1, rotate: 0 }}
-          exit={{ scale: 0, opacity: 0 }}
-          transition={{ type: "spring", stiffness: 300, damping: 20 }}
-          className="text-[120px] font-black text-rose-600 drop-shadow-[0_0_30px_rgba(244,63,94,0.5)]"
-        >
-          {countdownNum || "💌"}
+      <div className="fixed inset-0 bg-gradient-to-b from-amber-100 via-rose-100 to-pink-200 flex items-center justify-center overflow-hidden">
+        {/* Floating letters during countdown */}
+        <div className="absolute inset-0 pointer-events-none">
+          {Array.from({ length: 12 }).map((_, i) => (
+            <motion.div
+              key={i}
+              className="absolute text-3xl opacity-30"
+              style={{ left: `${10 + (i * 7)}%`, bottom: "-10%" }}
+              animate={{ y: "-120vh", rotate: 360 }}
+              transition={{
+                duration: 3 + Math.random() * 2,
+                repeat: Infinity,
+                delay: i * 0.2,
+                ease: "linear"
+              }}
+            >
+              {["💌", "💕", "✉️", "💝"][i % 4]}
+            </motion.div>
+          ))}
+        </div>
+
+        {/* Pulse effect */}
+        <motion.div className="absolute inset-0 flex items-center justify-center">
+          <motion.div
+            className="w-96 h-96 rounded-full bg-rose-400/20"
+            animate={{ scale: [0, 2], opacity: [0.4, 0] }}
+            transition={{ duration: 0.8, repeat: Infinity }}
+          />
         </motion.div>
+
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={countdownNum}
+            initial={{ scale: 3, opacity: 0, rotate: -20 }}
+            animate={{ scale: 1, opacity: 1, rotate: 0 }}
+            exit={{ scale: 0, opacity: 0, y: -50 }}
+            transition={{ type: "spring", stiffness: 300, damping: 20 }}
+            className="relative"
+          >
+            <div className="absolute inset-0 flex items-center justify-center blur-2xl">
+              <div className="text-[150px] font-black text-rose-400/50">
+                {countdownNum || "💌"}
+              </div>
+            </div>
+            <div className="text-[120px] font-black text-rose-600 drop-shadow-[0_0_30px_rgba(244,63,94,0.5)] relative">
+              {countdownNum || "💌"}
+            </div>
+          </motion.div>
+        </AnimatePresence>
       </div>
     );
   }
@@ -5969,53 +6790,176 @@ export default function ValentineCat() {
 
   if (scene === "title") {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-pink-200 via-rose-200 to-pink-300 flex flex-col items-center justify-center p-4">
-        <Particles emojis={["💖", "💕", "✨", "💗", "🌸"]} count={30} />
+      <div className="fixed inset-0 bg-gradient-to-b from-pink-200 via-rose-300 to-pink-400 flex flex-col items-center justify-center p-4 overflow-hidden">
+        {/* Animated background hearts */}
+        <div className="absolute inset-0 pointer-events-none overflow-hidden">
+          {Array.from({ length: 20 }).map((_, i) => (
+            <motion.div
+              key={i}
+              className="absolute text-2xl md:text-3xl opacity-20"
+              style={{ left: `${(i * 11) % 100}%` }}
+              initial={{ y: "100vh" }}
+              animate={{ y: "-100vh", rotate: [0, 360] }}
+              transition={{
+                duration: 12 + (i % 5) * 3,
+                repeat: Infinity,
+                delay: i * 0.4,
+                ease: "linear"
+              }}
+            >
+              {["💖", "💕", "💗", "🌸", "✨"][i % 5]}
+            </motion.div>
+          ))}
+        </div>
+
+        {/* Radial glow behind cat */}
         <motion.div
-          initial={{ scale: 0, rotate: -180 }}
-          animate={{ scale: 1, rotate: 0 }}
-          transition={{ type: "spring", stiffness: 200, delay: 0.2 }}
-          className="mb-8"
-        >
-          <CatSprite emotion="love" size="xl" animate />
-        </motion.div>
-        <motion.h1
-          initial={{ y: 50, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          transition={{ delay: 0.5 }}
-          className="text-5xl font-bold text-pink-800 mb-4 text-center"
-        >
-          Valentine's Quest
-        </motion.h1>
-        <motion.p
-          initial={{ y: 30, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          transition={{ delay: 0.7 }}
-          className="text-xl text-pink-600 mb-8 text-center"
-        >
-          A dramatic cat's journey to find love 💕
-        </motion.p>
-        <motion.div
-          initial={{ y: 30, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          transition={{ delay: 0.9 }}
-          className="flex flex-col gap-4"
-        >
-          <Button variant="pink" size="xl" onClick={startGame}>
-            <Heart className="w-6 h-6" /> Start Game
-          </Button>
-          <Button variant="outline" size="lg" onClick={() => {
-            gameStartRef.current = now();
-            setScene("chapter1_chase");
-          }}>
-            Skip Intro
-          </Button>
-        </motion.div>
+          className="absolute w-[300px] h-[300px] rounded-full pointer-events-none"
+          style={{ background: "radial-gradient(circle, rgba(255,182,193,0.6) 0%, transparent 70%)" }}
+          animate={{ scale: [1, 1.2, 1], opacity: [0.5, 0.8, 0.5] }}
+          transition={{ duration: 3, repeat: Infinity }}
+        />
+
+        {/* Main content */}
+        <div className="relative z-10 flex flex-col items-center">
+          {/* Cat with crown */}
+          <motion.div
+            initial={{ scale: 0, rotate: -180 }}
+            animate={{ scale: 1, rotate: 0 }}
+            transition={{ type: "spring", stiffness: 150, delay: 0.2 }}
+            className="relative mb-6"
+          >
+            {/* Crown */}
+            <motion.div
+              className="absolute -top-8 left-1/2 -translate-x-1/2 text-4xl z-10"
+              initial={{ y: -50, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              transition={{ delay: 0.8, type: "spring" }}
+            >
+              <motion.span
+                animate={{ y: [0, -5, 0], rotate: [-5, 5, -5] }}
+                transition={{ duration: 2, repeat: Infinity }}
+              >
+                👑
+              </motion.span>
+            </motion.div>
+            {/* Cat */}
+            <motion.div
+              animate={{ y: [0, -8, 0] }}
+              transition={{ duration: 2.5, repeat: Infinity, ease: "easeInOut" }}
+            >
+              <span className="text-[100px] md:text-[120px] block">😻</span>
+            </motion.div>
+            {/* Heart decorations */}
+            <motion.div
+              className="absolute -left-6 top-1/2 text-2xl"
+              animate={{ scale: [1, 1.3, 1], rotate: [-10, 10, -10] }}
+              transition={{ duration: 1.5, repeat: Infinity }}
+            >
+              💕
+            </motion.div>
+            <motion.div
+              className="absolute -right-6 top-1/2 text-2xl"
+              animate={{ scale: [1, 1.3, 1], rotate: [10, -10, 10] }}
+              transition={{ duration: 1.5, repeat: Infinity, delay: 0.3 }}
+            >
+              💗
+            </motion.div>
+          </motion.div>
+
+          {/* Title */}
+          <motion.div
+            initial={{ y: 50, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            transition={{ delay: 0.5, type: "spring" }}
+            className="text-center mb-2"
+          >
+            <h1 className="text-4xl md:text-6xl font-black bg-gradient-to-r from-pink-600 via-rose-500 to-red-500 bg-clip-text text-transparent drop-shadow-sm">
+              Valentine's Quest
+            </h1>
+          </motion.div>
+
+          {/* Subtitle with hearts */}
+          <motion.div
+            initial={{ y: 30, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            transition={{ delay: 0.7 }}
+            className="flex items-center gap-2 mb-8"
+          >
+            <motion.span animate={{ scale: [1, 1.2, 1] }} transition={{ duration: 1, repeat: Infinity }}>💖</motion.span>
+            <p className="text-lg md:text-xl text-pink-700 font-medium">
+              A dramatic cat's journey to find love
+            </p>
+            <motion.span animate={{ scale: [1, 1.2, 1] }} transition={{ duration: 1, repeat: Infinity, delay: 0.5 }}>💖</motion.span>
+          </motion.div>
+
+          {/* Buttons */}
+          <motion.div
+            initial={{ y: 30, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            transition={{ delay: 0.9 }}
+            className="flex flex-col gap-3 w-full max-w-xs"
+          >
+            <motion.button
+              onClick={startGame}
+              className="w-full py-4 px-8 bg-gradient-to-r from-pink-500 via-rose-500 to-red-500 text-white font-bold text-xl rounded-2xl shadow-lg relative overflow-hidden"
+              whileHover={{ scale: 1.03 }}
+              whileTap={{ scale: 0.97 }}
+            >
+              <motion.div
+                className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/30 to-white/0"
+                animate={{ x: ["-100%", "100%"] }}
+                transition={{ duration: 2, repeat: Infinity, repeatDelay: 1 }}
+              />
+              <span className="relative z-10 flex items-center justify-center gap-2">
+                <Heart className="w-6 h-6" /> Start Game
+              </span>
+            </motion.button>
+            <motion.button
+              onClick={() => {
+                gameStartRef.current = now();
+                setScene("chapter1_chase");
+              }}
+              className="w-full py-3 px-6 border-2 border-pink-400 text-pink-600 font-medium rounded-xl hover:bg-pink-50 transition-colors"
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+            >
+              Skip Intro →
+            </motion.button>
+          </motion.div>
+
+          {/* Features preview */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 1.3 }}
+            className="flex gap-4 mt-8"
+          >
+            {[
+              { emoji: "🎮", label: "Mini-games" },
+              { emoji: "👑", label: "Boss Battle" },
+              { emoji: "💕", label: "Romance" },
+            ].map((item, i) => (
+              <motion.div
+                key={i}
+                className="flex flex-col items-center"
+                initial={{ y: 20, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                transition={{ delay: 1.4 + i * 0.1 }}
+              >
+                <span className="text-2xl mb-1">{item.emoji}</span>
+                <span className="text-xs text-pink-600 font-medium">{item.label}</span>
+              </motion.div>
+            ))}
+          </motion.div>
+        </div>
+
+        {/* Footer */}
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          transition={{ delay: 1.5 }}
-          className="absolute bottom-8 text-pink-500 text-sm"
+          transition={{ delay: 1.8 }}
+          className="absolute bottom-6 text-pink-500 text-sm font-medium"
         >
           Made with 💖 and dramatic cat energy
         </motion.div>
@@ -6025,11 +6969,81 @@ export default function ValentineCat() {
 
   if (scene === "intro_cutscene") {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-indigo-900 via-purple-900 to-pink-900 flex items-center justify-center p-4">
-        <Particles emojis={["✨", "⭐", "💫"]} count={20} />
+      <div className="fixed inset-0 bg-gradient-to-b from-indigo-950 via-purple-900 to-pink-900 flex items-center justify-center p-4 overflow-hidden">
+        {/* Starfield background */}
+        <div className="absolute inset-0 pointer-events-none">
+          {Array.from({ length: 30 }).map((_, i) => (
+            <motion.div
+              key={i}
+              className="absolute w-1 h-1 bg-white rounded-full"
+              style={{
+                left: `${Math.random() * 100}%`,
+                top: `${Math.random() * 100}%`,
+              }}
+              animate={{
+                opacity: [0.2, 1, 0.2],
+                scale: [0.5, 1, 0.5],
+              }}
+              transition={{
+                duration: 2 + Math.random() * 2,
+                repeat: Infinity,
+                delay: Math.random() * 2,
+              }}
+            />
+          ))}
+        </div>
+
+        {/* Floating sparkles */}
+        <div className="absolute inset-0 pointer-events-none overflow-hidden">
+          {Array.from({ length: 12 }).map((_, i) => (
+            <motion.div
+              key={`sparkle-${i}`}
+              className="absolute text-xl opacity-40"
+              style={{ left: `${(i * 17) % 100}%` }}
+              initial={{ y: "100vh" }}
+              animate={{ y: "-100vh" }}
+              transition={{
+                duration: 15 + (i % 4) * 3,
+                repeat: Infinity,
+                delay: i * 0.8,
+                ease: "linear"
+              }}
+            >
+              {["✨", "⭐", "💫", "🌟"][i % 4]}
+            </motion.div>
+          ))}
+        </div>
+
+        {/* Progress indicator */}
+        <div className="absolute top-6 left-1/2 -translate-x-1/2 flex gap-2">
+          {INTRO_DIALOG.map((_, i) => (
+            <motion.div
+              key={i}
+              className={cn(
+                "w-2 h-2 rounded-full transition-colors duration-300",
+                i === dialogIndex ? "bg-pink-400" : i < dialogIndex ? "bg-pink-600" : "bg-white/30"
+              )}
+              animate={i === dialogIndex ? { scale: [1, 1.3, 1] } : {}}
+              transition={{ duration: 1, repeat: Infinity }}
+            />
+          ))}
+        </div>
+
+        {/* Dialog content */}
         <AnimatePresence mode="wait">
           <DialogBox key={dialogIndex} line={INTRO_DIALOG[dialogIndex]} onNext={advanceDialog} />
         </AnimatePresence>
+
+        {/* Skip button */}
+        <motion.button
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 1 }}
+          onClick={() => nextScene("chapter1_chase")}
+          className="absolute bottom-6 right-6 text-white/50 hover:text-white/80 text-sm transition-colors"
+        >
+          Skip →
+        </motion.button>
       </div>
     );
   }
@@ -6040,73 +7054,200 @@ export default function ValentineCat() {
 
   if (scene === "chapter1_chase") {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-pink-100 via-rose-100 to-pink-200 overflow-hidden flex items-center justify-center p-4">
-        <Particles emojis={["💕", "🌸", "✨"]} count={15} />
-        <Card className="max-w-md w-full p-8 bg-white/95 backdrop-blur shadow-2xl relative z-10">
-          <div className="text-center">
-            <motion.div className="mb-6" whileHover={{ scale: 1.1 }} whileTap={{ scale: 0.95 }} onClick={petCat}>
-              <CatSprite emotion={catMood} size="xl" />
+      <div className="fixed inset-0 bg-gradient-to-br from-pink-100 via-rose-200 to-pink-300 overflow-hidden flex items-center justify-center p-4">
+        {/* Animated background */}
+        <div className="absolute inset-0 pointer-events-none overflow-hidden">
+          {Array.from({ length: 15 }).map((_, i) => (
+            <motion.div
+              key={i}
+              className="absolute text-2xl opacity-30"
+              style={{ left: `${(i * 13) % 100}%` }}
+              initial={{ y: "100vh" }}
+              animate={{ y: "-100vh" }}
+              transition={{
+                duration: 10 + (i % 4) * 2,
+                repeat: Infinity,
+                delay: i * 0.5,
+                ease: "linear"
+              }}
+            >
+              {["💕", "🌸", "✨", "💗"][i % 4]}
             </motion.div>
-            <h1 className="text-3xl font-bold text-pink-800 mb-4">Will you be my Valentine?</h1>
-            <AnimatePresence mode="wait">
-              {catMessage && (
+          ))}
+        </div>
+
+        {/* Main card */}
+        <motion.div
+          initial={{ scale: 0.8, opacity: 0, y: 30 }}
+          animate={{ scale: 1, opacity: 1, y: 0 }}
+          transition={{ type: "spring", stiffness: 200 }}
+          className="max-w-md w-full relative z-10"
+        >
+          <div className="bg-white/95 backdrop-blur-xl rounded-3xl p-8 shadow-2xl border border-pink-200">
+            <div className="text-center">
+              {/* Cat with interaction */}
+              <motion.div
+                className="mb-6 relative inline-block cursor-pointer"
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={petCat}
+              >
+                {/* Glow effect based on mood */}
+                <motion.div
+                  className="absolute inset-0 rounded-full blur-2xl -z-10"
+                  animate={{
+                    scale: [1, 1.2, 1],
+                    opacity: catMood === "love" ? [0.6, 0.8, 0.6] : [0.3, 0.5, 0.3],
+                  }}
+                  transition={{ duration: 2, repeat: Infinity }}
+                  style={{
+                    background: catMood === "angry" || catMood === "sad"
+                      ? "radial-gradient(circle, rgba(239,68,68,0.4) 0%, transparent 70%)"
+                      : "radial-gradient(circle, rgba(255,182,193,0.6) 0%, transparent 70%)"
+                  }}
+                />
+                <motion.div
+                  animate={catMood === "love" ? { y: [0, -5, 0], rotate: [-3, 3, -3] } : { y: [0, -3, 0] }}
+                  transition={{ duration: 1.5, repeat: Infinity }}
+                >
+                  <span className="text-[80px] md:text-[100px] block">{CAT_EMOTIONS[catMood]}</span>
+                </motion.div>
                 <motion.p
-                  key={catMessage}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 0.6 }}
+                  className="text-xs text-pink-400 mt-1"
+                >
+                  tap to pet!
+                </motion.p>
+              </motion.div>
+
+              {/* Title */}
+              <motion.h1
+                className="text-3xl md:text-4xl font-black bg-gradient-to-r from-pink-600 via-rose-500 to-red-500 bg-clip-text text-transparent mb-4"
+                animate={stats.noCount >= 2 ? { x: [0, -2, 2, 0] } : {}}
+                transition={{ duration: 0.5, repeat: stats.noCount >= 2 ? Infinity : 0 }}
+              >
+                Will you be my Valentine?
+              </motion.h1>
+
+              {/* Cat message */}
+              <div className="h-[32px] mb-6">
+                <AnimatePresence mode="wait">
+                  {catMessage && (
+                    <motion.p
+                      key={catMessage}
+                      initial={{ opacity: 0, y: 10, scale: 0.9 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: -10 }}
+                      className="text-lg text-slate-600"
+                    >
+                      {catMessage}
+                    </motion.p>
+                  )}
+                </AnimatePresence>
+              </div>
+
+              {/* Buttons */}
+              <div className="flex flex-col gap-3">
+                <motion.button
+                  onClick={handleYes}
+                  className="w-full py-4 px-6 bg-gradient-to-r from-pink-500 via-rose-500 to-red-500 text-white font-bold text-lg rounded-2xl shadow-lg relative overflow-hidden"
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                >
+                  <motion.div
+                    className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/30 to-white/0"
+                    animate={{ x: ["-100%", "100%"] }}
+                    transition={{ duration: 2, repeat: Infinity, repeatDelay: 0.5 }}
+                  />
+                  <span className="relative z-10 flex items-center justify-center gap-2">
+                    <Heart className="w-5 h-5" /> Yes! 💖
+                  </span>
+                </motion.button>
+
+                <motion.div
+                  animate={
+                    stats.noCount === 0 ? {} :
+                    stats.noCount === 1 ? { x: [0, -15, 15, 0] } :
+                    stats.noCount === 2 ? { scale: [1, 0.85, 1], rotate: [0, 8, -8, 0] } :
+                    { opacity: 0.3, scale: 0.95 }
+                  }
+                  transition={{ duration: 0.4 }}
+                >
+                  <button
+                    className={cn(
+                      "w-full py-3 px-6 border-2 font-medium rounded-xl transition-all",
+                      stats.noCount >= 3
+                        ? "border-slate-300 text-slate-400 cursor-not-allowed"
+                        : stats.noCount >= 2
+                        ? "border-red-300 text-red-500 hover:bg-red-50"
+                        : "border-slate-300 text-slate-600 hover:bg-slate-50"
+                    )}
+                    onClick={() => {
+                      if (stats.noCount >= 3) return;
+                      const newCount = stats.noCount + 1;
+                      setStats(s => ({ ...s, noCount: newCount }));
+                      if (newCount === 1) unlockAchievement("first_no");
+                      const reaction = NO_REACTIONS[Math.min(newCount - 1, NO_REACTIONS.length - 1)];
+                      setCatMood(reaction.emotion as keyof typeof CAT_EMOTIONS);
+                      setCatMessage(reaction.text);
+                      if (newCount >= 3) {
+                        setTimeout(() => {
+                          setCatMessage("Fine! Prove your love through CHALLENGES! 😼");
+                          setTimeout(() => nextScene("chapter1_catch_no"), 1500);
+                        }, 1000);
+                      }
+                    }}
+                    disabled={stats.noCount >= 3}
+                  >
+                    {stats.noCount === 0 && "No 😅"}
+                    {stats.noCount === 1 && "Still no... 😬"}
+                    {stats.noCount === 2 && "I said NO! 😤"}
+                    {stats.noCount >= 3 && "Button broken 💔"}
+                  </button>
+                </motion.div>
+              </div>
+
+              {/* Progress indicator */}
+              {stats.noCount > 0 && stats.noCount < 3 && (
+                <motion.div
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                  className="text-lg text-slate-600 mb-6 min-h-[28px]"
+                  className="mt-4 flex items-center justify-center gap-2"
                 >
-                  {catMessage}
-                </motion.p>
+                  <div className="flex gap-1">
+                    {[1, 2, 3].map((i) => (
+                      <motion.div
+                        key={i}
+                        className={cn(
+                          "w-2 h-2 rounded-full",
+                          i <= stats.noCount ? "bg-red-400" : "bg-slate-200"
+                        )}
+                        animate={i <= stats.noCount ? { scale: [1, 1.3, 1] } : {}}
+                        transition={{ duration: 0.5 }}
+                      />
+                    ))}
+                  </div>
+                  <p className="text-sm text-slate-500">
+                    {stats.noCount === 1 && "The cat's getting upset..."}
+                    {stats.noCount === 2 && "One more and there'll be consequences!"}
+                  </p>
+                </motion.div>
               )}
-            </AnimatePresence>
-            <div className="flex flex-col gap-4">
-              <Button variant="pink" size="xl" className="w-full" onClick={handleYes}>
-                <Heart className="w-5 h-5" /> Yes! 💖
-              </Button>
-              <motion.div
-                animate={
-                  stats.noCount === 0 ? {} :
-                  stats.noCount === 1 ? { x: [0, -20, 20, 0] } :
-                  stats.noCount === 2 ? { scale: [1, 0.8, 1], rotate: [0, 10, -10, 0] } :
-                  { opacity: 0.3 }
-                }
-                transition={{ duration: 0.3 }}
-              >
-                <Button
-                  variant="outline"
-                  size="xl"
-                  className={cn("w-full transition-all", stats.noCount >= 3 && "cursor-not-allowed opacity-30")}
-                  onClick={() => {
-                    if (stats.noCount >= 3) return;
-                    const newCount = stats.noCount + 1;
-                    setStats(s => ({ ...s, noCount: newCount }));
-                    if (newCount === 1) unlockAchievement("first_no");
-                    const reaction = NO_REACTIONS[Math.min(newCount - 1, NO_REACTIONS.length - 1)];
-                    setCatMood(reaction.emotion as keyof typeof CAT_EMOTIONS);
-                    setCatMessage(reaction.text);
-                    if (newCount >= 3) {
-                      setTimeout(() => {
-                        setCatMessage("Fine! Prove your love through CHALLENGES! 😼");
-                        setTimeout(() => nextScene("chapter1_catch_no"), 1500);
-                      }, 1000);
-                    }
-                  }}
-                  disabled={stats.noCount >= 3}
+
+              {/* Pet counter */}
+              {stats.petCount > 0 && (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  className="mt-4 text-sm text-pink-500"
                 >
-                  {stats.noCount === 0 && "No 😅"}
-                  {stats.noCount === 1 && "Still no... 😬"}
-                  {stats.noCount === 2 && "I said NO! 😤"}
-                  {stats.noCount >= 3 && "Button broken 💔"}
-                </Button>
-              </motion.div>
+                  💕 {stats.petCount} pet{stats.petCount !== 1 && "s"} given
+                </motion.div>
+              )}
             </div>
-            {stats.noCount > 0 && stats.noCount < 3 && (
-              <p className="mt-4 text-sm text-slate-500">The cat seems upset... ({stats.noCount}/3 no's)</p>
-            )}
           </div>
-        </Card>
+        </motion.div>
         <AnimatePresence>
           {showAchievement && <AchievementPopup achievement={showAchievement} onClose={() => setShowAchievement(null)} />}
         </AnimatePresence>
