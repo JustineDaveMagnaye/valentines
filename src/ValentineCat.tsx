@@ -10,7 +10,6 @@ function cn(...xs: Array<string | undefined | false>) {
   return xs.filter(Boolean).join(" ");
 }
 
-type XY = { x: number; y: number };
 const rand = (a: number, b: number) => Math.random() * (b - a) + a;
 const pick = <T,>(arr: T[]): T => arr[Math.floor(rand(0, arr.length))];
 const now = () => performance.now();
@@ -53,7 +52,7 @@ type DialogLine = {
 
 const ACHIEVEMENTS: Achievement[] = [
   { id: "first_no", name: "Heartbreaker", desc: "Said no for the first time", emoji: "💔", unlocked: false },
-  { id: "persistent", name: "Persistent", desc: "Said no 10 times", emoji: "🏃", unlocked: false },
+  { id: "persistent", name: "Drama Survivor", desc: "Made it through all challenges", emoji: "🏃", unlocked: false },
   { id: "speedrun", name: "Speedrunner", desc: "Said yes within 5 seconds", emoji: "⚡", unlocked: false },
   { id: "rhythm_master", name: "Rhythm Master", desc: "Perfect score in rhythm game", emoji: "🎵", unlocked: false },
   { id: "puzzle_solver", name: "Big Brain", desc: "Solved the heart puzzle", emoji: "🧠", unlocked: false },
@@ -74,12 +73,12 @@ const INTRO_DIALOG: DialogLine[] = [
 ];
 
 const CHAPTER_TITLES = {
-  chapter1_chase: { num: 1, title: "The Chase Begins", subtitle: "Catch that No button!" },
+  chapter1_chase: { num: 1, title: "The Question", subtitle: "Will you say yes?" },
   chapter1_boss: { num: 1, title: "Bubble Pop Blitz", subtitle: "Pop the love bubbles!" },
   chapter2_love_potion: { num: 2, title: "Love Potion Lab", subtitle: "Mix the perfect potion!" },
   chapter2_fortune: { num: 2, title: "Wheel of Love", subtitle: "Spin for your destiny!" },
   chapter2_maze: { num: 2, title: "Heart's Journey", subtitle: "Find your way to love!" },
-  chapter3_boss_battle: { num: "💀", title: "DRAMA KING", subtitle: "The Ultimate Showdown!" },
+  chapter3_boss_battle: { num: "👑", title: "DRAMA KING", subtitle: "The Ultimate Showdown!" },
   chapter3_final: { num: 3, title: "Final Decision", subtitle: "The moment of truth" },
 };
 
@@ -405,13 +404,16 @@ function BubblePopGame({ onComplete }: { onComplete: (score: number) => void }) 
 
   const onCompleteRef = useRef(onComplete);
   const gameEndedRef = useRef(false);
+  const scoreRef = useRef(0);
 
   useEffect(() => { onCompleteRef.current = onComplete; }, [onComplete]);
+  useEffect(() => { scoreRef.current = score; }, [score]);
 
   const startGame = () => {
     gameEndedRef.current = false;
     setBubbles([]);
     setScore(0);
+    scoreRef.current = 0;
     setLives(3);
     setTimeLeft(12);
     setCombo(0);
@@ -423,12 +425,12 @@ function BubblePopGame({ onComplete }: { onComplete: (score: number) => void }) 
     if (phase !== "playing") return;
     const timer = setInterval(() => {
       setTimeLeft(t => {
-        if (t <= 1 || lives <= 0) {
+        if (t <= 1) {
           clearInterval(timer);
           if (!gameEndedRef.current) {
             gameEndedRef.current = true;
             setPhase("done");
-            setTimeout(() => onCompleteRef.current(score), 1500);
+            setTimeout(() => onCompleteRef.current(scoreRef.current), 1500);
           }
           return 0;
         }
@@ -436,7 +438,7 @@ function BubblePopGame({ onComplete }: { onComplete: (score: number) => void }) 
       });
     }, 1000);
     return () => clearInterval(timer);
-  }, [phase, lives, score]);
+  }, [phase]);
 
   // Spawn bubbles
   useEffect(() => {
@@ -465,7 +467,10 @@ function BubblePopGame({ onComplete }: { onComplete: (score: number) => void }) 
 
     if (type === "love") {
       const points = 10 + combo * 5;
-      setScore(s => s + points);
+      setScore(s => {
+        scoreRef.current = s + points;
+        return s + points;
+      });
       setCombo(c => c + 1);
       setLastPop({ x, y, points });
       setTimeout(() => setLastPop(null), 500);
@@ -475,7 +480,7 @@ function BubblePopGame({ onComplete }: { onComplete: (score: number) => void }) 
         if (newLives <= 0 && !gameEndedRef.current) {
           gameEndedRef.current = true;
           setPhase("done");
-          setTimeout(() => onCompleteRef.current(score), 1500);
+          setTimeout(() => onCompleteRef.current(scoreRef.current), 1500);
         }
         return newLives;
       });
@@ -644,7 +649,9 @@ function LovePotionGame({ onComplete }: { onComplete: (score: number) => void })
     gameEndedRef.current = false;
     setScore(0);
     setRound(0);
-    startRound();
+    setPhase("playing");
+    // Start first round after a brief delay
+    setTimeout(() => startRound(), 100);
   };
 
   const startRound = () => {
@@ -873,12 +880,15 @@ function FortuneWheelGame({ onComplete }: { onComplete: (score: number) => void 
 
   const onCompleteRef = useRef(onComplete);
   const gameEndedRef = useRef(false);
+  const scoreRef = useRef(0);
 
   useEffect(() => { onCompleteRef.current = onComplete; }, [onComplete]);
+  useEffect(() => { scoreRef.current = score; }, [score]);
 
   const startGame = () => {
     gameEndedRef.current = false;
     setScore(0);
+    scoreRef.current = 0;
     setSpinsLeft(3);
     setResult(null);
     setPhase("playing");
@@ -903,7 +913,9 @@ function FortuneWheelGame({ onComplete }: { onComplete: (score: number) => void 
     setTimeout(() => {
       const segment = segments[landingSegment];
       setResult(segment.label);
-      setScore(s => s + segment.points);
+      const newScore = scoreRef.current + segment.points;
+      setScore(newScore);
+      scoreRef.current = newScore;
       setSpinning(false);
 
       // Check if game over
@@ -911,7 +923,7 @@ function FortuneWheelGame({ onComplete }: { onComplete: (score: number) => void 
         gameEndedRef.current = true;
         setTimeout(() => {
           setPhase("done");
-          setTimeout(() => onCompleteRef.current(score + segment.points), 1500);
+          setTimeout(() => onCompleteRef.current(scoreRef.current), 1500);
         }, 1500);
       }
     }, 3500);
@@ -1557,21 +1569,6 @@ export default function ValentineCat() {
   const [catMessage, setCatMessage] = useState("");
   const gameStartRef = useRef(0);
 
-  // Chase game state
-  const [noPos, setNoPos] = useState<XY>({ x: 50, y: 50 });
-  const [holding, setHolding] = useState(false);
-  const [holdProgress, setHoldProgress] = useState(0);
-  const holdRef = useRef<number | null>(null);
-  const holdStartRef = useRef(0);
-
-  // Viewport
-  const [vp, setVp] = useState({ w: 400, h: 800 });
-  useEffect(() => {
-    const update = () => setVp({ w: window.innerWidth, h: window.innerHeight });
-    update();
-    window.addEventListener("resize", update);
-    return () => window.removeEventListener("resize", update);
-  }, []);
 
   // Unlock achievement
   const unlockAchievement = useCallback((id: string) => {
@@ -1613,84 +1610,6 @@ export default function ValentineCat() {
     }
   }, [dialogIndex, nextScene]);
 
-  // Chase game: move the No button
-  const moveNoButton = useCallback(() => {
-    const margin = 80;
-    setNoPos({
-      x: rand(margin, vp.w - margin),
-      y: rand(margin + 60, vp.h - margin),
-    });
-  }, [vp.w, vp.h]);
-
-  // Initialize No button position
-  useEffect(() => {
-    if (scene === "chapter1_chase") {
-      moveNoButton();
-    }
-  }, [scene, moveNoButton]);
-
-  // Handle No button hold - EASIER: shorter hold time, no escape on partial hold
-  const startHold = useCallback(() => {
-    if (holding) return;
-    setHolding(true);
-    holdStartRef.current = now();
-
-    // Hold time scales with difficulty: 500ms base, increases slightly each time
-    const holdTime = 500 + stats.noCount * 50; // 500ms -> 750ms at max
-
-    const loop = () => {
-      const elapsed = now() - holdStartRef.current;
-      const progress = Math.min(elapsed / holdTime, 1);
-      setHoldProgress(progress);
-
-      if (progress >= 1) {
-        // Successfully said no!
-        setHolding(false);
-        setHoldProgress(0);
-        const newCount = stats.noCount + 1;
-        setStats(s => ({ ...s, noCount: newCount }));
-
-        // Reactions and achievements
-        if (newCount === 1) unlockAchievement("first_no");
-        if (newCount === 10) unlockAchievement("persistent");
-
-        const reaction = NO_REACTIONS[Math.min(newCount - 1, NO_REACTIONS.length - 1)];
-        setCatMood(reaction.emotion as keyof typeof CAT_EMOTIONS);
-        setCatMessage(reaction.text);
-
-        // Progress to boss after enough no's (reduced from 5 to 3)
-        if (newCount >= 3) {
-          setTimeout(() => nextScene("chapter1_boss"), 1500);
-        } else {
-          // Small delay before moving so player sees the success
-          setTimeout(() => moveNoButton(), 800);
-        }
-        return;
-      }
-
-      holdRef.current = requestAnimationFrame(loop);
-    };
-
-    holdRef.current = requestAnimationFrame(loop);
-  }, [holding, stats.noCount, moveNoButton, unlockAchievement, nextScene]);
-
-  const endHold = useCallback(() => {
-    if (holdRef.current) cancelAnimationFrame(holdRef.current);
-    const wasHolding = holding;
-    const progress = holdProgress;
-    setHolding(false);
-    setHoldProgress(0);
-
-    // Only show message if they were actually trying (>50% progress)
-    // Don't move the button - let them try again in same spot!
-    if (wasHolding && progress > 0.5 && progress < 1) {
-      setCatMessage("So close! Try again! 😼");
-    } else if (wasHolding && progress > 0.2) {
-      setCatMessage("Keep holding! 💪");
-    }
-    // Button stays in place - much more fair!
-  }, [holding, holdProgress]);
-
   // Handle Yes button
   const handleYes = useCallback(() => {
     const elapsed = now() - gameStartRef.current;
@@ -1700,11 +1619,17 @@ export default function ValentineCat() {
       unlockAchievement("speedrun");
     }
 
+    // Unlock "persistent" achievement for making it through challenges
+    if (stats.noCount >= 3) {
+      unlockAchievement("persistent");
+    }
+
     // Determine ending based on stats
     if (stats.noCount === 0 && stats.petCount >= 10) {
       nextScene("ending_perfect");
       unlockAchievement("true_love");
-    } else if (stats.noCount >= 10) {
+    } else if (stats.noCount >= 3 && stats.petCount === 0) {
+      // Said no 3 times and never pet the cat = friend ending
       nextScene("ending_friend");
     } else {
       nextScene("ending_good");
@@ -1769,7 +1694,10 @@ export default function ValentineCat() {
           <Button variant="pink" size="xl" onClick={startGame}>
             <Heart className="w-6 h-6" /> Start Game
           </Button>
-          <Button variant="outline" size="lg" onClick={() => setScene("chapter1_chase")}>
+          <Button variant="outline" size="lg" onClick={() => {
+            gameStartRef.current = now();
+            setScene("chapter1_chase");
+          }}>
             Skip Intro
           </Button>
         </motion.div>
@@ -1807,113 +1735,101 @@ export default function ValentineCat() {
     return <ChapterTitle chapter={scene as keyof typeof CHAPTER_TITLES} onComplete={() => setShowChapterTitle(false)} />;
   }
 
-  // Chapter 1: The Chase
+  // Chapter 1: The Big Question - Simple Yes/No with funny No button behavior
   if (scene === "chapter1_chase") {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-pink-100 via-rose-100 to-pink-200 overflow-hidden">
+      <div className="min-h-screen bg-gradient-to-br from-pink-100 via-rose-100 to-pink-200 overflow-hidden flex items-center justify-center p-4">
         <Particles emojis={["💕", "🌸", "✨"]} count={15} />
 
-        {/* HUD */}
-        <div className="fixed top-4 left-4 right-4 flex justify-between items-start z-50">
-          <Card className="p-3 bg-white/90">
-            <div className="flex items-center gap-2">
-              <CatSprite emotion={catMood} size="sm" className="text-2xl" />
-              <div>
-                <div className="font-bold text-pink-700">Cat Mood</div>
-                <div className="text-xs text-slate-600">No count: {stats.noCount}/3</div>
-              </div>
-            </div>
-          </Card>
-          <Card className="p-3 bg-white/90">
-            <div className="text-sm font-medium text-pink-700">Chapter 1</div>
-            <div className="text-xs text-slate-600">Catch the button!</div>
-          </Card>
-        </div>
+        <Card className="max-w-md w-full p-8 bg-white/95 backdrop-blur shadow-2xl relative z-10">
+          <div className="text-center">
+            <motion.div
+              className="mb-6"
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={petCat}
+            >
+              <CatSprite emotion={catMood} size="xl" />
+            </motion.div>
 
-        {/* Main Card */}
-        <div className="min-h-screen flex items-center justify-center p-4 pt-24">
-          <Card className="max-w-md w-full p-8 bg-white/90 backdrop-blur shadow-2xl">
-            <div className="text-center">
-              <motion.div
-                className="mb-4"
-                whileHover={{ scale: 1.1 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={petCat}
-              >
-                <CatSprite emotion={catMood} size="lg" />
-              </motion.div>
+            <h1 className="text-3xl font-bold text-pink-800 mb-4">
+              Will you be my Valentine?
+            </h1>
 
-              <h1 className="text-3xl font-bold text-pink-800 mb-2">
-                Will you be my Valentine?
-              </h1>
+            <AnimatePresence mode="wait">
+              {catMessage && (
+                <motion.p
+                  key={catMessage}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  className="text-lg text-slate-600 mb-6 min-h-[28px]"
+                >
+                  {catMessage}
+                </motion.p>
+              )}
+            </AnimatePresence>
 
-              <AnimatePresence mode="wait">
-                {catMessage && (
-                  <motion.p
-                    key={catMessage}
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -10 }}
-                    className="text-lg text-slate-600 mb-6"
-                  >
-                    {catMessage}
-                  </motion.p>
-                )}
-              </AnimatePresence>
-
+            <div className="flex flex-col gap-4">
               <Button variant="pink" size="xl" className="w-full" onClick={handleYes}>
                 <Heart className="w-5 h-5" /> Yes! 💖
               </Button>
 
+              {/* No button that runs away / shrinks / does funny things */}
+              <motion.div
+                animate={
+                  stats.noCount === 0 ? {} :
+                  stats.noCount === 1 ? { x: [0, -20, 20, 0] } :
+                  stats.noCount === 2 ? { scale: [1, 0.8, 1], rotate: [0, 10, -10, 0] } :
+                  { opacity: 0.3 }
+                }
+                transition={{ duration: 0.3 }}
+              >
+                <Button
+                  variant="outline"
+                  size="xl"
+                  className={cn(
+                    "w-full transition-all",
+                    stats.noCount >= 3 && "cursor-not-allowed opacity-30"
+                  )}
+                  onClick={() => {
+                    if (stats.noCount >= 3) return;
+
+                    const newCount = stats.noCount + 1;
+                    setStats(s => ({ ...s, noCount: newCount }));
+
+                    // Reactions
+                    if (newCount === 1) unlockAchievement("first_no");
+
+                    const reaction = NO_REACTIONS[Math.min(newCount - 1, NO_REACTIONS.length - 1)];
+                    setCatMood(reaction.emotion as keyof typeof CAT_EMOTIONS);
+                    setCatMessage(reaction.text);
+
+                    // After 3 no's, go to mini-games
+                    if (newCount >= 3) {
+                      setTimeout(() => {
+                        setCatMessage("Fine! Prove your love through CHALLENGES! 😼");
+                        setTimeout(() => nextScene("chapter1_boss"), 1500);
+                      }, 1000);
+                    }
+                  }}
+                  disabled={stats.noCount >= 3}
+                >
+                  {stats.noCount === 0 && "No 😅"}
+                  {stats.noCount === 1 && "Still no... 😬"}
+                  {stats.noCount === 2 && "I said NO! 😤"}
+                  {stats.noCount >= 3 && "Button broken 💔"}
+                </Button>
+              </motion.div>
+            </div>
+
+            {stats.noCount > 0 && stats.noCount < 3 && (
               <p className="mt-4 text-sm text-slate-500">
-                Find and hold the floating "No" button... if you dare 😼
+                The cat seems upset... ({stats.noCount}/3 no's)
               </p>
-            </div>
-          </Card>
-        </div>
-
-        {/* Floating No Button - Simplified for performance */}
-        <div
-          className="fixed z-40 -translate-x-1/2 -translate-y-1/2"
-          style={{ left: noPos.x, top: noPos.y }}
-        >
-          {/* Simple CSS glow */}
-          {!holding && (
-            <div className="absolute inset-0 rounded-2xl bg-rose-400/40 blur-xl animate-pulse" />
-          )}
-
-          <button
-            className={cn(
-              "relative px-8 py-5 rounded-2xl font-bold text-xl shadow-xl transition-all select-none",
-              holding
-                ? "bg-rose-500 text-white scale-95"
-                : "bg-white border-2 border-rose-300 text-rose-600 hover:border-rose-400 hover:scale-105"
             )}
-            onPointerDown={startHold}
-            onPointerUp={endHold}
-            onPointerCancel={endHold}
-            onTouchStart={startHold}
-            onTouchEnd={endHold}
-            style={{ touchAction: "none" }}
-          >
-            {/* Progress ring using CSS */}
-            <div
-              className="absolute -inset-1 rounded-2xl transition-opacity"
-              style={{
-                background: `conic-gradient(rgba(244,63,94,1) ${holdProgress * 360}deg, rgba(200,200,200,0.3) 0deg)`,
-                opacity: holding ? 1 : 0,
-              }}
-            >
-              <div className="absolute inset-[3px] rounded-[14px] bg-rose-500" />
-            </div>
-
-            <span className="relative z-10 flex flex-col items-center gap-1">
-              <span>{holding ? `${Math.round(holdProgress * 100)}%` : `No ${CAT_EMOTIONS.surprised}`}</span>
-              {!holding && <span className="text-xs font-normal opacity-70">tap & hold</span>}
-              {holding && <span className="text-xs font-normal">keep holding!</span>}
-            </span>
-          </button>
-        </div>
+          </div>
+        </Card>
 
         {/* Achievement popup */}
         <AnimatePresence>
