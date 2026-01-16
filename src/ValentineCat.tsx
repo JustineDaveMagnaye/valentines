@@ -3896,15 +3896,15 @@ type BossPhaseType = "phase1" | "phase2" | "phase3" | "rage";
 
 // Enhanced boss attacks with more variety
 const BOSS_ATTACKS: Record<BossAttackType, { name: string; emoji: string; damage: number; chargeTime: number; warning: string; special?: string }> = {
-  drama_bomb: { name: "Drama Bomb!", emoji: "💣", damage: 12, chargeTime: 1000, warning: "💥" },
-  tantrum_wave: { name: "Tantrum Wave!", emoji: "🌊", damage: 10, chargeTime: 800, warning: "〰️" },
-  guilt_trip: { name: "Guilt Trip!", emoji: "😿", damage: 15, chargeTime: 1200, warning: "💔", special: "slow" },
-  love_laser: { name: "Love Laser!", emoji: "💘", damage: 18, chargeTime: 1500, warning: "⚡", special: "pierce" },
-  ultimate_meow: { name: "ULTIMATE MEOW!", emoji: "🔊", damage: 35, chargeTime: 2200, warning: "☠️", special: "stun" },
-  heart_rain: { name: "Heart Rain!", emoji: "💕", damage: 8, chargeTime: 600, warning: "🌧️", special: "multi" },
-  jealousy_spiral: { name: "Jealousy Spiral!", emoji: "💚", damage: 14, chargeTime: 1100, warning: "🌀", special: "dot" },
-  attention_beam: { name: "LOOK AT ME!", emoji: "👁️", damage: 20, chargeTime: 1800, warning: "👀", special: "track" },
-  cuddle_crush: { name: "Cuddle Crush!", emoji: "🤗", damage: 25, chargeTime: 2000, warning: "💪", special: "grab" },
+  drama_bomb: { name: "Drama Bomb!", emoji: "💣", damage: 8, chargeTime: 1200, warning: "💥" },
+  tantrum_wave: { name: "Tantrum Wave!", emoji: "🌊", damage: 6, chargeTime: 1000, warning: "〰️" },
+  guilt_trip: { name: "Guilt Trip!", emoji: "😿", damage: 10, chargeTime: 1400, warning: "💔", special: "slow" },
+  love_laser: { name: "Love Laser!", emoji: "💘", damage: 12, chargeTime: 1800, warning: "⚡", special: "pierce" },
+  ultimate_meow: { name: "ULTIMATE MEOW!", emoji: "🔊", damage: 20, chargeTime: 2500, warning: "☠️", special: "stun" },
+  heart_rain: { name: "Heart Rain!", emoji: "💕", damage: 4, chargeTime: 800, warning: "🌧️", special: "multi" },
+  jealousy_spiral: { name: "Jealousy Spiral!", emoji: "💚", damage: 8, chargeTime: 1300, warning: "🌀", special: "dot" },
+  attention_beam: { name: "LOOK AT ME!", emoji: "👁️", damage: 12, chargeTime: 2000, warning: "👀", special: "track" },
+  cuddle_crush: { name: "Cuddle Crush!", emoji: "🤗", damage: 15, chargeTime: 2200, warning: "💪", special: "grab" },
   rest: { name: "", emoji: "", damage: 0, chargeTime: 0, warning: "" },
 };
 
@@ -3924,25 +3924,25 @@ const PARRY_MESSAGES = ["PERFECT! ✨", "DEFLECTED! 🛡️", "COUNTERED! 💫",
 const CRITICAL_MESSAGES = ["CRITICAL! 💥", "SUPER! ⭐", "DEVASTATING! 🔥", "MASSIVE! 💪"];
 
 const LOVE_ATTACKS = [
-  { text: "You're purrfect! 💕", damage: 5, crit: 12 },
-  { text: "So fluffy! ✨", damage: 4, crit: 10 },
-  { text: "Best cat ever! 💖", damage: 5, crit: 11 },
-  { text: "I love you! 😻", damage: 6, crit: 15 },
-  { text: "Cutest kitty! 🌟", damage: 4, crit: 10 },
-  { text: "My favorite! 💝", damage: 5, crit: 12 },
-  { text: "So precious! 🥰", damage: 5, crit: 11 },
-  { text: "Adorable! 💗", damage: 4, crit: 10 },
-  { text: "SUPER LOVE! 💖✨", damage: 7, crit: 18 },
-  { text: "Maximum cuddles! 🤗", damage: 6, crit: 14 },
+  { text: "You're purrfect! 💕", damage: 8, crit: 18 },
+  { text: "So fluffy! ✨", damage: 7, crit: 16 },
+  { text: "Best cat ever! 💖", damage: 8, crit: 17 },
+  { text: "I love you! 😻", damage: 10, crit: 22 },
+  { text: "Cutest kitty! 🌟", damage: 7, crit: 16 },
+  { text: "My favorite! 💝", damage: 8, crit: 18 },
+  { text: "So precious! 🥰", damage: 8, crit: 17 },
+  { text: "Adorable! 💗", damage: 7, crit: 16 },
+  { text: "SUPER LOVE! 💖✨", damage: 12, crit: 25 },
+  { text: "Maximum cuddles! 🤗", damage: 10, crit: 20 },
 ];
 
 const DramaKingBattle = memo(function DramaKingBattle({ onComplete }: { onComplete: (won: boolean) => void }) {
   const [phase, setPhase] = useState<"tutorial" | "countdown" | "battle" | "victory" | "defeat">("tutorial");
   const [countdownNum, setCountdownNum] = useState(3);
 
-  // Boss state - HARDER: 150 HP instead of 100
-  const [bossHP, setBossHP] = useState(150);
-  const [bossMaxHP] = useState(150);
+  // Boss state - balanced: 100 HP
+  const [bossHP, setBossHP] = useState(100);
+  const [bossMaxHP] = useState(100);
   const [bossPhase, setBossPhase] = useState<BossPhaseType>("phase1");
   const [bossAction, setBossAction] = useState<"idle" | "charging" | "attacking" | "stunned" | "enraged" | "healing">("idle");
   const [currentAttack, setCurrentAttack] = useState<BossAttackType>("rest");
@@ -4025,7 +4025,7 @@ const DramaKingBattle = memo(function DramaKingBattle({ onComplete }: { onComple
   // Refs for smooth animations
   const onCompleteRef = useRef(onComplete);
   const gameEndedRef = useRef(false);
-  const bossHPRef = useRef(150);
+  const bossHPRef = useRef(100);
   const playerHPRef = useRef(100);
   const comboRef = useRef(0);
   const shieldActiveRef = useRef(false);
@@ -4115,8 +4115,8 @@ const DramaKingBattle = memo(function DramaKingBattle({ onComplete }: { onComple
     if (phase !== "countdown") return;
     if (countdownNum === 0) {
       gameEndedRef.current = false;
-      setBossHP(150);
-      bossHPRef.current = 150;
+      setBossHP(100);
+      bossHPRef.current = 100;
       setPlayerHP(100);
       playerHPRef.current = 100;
       setBossPhase("phase1");
@@ -4232,10 +4232,10 @@ const DramaKingBattle = memo(function DramaKingBattle({ onComplete }: { onComple
         }
       }
 
-      // Boss heals slowly if player doesn't attack for 5+ seconds
-      if (currentTime - lastAttackTime.current > 5000 && bossHPRef.current < 150 && bossHPRef.current > 0) {
+      // Boss heals slowly if player doesn't attack for 7+ seconds
+      if (currentTime - lastAttackTime.current > 7000 && bossHPRef.current < 100 && bossHPRef.current > 0) {
         setBossHP(hp => {
-          const newHP = Math.min(150, hp + deltaTime * 3);
+          const newHP = Math.min(100, hp + deltaTime * 1.5);
           bossHPRef.current = newHP;
           return newHP;
         });
@@ -4297,11 +4297,11 @@ const DramaKingBattle = memo(function DramaKingBattle({ onComplete }: { onComple
 
     const getAttackSpeed = (): number => {
       switch (bossPhaseRef.current) {
-        case "phase1": return 2200 + Math.random() * 1200;
-        case "phase2": return 1600 + Math.random() * 800;
-        case "phase3": return 1200 + Math.random() * 600;
-        case "rage": return 800 + Math.random() * 400;
-        default: return 2000;
+        case "phase1": return 2800 + Math.random() * 1500;
+        case "phase2": return 2200 + Math.random() * 1000;
+        case "phase3": return 1800 + Math.random() * 800;
+        case "rage": return 1400 + Math.random() * 600;
+        default: return 2500;
       }
     };
 
@@ -4473,7 +4473,7 @@ const DramaKingBattle = memo(function DramaKingBattle({ onComplete }: { onComple
 
   // Build special meter based on combo
   useEffect(() => {
-    if (combo >= 15 && !specialReady && specialCooldown === 0) {
+    if (combo >= 10 && !specialReady && specialCooldown === 0) {
       setSpecialReady(true);
     }
   }, [combo, specialReady, specialCooldown]);
@@ -4660,9 +4660,9 @@ const DramaKingBattle = memo(function DramaKingBattle({ onComplete }: { onComple
       setTimeout(() => {
         setShieldActive(false);
         shieldActiveRef.current = false;
-      }, 700);
+      }, 800);
 
-      setShieldCooldown(2.5);
+      setShieldCooldown(1.5);
     }
   }, [shieldCooldown, bossAction, playerStunned, triggerShake, triggerLightning, spawnParticles, spawnFloatingText, spawnScorePopup, showBossMessage]);
 
@@ -5366,11 +5366,11 @@ const DramaKingBattle = memo(function DramaKingBattle({ onComplete }: { onComple
           whileTap={!specialReady || playerStunned ? {} : { scale: 0.95 }}
         >
           <span className="text-xl">⚡</span>
-          <div className="text-xs">{specialReady ? "MEGA!" : `${Math.max(0, 15 - combo)}`}</div>
+          <div className="text-xs">{specialReady ? "MEGA!" : `${Math.max(0, 10 - combo)}`}</div>
           {!specialReady && combo > 0 && (
             <div
               className="absolute bottom-0 left-0 h-1 bg-amber-400"
-              style={{ width: `${Math.min(100, (combo / 15) * 100)}%` }}
+              style={{ width: `${Math.min(100, (combo / 10) * 100)}%` }}
             />
           )}
         </motion.button>
@@ -5410,6 +5410,511 @@ const DramaKingBattle = memo(function DramaKingBattle({ onComplete }: { onComple
         )}>
           {bossPhase === "phase3" ? "⚠️ FINAL PHASE" : bossPhase === "phase2" ? "PHASE 2" : "PHASE 1"}
         </span>
+      </div>
+    </div>
+  );
+});
+
+// ============================================================================
+// FINAL PROPOSAL SCENE - After defeating the boss
+// ============================================================================
+
+const FinalProposalScene = memo(function FinalProposalScene({
+  onYes,
+  stats
+}: {
+  onYes: () => void;
+  stats: { noCount: number; yesTime: number; petCount: number; totalScore: number };
+}) {
+  const [phase, setPhase] = useState<"intro" | "story" | "question" | "waiting">("intro");
+  const [storyIndex, setStoryIndex] = useState(0);
+  const [showButton, setShowButton] = useState(false);
+  const [heartBurst, setHeartBurst] = useState(false);
+  const [noButtonPos, setNoButtonPos] = useState({ x: 0, y: 0 });
+  const [noAttempts, setNoAttempts] = useState(0);
+  const [catEmotion, setCatEmotion] = useState<"hopeful" | "nervous" | "pleading" | "overjoyed">("hopeful");
+  const [bgHue, setBgHue] = useState(0);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const STORY_LINES = [
+    { text: "You've come so far...", emoji: "✨", delay: 2000 },
+    { text: "Through chases and games...", emoji: "🎮", delay: 2000 },
+    { text: "Through puzzles and battles...", emoji: "⚔️", delay: 2000 },
+    { text: "You proved your love is real.", emoji: "💖", delay: 2500 },
+    { text: "And now...", emoji: "🌟", delay: 1500 },
+  ];
+
+  // Animate background hue
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setBgHue(h => (h + 0.5) % 360);
+    }, 50);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Intro animation sequence
+  useEffect(() => {
+    const timer = setTimeout(() => setPhase("story"), 2000);
+    return () => clearTimeout(timer);
+  }, []);
+
+  // Story progression
+  useEffect(() => {
+    if (phase !== "story") return;
+    if (storyIndex >= STORY_LINES.length) {
+      setTimeout(() => {
+        setPhase("question");
+        setCatEmotion("nervous");
+      }, 500);
+      return;
+    }
+    const timer = setTimeout(() => {
+      setStoryIndex(i => i + 1);
+    }, STORY_LINES[storyIndex].delay);
+    return () => clearTimeout(timer);
+  }, [phase, storyIndex]);
+
+  // Show button after question appears
+  useEffect(() => {
+    if (phase === "question") {
+      const timer = setTimeout(() => setShowButton(true), 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [phase]);
+
+  // Move No button on hover
+  const handleNoHover = () => {
+    if (!containerRef.current) return;
+    const rect = containerRef.current.getBoundingClientRect();
+    const maxX = rect.width - 150;
+    const maxY = rect.height - 60;
+    setNoButtonPos({
+      x: Math.random() * maxX - maxX / 2,
+      y: Math.random() * maxY - maxY / 2,
+    });
+    setNoAttempts(n => n + 1);
+    setCatEmotion("pleading");
+    setTimeout(() => setCatEmotion("nervous"), 500);
+  };
+
+  const handleYesClick = () => {
+    setPhase("waiting");
+    setCatEmotion("overjoyed");
+    setHeartBurst(true);
+    setTimeout(() => onYes(), 2500);
+  };
+
+  const getCatEmoji = () => {
+    switch (catEmotion) {
+      case "hopeful": return "🥺";
+      case "nervous": return "😿";
+      case "pleading": return "🙀";
+      case "overjoyed": return "😻";
+      default: return "😺";
+    }
+  };
+
+  const getNoButtonText = () => {
+    if (noAttempts === 0) return "No...";
+    if (noAttempts === 1) return "Please?";
+    if (noAttempts === 2) return "Pretty please?";
+    if (noAttempts === 3) return "I'll be good!";
+    if (noAttempts === 4) return "Don't go! 😿";
+    return "💔";
+  };
+
+  return (
+    <div
+      ref={containerRef}
+      className="fixed inset-0 overflow-hidden"
+      style={{
+        background: `linear-gradient(135deg,
+          hsl(${340 + bgHue * 0.1}, 80%, 85%) 0%,
+          hsl(${350 + bgHue * 0.1}, 75%, 75%) 50%,
+          hsl(${320 + bgHue * 0.1}, 70%, 70%) 100%)`
+      }}
+    >
+      {/* Floating hearts background */}
+      <div className="absolute inset-0 pointer-events-none overflow-hidden">
+        {Array.from({ length: 30 }).map((_, i) => (
+          <motion.div
+            key={i}
+            className="absolute text-2xl opacity-40"
+            style={{ left: `${(i * 7) % 100}%` }}
+            initial={{ y: "100vh", rotate: 0 }}
+            animate={{
+              y: "-100vh",
+              rotate: [0, 360],
+              x: [0, Math.sin(i) * 30, 0],
+            }}
+            transition={{
+              duration: 8 + (i % 5) * 2,
+              repeat: Infinity,
+              delay: i * 0.3,
+              ease: "linear"
+            }}
+          >
+            {["💖", "💕", "💗", "💘", "💝", "✨", "🌸"][i % 7]}
+          </motion.div>
+        ))}
+      </div>
+
+      {/* Sparkle particles */}
+      <AnimatePresence>
+        {phase === "question" && (
+          <>
+            {Array.from({ length: 20 }).map((_, i) => (
+              <motion.div
+                key={`sparkle-${i}`}
+                className="absolute text-xl pointer-events-none"
+                style={{
+                  left: `${20 + Math.random() * 60}%`,
+                  top: `${20 + Math.random() * 60}%`
+                }}
+                initial={{ scale: 0, opacity: 0 }}
+                animate={{
+                  scale: [0, 1.5, 0],
+                  opacity: [0, 1, 0],
+                  rotate: [0, 180],
+                }}
+                transition={{
+                  duration: 2,
+                  repeat: Infinity,
+                  delay: i * 0.2,
+                  repeatDelay: 1
+                }}
+              >
+                ✨
+              </motion.div>
+            ))}
+          </>
+        )}
+      </AnimatePresence>
+
+      {/* Heart burst effect */}
+      <AnimatePresence>
+        {heartBurst && (
+          <>
+            {Array.from({ length: 50 }).map((_, i) => {
+              const angle = (i / 50) * Math.PI * 2;
+              const distance = 150 + Math.random() * 200;
+              return (
+                <motion.div
+                  key={`burst-${i}`}
+                  className="absolute left-1/2 top-1/2 text-3xl pointer-events-none"
+                  initial={{ x: 0, y: 0, scale: 0, opacity: 1 }}
+                  animate={{
+                    x: Math.cos(angle) * distance,
+                    y: Math.sin(angle) * distance,
+                    scale: [0, 1.5, 1],
+                    opacity: [1, 1, 0],
+                    rotate: [0, 360],
+                  }}
+                  transition={{ duration: 1.5, ease: "easeOut" }}
+                >
+                  {["💖", "💕", "💗", "💘", "💝", "❤️", "🧡", "💛"][i % 8]}
+                </motion.div>
+              );
+            })}
+            <motion.div
+              className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[200vmax] h-[200vmax] rounded-full pointer-events-none"
+              initial={{ scale: 0, opacity: 0.5 }}
+              animate={{ scale: 2, opacity: 0 }}
+              transition={{ duration: 1.5 }}
+              style={{ background: "radial-gradient(circle, rgba(255,182,193,0.8) 0%, transparent 70%)" }}
+            />
+          </>
+        )}
+      </AnimatePresence>
+
+      {/* Main content */}
+      <div className="relative z-10 flex flex-col items-center justify-center min-h-screen p-4">
+        {/* Intro phase */}
+        <AnimatePresence mode="wait">
+          {phase === "intro" && (
+            <motion.div
+              key="intro"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0, scale: 0.8 }}
+              className="text-center"
+            >
+              <motion.div
+                className="text-8xl mb-6"
+                animate={{
+                  scale: [1, 1.2, 1],
+                  rotate: [0, -10, 10, 0],
+                }}
+                transition={{ duration: 2, repeat: Infinity }}
+              >
+                👑
+              </motion.div>
+              <motion.h1
+                className="text-4xl md:text-5xl font-black text-white drop-shadow-lg"
+                initial={{ y: 20, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                transition={{ delay: 0.3 }}
+              >
+                Victory!
+              </motion.h1>
+              <motion.p
+                className="text-xl text-white/80 mt-4"
+                initial={{ y: 20, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                transition={{ delay: 0.6 }}
+              >
+                The Drama King has been defeated...
+              </motion.p>
+            </motion.div>
+          )}
+
+          {/* Story phase */}
+          {phase === "story" && storyIndex < STORY_LINES.length && (
+            <motion.div
+              key={`story-${storyIndex}`}
+              initial={{ opacity: 0, y: 30, scale: 0.9 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -30 }}
+              transition={{ duration: 0.5 }}
+              className="text-center"
+            >
+              <motion.div
+                className="text-6xl mb-6"
+                animate={{ scale: [1, 1.3, 1] }}
+                transition={{ duration: 0.5 }}
+              >
+                {STORY_LINES[storyIndex].emoji}
+              </motion.div>
+              <h2 className="text-3xl md:text-4xl font-bold text-white drop-shadow-lg">
+                {STORY_LINES[storyIndex].text}
+              </h2>
+            </motion.div>
+          )}
+
+          {/* Question phase */}
+          {(phase === "question" || phase === "waiting") && (
+            <motion.div
+              key="question"
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="w-full max-w-md"
+            >
+              {/* Cat character */}
+              <motion.div
+                className="text-center mb-8"
+                animate={phase === "waiting" ? {
+                  y: [0, -30, 0],
+                  rotate: [0, -15, 15, 0],
+                } : {
+                  y: [0, -10, 0],
+                }}
+                transition={{
+                  duration: phase === "waiting" ? 0.5 : 2,
+                  repeat: Infinity
+                }}
+              >
+                <div className="relative inline-block">
+                  {/* Glow effect */}
+                  <motion.div
+                    className="absolute inset-0 rounded-full blur-2xl"
+                    animate={{
+                      scale: [1, 1.3, 1],
+                      opacity: [0.5, 0.8, 0.5],
+                    }}
+                    transition={{ duration: 2, repeat: Infinity }}
+                    style={{ background: "radial-gradient(circle, rgba(255,182,193,0.8) 0%, transparent 70%)" }}
+                  />
+                  <motion.span
+                    className="text-[120px] relative z-10 block"
+                    animate={catEmotion === "overjoyed" ? {
+                      rotate: [0, -20, 20, 0],
+                      scale: [1, 1.2, 1],
+                    } : {}}
+                    transition={{ duration: 0.3, repeat: catEmotion === "overjoyed" ? Infinity : 0 }}
+                  >
+                    {getCatEmoji()}
+                  </motion.span>
+                </div>
+              </motion.div>
+
+              {/* Question card */}
+              <motion.div
+                initial={{ y: 50, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                transition={{ delay: 0.3, type: "spring", stiffness: 200 }}
+                className="bg-white/95 backdrop-blur-xl rounded-3xl p-8 shadow-2xl border-2 border-pink-200"
+              >
+                {phase === "waiting" ? (
+                  <motion.div
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    className="text-center"
+                  >
+                    <motion.div
+                      className="text-6xl mb-4"
+                      animate={{ scale: [1, 1.3, 1] }}
+                      transition={{ duration: 0.5, repeat: Infinity }}
+                    >
+                      💖
+                    </motion.div>
+                    <h2 className="text-3xl font-black bg-gradient-to-r from-pink-500 via-rose-500 to-red-500 bg-clip-text text-transparent">
+                      YAAAY!!!
+                    </h2>
+                    <p className="text-lg text-pink-600 mt-2">You made me the happiest cat!</p>
+                  </motion.div>
+                ) : (
+                  <>
+                    <motion.div
+                      className="text-center mb-6"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ delay: 0.5 }}
+                    >
+                      <motion.p
+                        className="text-lg text-slate-500 mb-2"
+                        initial={{ y: 10, opacity: 0 }}
+                        animate={{ y: 0, opacity: 1 }}
+                        transition={{ delay: 0.6 }}
+                      >
+                        After everything we've been through...
+                      </motion.p>
+                      <motion.h2
+                        className="text-2xl md:text-3xl font-black bg-gradient-to-r from-pink-600 via-rose-500 to-red-500 bg-clip-text text-transparent"
+                        initial={{ y: 10, opacity: 0 }}
+                        animate={{ y: 0, opacity: 1 }}
+                        transition={{ delay: 0.8 }}
+                      >
+                        Will you be my Valentine?
+                      </motion.h2>
+                      <motion.div
+                        className="flex justify-center gap-2 mt-3"
+                        initial={{ scale: 0 }}
+                        animate={{ scale: 1 }}
+                        transition={{ delay: 1, type: "spring" }}
+                      >
+                        {["💕", "💖", "💕"].map((h, i) => (
+                          <motion.span
+                            key={i}
+                            className="text-2xl"
+                            animate={{ y: [0, -5, 0], scale: [1, 1.2, 1] }}
+                            transition={{ duration: 1, delay: i * 0.2, repeat: Infinity }}
+                          >
+                            {h}
+                          </motion.span>
+                        ))}
+                      </motion.div>
+                    </motion.div>
+
+                    {/* Buttons */}
+                    <AnimatePresence>
+                      {showButton && (
+                        <motion.div
+                          initial={{ opacity: 0, y: 20 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          className="space-y-4"
+                        >
+                          {/* Yes button */}
+                          <motion.button
+                            onClick={handleYesClick}
+                            className="w-full py-5 px-8 bg-gradient-to-r from-pink-500 via-rose-500 to-red-500 text-white font-bold text-xl rounded-2xl shadow-lg relative overflow-hidden group"
+                            whileHover={{ scale: 1.02 }}
+                            whileTap={{ scale: 0.98 }}
+                          >
+                            <motion.div
+                              className="absolute inset-0 bg-gradient-to-r from-pink-400 via-rose-400 to-red-400"
+                              initial={{ x: "-100%" }}
+                              whileHover={{ x: "100%" }}
+                              transition={{ duration: 0.5 }}
+                            />
+                            <span className="relative z-10 flex items-center justify-center gap-3">
+                              <motion.span
+                                animate={{ scale: [1, 1.3, 1] }}
+                                transition={{ duration: 0.5, repeat: Infinity }}
+                              >
+                                💖
+                              </motion.span>
+                              Yes, forever!
+                              <motion.span
+                                animate={{ scale: [1, 1.3, 1] }}
+                                transition={{ duration: 0.5, repeat: Infinity, delay: 0.25 }}
+                              >
+                                💖
+                              </motion.span>
+                            </span>
+                          </motion.button>
+
+                          {/* No button - runs away */}
+                          <motion.button
+                            onMouseEnter={handleNoHover}
+                            onTouchStart={handleNoHover}
+                            animate={{
+                              x: noButtonPos.x,
+                              y: noButtonPos.y,
+                              opacity: noAttempts > 4 ? 0.3 : 1,
+                            }}
+                            transition={{ type: "spring", stiffness: 300, damping: 20 }}
+                            className={cn(
+                              "w-full py-3 px-6 border-2 border-slate-300 text-slate-500 font-medium rounded-xl transition-colors",
+                              noAttempts > 0 && "border-dashed"
+                            )}
+                          >
+                            {getNoButtonText()}
+                          </motion.button>
+
+                          {noAttempts > 2 && (
+                            <motion.p
+                              initial={{ opacity: 0 }}
+                              animate={{ opacity: 1 }}
+                              className="text-center text-sm text-slate-400 italic"
+                            >
+                              "The button seems to have a mind of its own..." 😼
+                            </motion.p>
+                          )}
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </>
+                )}
+              </motion.div>
+
+              {/* Stats preview */}
+              {phase === "question" && showButton && (
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.5 }}
+                  className="mt-6 flex justify-center gap-4"
+                >
+                  <div className="bg-white/60 backdrop-blur rounded-xl px-4 py-2 text-center">
+                    <div className="text-2xl">🎮</div>
+                    <div className="text-xs text-slate-600 font-medium">Score</div>
+                    <div className="text-lg font-bold text-pink-600">{stats.totalScore}</div>
+                  </div>
+                  <div className="bg-white/60 backdrop-blur rounded-xl px-4 py-2 text-center">
+                    <div className="text-2xl">🐱</div>
+                    <div className="text-xs text-slate-600 font-medium">Pets</div>
+                    <div className="text-lg font-bold text-pink-600">{stats.petCount}</div>
+                  </div>
+                  <div className="bg-white/60 backdrop-blur rounded-xl px-4 py-2 text-center">
+                    <div className="text-2xl">⏱️</div>
+                    <div className="text-xs text-slate-600 font-medium">Time</div>
+                    <div className="text-lg font-bold text-pink-600">{Math.round(stats.yesTime / 1000 || 0)}s</div>
+                  </div>
+                </motion.div>
+              )}
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+
+      {/* Bottom decoration */}
+      <div className="absolute bottom-0 left-0 right-0 h-32 pointer-events-none">
+        <svg viewBox="0 0 1200 120" preserveAspectRatio="none" className="w-full h-full">
+          <path
+            d="M0,60 C200,120 400,0 600,60 C800,120 1000,0 1200,60 L1200,120 L0,120 Z"
+            fill="rgba(255,255,255,0.3)"
+          />
+        </svg>
       </div>
     </div>
   );
@@ -5668,32 +6173,7 @@ export default function ValentineCat() {
   }
 
   if (scene === "chapter3_final") {
-    return (
-      <div className="min-h-screen bg-gradient-to-b from-pink-300 via-rose-400 to-red-500 flex items-center justify-center p-4">
-        <Particles emojis={["💖", "💕", "💗", "💘", "💝", "✨"]} count={40} />
-        <motion.div initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="max-w-lg w-full">
-          <Card className="p-8 bg-white/95 backdrop-blur shadow-2xl text-center">
-            <motion.div animate={{ y: [0, -10, 0], rotate: [0, 5, -5, 0] }} transition={{ duration: 2, repeat: Infinity }}>
-              <CatSprite emotion="love" size="xl" />
-            </motion.div>
-            <h1 className="text-4xl font-bold text-pink-800 mt-6 mb-4">The Final Question</h1>
-            <p className="text-xl text-slate-600 mb-2">After all we've been through...</p>
-            <motion.p className="text-2xl font-bold text-pink-600 mb-8" animate={{ scale: [1, 1.05, 1] }} transition={{ duration: 1.5, repeat: Infinity }}>
-              Will you be my Valentine? 💖
-            </motion.p>
-            <div className="space-y-4">
-              <Button variant="pink" size="xl" className="w-full" onClick={handleYes}>
-                <Heart className="w-6 h-6" /> Yes, forever! 💕
-              </Button>
-              <Button variant="outline" size="lg" className="w-full opacity-50 cursor-not-allowed" disabled>
-                No (button broken 😼)
-              </Button>
-            </div>
-            <p className="mt-6 text-sm text-slate-500 italic">"The No button mysteriously stopped working..." — The Cat</p>
-          </Card>
-        </motion.div>
-      </div>
-    );
+    return <FinalProposalScene onYes={handleYes} stats={stats} />;
   }
 
   if (scene === "ending_good") {
