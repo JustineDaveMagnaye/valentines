@@ -125,8 +125,6 @@ const ROMANTIC_LETTERS = [
   { opening: "Beloved Valentine,", body: "I've calculated that I spend 87% of my day thinking about you. The other 13% is naps. You're basically my whole life.", closing: "Mathematically yours, 🧮" },
   { opening: "To My Soulmate,", body: "In a world of ordinary cats, you make me feel like a lion. Rawr. That means I love you in lion language.", closing: "Majestically yours, 👑" },
 ];
-const DRAMATIC_LINES = ["Why don't you LOVE ME?! 😾", "*knocks your stuff off table* 😼", "I'm being IGNORED! 🙀", "This is my FINAL FORM! 😾", "*judges you silently* 😿", "You'll REGRET this! 😾"];
-const LOVE_COMPLIMENTS = ["You're purrfect! 💕", "So fluffy! ✨", "Best cat! 💖", "Love you! 😻", "Cutest! 🌟"];
 
 // ============================================================================
 // COMPONENTS
@@ -3892,244 +3890,1141 @@ const RejectLettersGame = memo(function RejectLettersGame({ onComplete }: { onCo
   );
 });
 
-// BOSS BATTLE - Optimized
-const DramaKingBattle = memo(function DramaKingBattle({ onComplete }: { onComplete: (won: boolean) => void }) {
-  const [phase, setPhase] = useState<"intro" | "battle" | "victory" | "defeat">("intro");
-  const [bossHP, setBossHP] = useState(100);
-  const [playerLove, setPlayerLove] = useState(100);
-  const [bossAction, setBossAction] = useState<"idle" | "charging" | "attacking">("idle");
-  const [currentAttack, setCurrentAttack] = useState("");
-  const [compliments, setCompliments] = useState<Array<{ id: number; x: number; y: number; text: string }>>([]);
-  const [shieldCooldown, setShieldCooldown] = useState(0);
+// BOSS BATTLE - Completely Redesigned Epic Battle
+// Boss attack types for the dramatic battle
+type BossAttackType = "drama_bomb" | "tantrum_wave" | "guilt_trip" | "love_laser" | "ultimate_meow" | "rest";
+type BossPhaseType = "phase1" | "phase2" | "phase3";
 
+// Boss attack patterns and dialogue
+const BOSS_ATTACKS = {
+  drama_bomb: { name: "Drama Bomb!", emoji: "💣", damage: 15, chargeTime: 1200, warning: "💥" },
+  tantrum_wave: { name: "Tantrum Wave!", emoji: "🌊", damage: 12, chargeTime: 1000, warning: "〰️" },
+  guilt_trip: { name: "Guilt Trip!", emoji: "😿", damage: 18, chargeTime: 1500, warning: "💔" },
+  love_laser: { name: "Love Laser!", emoji: "💘", damage: 20, chargeTime: 1800, warning: "⚡" },
+  ultimate_meow: { name: "ULTIMATE MEOW!", emoji: "🔊", damage: 30, chargeTime: 2500, warning: "☠️" },
+  rest: { name: "", emoji: "", damage: 0, chargeTime: 0, warning: "" },
+};
+
+const PARRY_MESSAGES = ["PERFECT PARRY! ✨", "DEFLECTED! 🛡️", "REFLECTED! 💫", "BLOCKED! 🌟"];
+const LOVE_ATTACKS = [
+  { text: "You're purrfect! 💕", damage: 8 },
+  { text: "So fluffy! ✨", damage: 6 },
+  { text: "Best cat ever! 💖", damage: 7 },
+  { text: "I love you! 😻", damage: 10 },
+  { text: "Cutest kitty! 🌟", damage: 6 },
+  { text: "My favorite! 💝", damage: 8 },
+  { text: "So precious! 🥰", damage: 7 },
+  { text: "Adorable! 💗", damage: 6 },
+];
+
+const DramaKingBattle = memo(function DramaKingBattle({ onComplete }: { onComplete: (won: boolean) => void }) {
+  const [phase, setPhase] = useState<"tutorial" | "countdown" | "battle" | "victory" | "defeat">("tutorial");
+  const [countdownNum, setCountdownNum] = useState(3);
+
+  // Boss state
+  const [bossHP, setBossHP] = useState(100);
+  const [bossPhase, setBossPhase] = useState<BossPhaseType>("phase1");
+  const [bossAction, setBossAction] = useState<"idle" | "charging" | "attacking" | "stunned" | "enraged">("idle");
+  const [currentAttack, setCurrentAttack] = useState<BossAttackType>("rest");
+  const [bossEmotion, setBossEmotion] = useState<"smug" | "angry" | "charging" | "hurt" | "defeated">("smug");
+
+  // Player state
+  const [playerHP, setPlayerHP] = useState(100);
+  const [combo, setCombo] = useState(0);
+  const [maxCombo, setMaxCombo] = useState(0);
+  const [totalDamageDealt, setTotalDamageDealt] = useState(0);
+  const [perfectParries, setPerfectParries] = useState(0);
+  const [loveSent, setLoveSent] = useState(0);
+
+  // Battle mechanics
+  const [shieldActive, setShieldActive] = useState(false);
+  const [shieldCooldown, setShieldCooldown] = useState(0);
+  const [parryWindow, setParryWindow] = useState(false);
+  const [parrySuccess, setParrySuccess] = useState(false);
+  const [attackCooldown, setAttackCooldown] = useState(0);
+  const [chargeProgress, setChargeProgress] = useState(0);
+
+  // Visual effects
+  const [screenShake, setScreenShake] = useState(0);
+  const [hitFlash, setHitFlash] = useState<"none" | "player" | "boss">("none");
+  const [particles, setParticles] = useState<Array<{
+    id: number;
+    x: number;
+    y: number;
+    vx: number;
+    vy: number;
+    type: "heart" | "star" | "spark" | "drama" | "crown" | "shield" | "heal";
+    life: number;
+    size: number;
+    color: string;
+    rotation: number;
+  }>>([]);
+  const [floatingTexts, setFloatingTexts] = useState<Array<{
+    id: number;
+    x: number;
+    y: number;
+    text: string;
+    color: string;
+    size: "sm" | "md" | "lg";
+  }>>([]);
+  const [scorePopups, setScorePopups] = useState<Array<{
+    id: number;
+    x: number;
+    y: number;
+    value: number;
+    type: "damage" | "parry" | "combo" | "heal";
+  }>>([]);
+
+  // Background effects
+  const [bgIntensity, setBgIntensity] = useState(0);
+  const [lightning, setLightning] = useState(false);
+
+  // Refs
   const onCompleteRef = useRef(onComplete);
   const gameEndedRef = useRef(false);
+  const bossHPRef = useRef(100);
+  const playerHPRef = useRef(100);
+  const comboRef = useRef(0);
+  const shieldActiveRef = useRef(false);
+  const parryWindowRef = useRef(false);
 
   useEffect(() => { onCompleteRef.current = onComplete; }, [onComplete]);
+  useEffect(() => { bossHPRef.current = bossHP; }, [bossHP]);
+  useEffect(() => { playerHPRef.current = playerHP; }, [playerHP]);
+  useEffect(() => { comboRef.current = combo; }, [combo]);
+  useEffect(() => { shieldActiveRef.current = shieldActive; }, [shieldActive]);
+  useEffect(() => { parryWindowRef.current = parryWindow; }, [parryWindow]);
 
-  const startBattle = useCallback(() => {
-    setPhase("battle");
+  // Spawn particles helper
+  const spawnParticles = useCallback((
+    x: number, y: number,
+    type: "heart" | "star" | "spark" | "drama" | "crown" | "shield" | "heal",
+    count: number,
+    spread: number = 1
+  ) => {
+    const colors: Record<string, string[]> = {
+      heart: ["#ff6b9d", "#ff4081", "#e91e63", "#f48fb1"],
+      star: ["#ffd700", "#ffeb3b", "#ffc107", "#ff9800"],
+      spark: ["#00bcd4", "#03a9f4", "#2196f3", "#3f51b5"],
+      drama: ["#9c27b0", "#673ab7", "#7c4dff", "#e040fb"],
+      crown: ["#ffd700", "#ffb300", "#ff8f00", "#ff6f00"],
+      shield: ["#4fc3f7", "#29b6f6", "#03a9f4", "#0288d1"],
+      heal: ["#66bb6a", "#4caf50", "#43a047", "#2e7d32"],
+    };
+    const newParticles = Array.from({ length: count }, (_, i) => ({
+      id: performance.now() + i + Math.random() * 1000,
+      x, y,
+      vx: (Math.random() - 0.5) * 12 * spread,
+      vy: (Math.random() - 0.5) * 12 * spread - 3,
+      type,
+      life: 1,
+      size: 6 + Math.random() * 8,
+      color: colors[type][Math.floor(Math.random() * colors[type].length)],
+      rotation: Math.random() * 360,
+    }));
+    setParticles(prev => [...prev.slice(-60), ...newParticles]);
+  }, []);
 
-    // Start boss attack pattern
-    const attack = () => {
-      if (gameEndedRef.current) return;
+  // Spawn floating text
+  const spawnFloatingText = useCallback((x: number, y: number, text: string, color: string, size: "sm" | "md" | "lg" = "md") => {
+    setFloatingTexts(prev => [...prev.slice(-8), { id: performance.now(), x, y, text, color, size }]);
+    setTimeout(() => setFloatingTexts(prev => prev.slice(1)), 1500);
+  }, []);
 
-      setBossAction("charging");
-      setCurrentAttack(DRAMATIC_LINES[Math.floor(Math.random() * DRAMATIC_LINES.length)]);
+  // Spawn score popup
+  const spawnScorePopup = useCallback((x: number, y: number, value: number, type: "damage" | "parry" | "combo" | "heal") => {
+    setScorePopups(prev => [...prev.slice(-6), { id: performance.now(), x, y, value, type }]);
+    setTimeout(() => setScorePopups(prev => prev.slice(1)), 1200);
+  }, []);
 
-      setTimeout(() => {
-        if (gameEndedRef.current) return;
-        setBossAction("attacking");
+  // Screen shake helper
+  const triggerShake = useCallback((intensity: number) => {
+    setScreenShake(intensity);
+    setTimeout(() => setScreenShake(0), 300);
+  }, []);
 
-        setTimeout(() => {
-          if (gameEndedRef.current) return;
-          setBossAction("idle");
-          setCurrentAttack("");
-          setTimeout(attack, 2000 + Math.random() * 1500);
-        }, 1500);
-      }, 1500);
+  // Lightning flash
+  const triggerLightning = useCallback(() => {
+    setLightning(true);
+    setTimeout(() => setLightning(false), 100);
+  }, []);
+
+  // Start countdown
+  const startCountdown = useCallback(() => {
+    setPhase("countdown");
+    setCountdownNum(3);
+  }, []);
+
+  // Countdown effect
+  useEffect(() => {
+    if (phase !== "countdown") return;
+    if (countdownNum === 0) {
+      gameEndedRef.current = false;
+      setBossHP(100);
+      bossHPRef.current = 100;
+      setPlayerHP(100);
+      playerHPRef.current = 100;
+      setBossPhase("phase1");
+      setBossAction("idle");
+      setBossEmotion("smug");
+      setCurrentAttack("rest");
+      setCombo(0);
+      comboRef.current = 0;
+      setMaxCombo(0);
+      setTotalDamageDealt(0);
+      setPerfectParries(0);
+      setLoveSent(0);
+      setShieldActive(false);
+      setShieldCooldown(0);
+      setAttackCooldown(0);
+      setChargeProgress(0);
+      setParticles([]);
+      setFloatingTexts([]);
+      setScorePopups([]);
+      setBgIntensity(0);
+      setPhase("battle");
+      return;
+    }
+    const timer = setTimeout(() => setCountdownNum(c => c - 1), 700);
+    return () => clearTimeout(timer);
+  }, [phase, countdownNum]);
+
+  // Update particles
+  useEffect(() => {
+    if (particles.length === 0) return;
+    const interval = setInterval(() => {
+      setParticles(prev => prev.map(p => ({
+        ...p,
+        x: p.x + p.vx * 0.5,
+        y: p.y + p.vy * 0.5,
+        vy: p.vy + 0.3,
+        life: p.life - 0.03,
+        rotation: p.rotation + p.vx * 2,
+      })).filter(p => p.life > 0));
+    }, 16);
+    return () => clearInterval(interval);
+  }, [particles.length]);
+
+  // Boss phase transitions
+  useEffect(() => {
+    if (phase !== "battle") return;
+    if (bossHP <= 30 && bossPhase !== "phase3") {
+      setBossPhase("phase3");
+      setBossEmotion("angry");
+      setBgIntensity(2);
+      triggerShake(15);
+      triggerLightning();
+      spawnParticles(50, 25, "crown", 20, 2);
+      spawnFloatingText(50, 30, "FINAL FORM! 👑", "#ffd700", "lg");
+    } else if (bossHP <= 60 && bossHP > 30 && bossPhase === "phase1") {
+      setBossPhase("phase2");
+      setBossEmotion("angry");
+      setBgIntensity(1);
+      triggerShake(10);
+      spawnParticles(50, 25, "drama", 15, 1.5);
+      spawnFloatingText(50, 30, "ENRAGED! 😾", "#e040fb", "lg");
+    }
+  }, [bossHP, bossPhase, phase, triggerShake, triggerLightning, spawnParticles, spawnFloatingText]);
+
+  // Boss attack loop
+  useEffect(() => {
+    if (phase !== "battle" || gameEndedRef.current) return;
+
+    const getAttackSpeed = () => {
+      switch (bossPhase) {
+        case "phase1": return 2500 + Math.random() * 1500;
+        case "phase2": return 2000 + Math.random() * 1000;
+        case "phase3": return 1500 + Math.random() * 800;
+      }
     };
 
-    setTimeout(attack, 2000);
-  }, []);
+    const getRandomAttack = (): BossAttackType => {
+      const attacks: BossAttackType[] = bossPhase === "phase3"
+        ? ["drama_bomb", "tantrum_wave", "guilt_trip", "love_laser", "ultimate_meow"]
+        : bossPhase === "phase2"
+        ? ["drama_bomb", "tantrum_wave", "guilt_trip", "love_laser"]
+        : ["drama_bomb", "tantrum_wave", "guilt_trip"];
+      return attacks[Math.floor(Math.random() * attacks.length)];
+    };
+
+    const executeAttack = () => {
+      if (gameEndedRef.current || bossAction === "stunned") return;
+
+      const attack = getRandomAttack();
+      const attackData = BOSS_ATTACKS[attack];
+
+      setCurrentAttack(attack);
+      setBossAction("charging");
+      setBossEmotion("charging");
+      setChargeProgress(0);
+
+      // Show warning
+      spawnFloatingText(50, 40, attackData.warning + " " + attackData.name, "#ff5722", "md");
+
+      // Charge animation
+      let progress = 0;
+      const chargeInterval = setInterval(() => {
+        progress += 50 / attackData.chargeTime;
+        setChargeProgress(Math.min(progress, 1));
+
+        if (progress >= 0.8 && progress < 0.85) {
+          setParryWindow(true);
+          parryWindowRef.current = true;
+        }
+
+        if (progress >= 1) {
+          clearInterval(chargeInterval);
+          setChargeProgress(0);
+          setParryWindow(false);
+          parryWindowRef.current = false;
+
+          // Execute attack
+          setBossAction("attacking");
+          setBossEmotion("angry");
+          triggerShake(8);
+          spawnParticles(50, 35, "drama", 12, 1.5);
+
+          // Check if player blocked
+          if (!shieldActiveRef.current) {
+            // Player takes damage
+            setPlayerHP(hp => {
+              const newHP = Math.max(0, hp - attackData.damage);
+              playerHPRef.current = newHP;
+              if (newHP <= 0 && !gameEndedRef.current) {
+                gameEndedRef.current = true;
+                setPhase("defeat");
+                setTimeout(() => onCompleteRef.current(false), 2500);
+              }
+              return newHP;
+            });
+            setHitFlash("player");
+            setTimeout(() => setHitFlash("none"), 200);
+            setCombo(0);
+            comboRef.current = 0;
+            spawnFloatingText(50, 70, `-${attackData.damage}`, "#ff1744", "lg");
+          } else {
+            // Blocked
+            spawnParticles(50, 60, "shield", 8);
+            spawnFloatingText(50, 60, "BLOCKED!", "#29b6f6", "md");
+          }
+
+          // Reset after attack
+          setTimeout(() => {
+            if (gameEndedRef.current) return;
+            setBossAction("idle");
+            setBossEmotion("smug");
+            setCurrentAttack("rest");
+            setTimeout(executeAttack, getAttackSpeed());
+          }, 800);
+        }
+      }, 50);
+
+      return () => clearInterval(chargeInterval);
+    };
+
+    const timeout = setTimeout(executeAttack, 1500);
+    return () => clearTimeout(timeout);
+  }, [phase, bossPhase, bossAction, triggerShake, spawnParticles, spawnFloatingText]);
 
   // Shield cooldown
   useEffect(() => {
     if (shieldCooldown <= 0) return;
     const timer = setInterval(() => {
-      setShieldCooldown(c => Math.max(0, c - 1));
-    }, 1000);
+      setShieldCooldown(c => Math.max(0, c - 0.1));
+    }, 100);
     return () => clearInterval(timer);
   }, [shieldCooldown]);
 
-  // Take damage when boss attacks
+  // Attack cooldown
   useEffect(() => {
-    if (bossAction !== "attacking" || shieldCooldown > 0) return;
+    if (attackCooldown <= 0) return;
+    const timer = setInterval(() => {
+      setAttackCooldown(c => Math.max(0, c - 0.1));
+    }, 100);
+    return () => clearInterval(timer);
+  }, [attackCooldown]);
 
-    setPlayerLove(hp => {
-      const newHP = Math.max(0, hp - 20);
+  // Send love attack
+  const sendLove = useCallback(() => {
+    if (gameEndedRef.current || attackCooldown > 0) return;
+
+    const loveAttack = LOVE_ATTACKS[Math.floor(Math.random() * LOVE_ATTACKS.length)];
+    const comboBonus = Math.floor(comboRef.current / 3);
+    const phaseBonus = bossPhase === "phase3" ? 3 : bossPhase === "phase2" ? 1 : 0;
+    const totalDamage = loveAttack.damage + comboBonus + phaseBonus;
+
+    setLoveSent(l => l + 1);
+    setAttackCooldown(0.3);
+
+    // Spawn particles towards boss
+    spawnParticles(50, 55, "heart", 5, 0.5);
+
+    // Floating love text
+    spawnFloatingText(50 + (Math.random() - 0.5) * 30, 40, loveAttack.text, "#ff4081", "sm");
+
+    // Deal damage
+    setBossHP(hp => {
+      const newHP = Math.max(0, hp - totalDamage);
+      bossHPRef.current = newHP;
       if (newHP <= 0 && !gameEndedRef.current) {
         gameEndedRef.current = true;
-        setPhase("defeat");
-        setTimeout(() => onCompleteRef.current(false), 2000);
+        triggerShake(20);
+        spawnParticles(50, 25, "star", 30, 2);
+        spawnParticles(50, 25, "crown", 15, 2);
+        setTimeout(() => setPhase("victory"), 1000);
+        setTimeout(() => onCompleteRef.current(true), 3500);
       }
       return newHP;
     });
-  }, [bossAction, shieldCooldown]);
 
-  const sendCompliment = useCallback(() => {
-    if (gameEndedRef.current) return;
+    setTotalDamageDealt(d => d + totalDamage);
+    setCombo(c => {
+      const newCombo = c + 1;
+      if (newCombo > maxCombo) setMaxCombo(newCombo);
+      return newCombo;
+    });
 
-    const text = LOVE_COMPLIMENTS[Math.floor(Math.random() * LOVE_COMPLIMENTS.length)];
-    const newCompliment = {
-      id: Date.now(),
-      x: 30 + Math.random() * 40,
-      y: 60,
-      text,
+    // Score popup
+    spawnScorePopup(50 + (Math.random() - 0.5) * 20, 35, totalDamage, comboRef.current >= 5 ? "combo" : "damage");
+
+    // Boss react
+    if (Math.random() < 0.2) {
+      setBossEmotion("hurt");
+      setTimeout(() => {
+        if (!gameEndedRef.current && bossAction === "idle") setBossEmotion("smug");
+      }, 300);
+    }
+
+    setHitFlash("boss");
+    setTimeout(() => setHitFlash("none"), 100);
+  }, [attackCooldown, bossPhase, maxCombo, bossAction, triggerShake, spawnParticles, spawnFloatingText, spawnScorePopup]);
+
+  // Activate shield / parry
+  const activateShield = useCallback(() => {
+    if (gameEndedRef.current || shieldCooldown > 0) return;
+
+    // Check for perfect parry
+    if (parryWindowRef.current && bossAction === "charging") {
+      // Perfect parry!
+      setParrySuccess(true);
+      setPerfectParries(p => p + 1);
+
+      // Stun boss
+      setBossAction("stunned");
+      setBossEmotion("hurt");
+      setCurrentAttack("rest");
+      setChargeProgress(0);
+      setParryWindow(false);
+      parryWindowRef.current = false;
+
+      // Visual feedback
+      triggerShake(12);
+      triggerLightning();
+      spawnParticles(50, 30, "star", 20, 2);
+      spawnParticles(50, 50, "shield", 15, 1.5);
+      spawnFloatingText(50, 45, pick(PARRY_MESSAGES), "#ffd700", "lg");
+      spawnScorePopup(50, 40, 25, "parry");
+
+      // Bonus damage
+      setBossHP(hp => {
+        const newHP = Math.max(0, hp - 15);
+        bossHPRef.current = newHP;
+        return newHP;
+      });
+      setTotalDamageDealt(d => d + 15);
+
+      // Recover from stun
+      setTimeout(() => {
+        if (gameEndedRef.current) return;
+        setParrySuccess(false);
+        setBossAction("idle");
+        setBossEmotion("angry");
+      }, 1500);
+
+      setShieldCooldown(2);
+    } else {
+      // Normal shield
+      setShieldActive(true);
+      shieldActiveRef.current = true;
+      spawnParticles(50, 60, "shield", 8, 0.5);
+
+      setTimeout(() => {
+        setShieldActive(false);
+        shieldActiveRef.current = false;
+      }, 800);
+
+      setShieldCooldown(3);
+    }
+  }, [shieldCooldown, bossAction, triggerShake, triggerLightning, spawnParticles, spawnFloatingText, spawnScorePopup]);
+
+  // Get boss emoji based on state
+  const getBossEmoji = () => {
+    if (bossEmotion === "defeated") return "😵";
+    if (bossEmotion === "hurt") return "😿";
+    if (bossEmotion === "charging") return "🙀";
+    if (bossAction === "attacking") return "😾";
+    if (bossAction === "stunned") return "😵‍💫";
+    if (bossPhase === "phase3") return "👿";
+    if (bossPhase === "phase2") return "😾";
+    return "😼";
+  };
+
+  // Tutorial screen
+  if (phase === "tutorial") {
+    return (
+      <div className="fixed inset-0 bg-gradient-to-b from-slate-900 via-purple-900 to-slate-900 flex flex-col items-center justify-center p-4 overflow-hidden">
+        {/* Animated background */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          {Array.from({ length: 20 }).map((_, i) => (
+            <motion.div
+              key={i}
+              className="absolute text-3xl opacity-20"
+              style={{ left: `${(i * 12) % 100}%`, top: `${(i * 15) % 100}%` }}
+              animate={{
+                y: [0, -30, 0],
+                rotate: [-10, 10, -10],
+                scale: [1, 1.2, 1],
+              }}
+              transition={{ duration: 3 + (i % 3), repeat: Infinity, delay: i * 0.2 }}
+            >
+              {["💔", "😾", "👑", "⚡", "💥"][i % 5]}
+            </motion.div>
+          ))}
+        </div>
+
+        <motion.div
+          initial={{ scale: 0.8, opacity: 0, y: 30 }}
+          animate={{ scale: 1, opacity: 1, y: 0 }}
+          transition={{ type: "spring", stiffness: 200 }}
+          className="bg-slate-800/95 backdrop-blur-xl rounded-3xl p-6 max-w-sm text-center shadow-2xl relative z-10 border-2 border-purple-500/50"
+        >
+          {/* Crown decoration */}
+          <motion.div
+            className="absolute -top-8 left-1/2 -translate-x-1/2 text-5xl"
+            animate={{ y: [0, -5, 0], rotate: [-5, 5, -5] }}
+            transition={{ duration: 2, repeat: Infinity }}
+          >
+            👑
+          </motion.div>
+
+          <div className="mt-4 mb-3">
+            <motion.div
+              className="text-7xl mb-2"
+              animate={{ scale: [1, 1.1, 1], rotate: [0, -5, 5, 0] }}
+              transition={{ duration: 1.5, repeat: Infinity }}
+            >
+              😾
+            </motion.div>
+          </div>
+
+          <h2 className="text-2xl font-black bg-gradient-to-r from-purple-400 via-pink-400 to-red-400 bg-clip-text text-transparent mb-2">
+            THE DRAMA KING
+          </h2>
+          <p className="text-purple-300 mb-4 text-sm">
+            "You DARE challenge me?!<br/>
+            <span className="font-bold text-pink-400">PROVE YOUR DEVOTION!</span>"
+          </p>
+
+          <div className="bg-slate-700/60 rounded-2xl p-4 mb-4 text-left">
+            <p className="text-white text-sm font-bold mb-3 text-center">Battle Controls:</p>
+            <div className="space-y-3">
+              <div className="flex items-center gap-3">
+                <motion.div
+                  className="w-12 h-12 bg-gradient-to-br from-pink-500 to-rose-600 rounded-xl flex items-center justify-center shadow-lg"
+                  animate={{ scale: [1, 1.1, 1] }}
+                  transition={{ duration: 1, repeat: Infinity }}
+                >
+                  <span className="text-xl">💖</span>
+                </motion.div>
+                <div>
+                  <div className="text-white text-sm font-bold">Send Love</div>
+                  <div className="text-purple-300 text-xs">Tap rapidly to damage!</div>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <motion.div
+                  className="w-12 h-12 bg-gradient-to-br from-blue-500 to-cyan-600 rounded-xl flex items-center justify-center shadow-lg"
+                  animate={{ rotate: [-5, 5, -5] }}
+                  transition={{ duration: 0.5, repeat: Infinity }}
+                >
+                  <span className="text-xl">🛡️</span>
+                </motion.div>
+                <div>
+                  <div className="text-white text-sm font-bold">Shield / Parry</div>
+                  <div className="text-purple-300 text-xs">Block attacks! Perfect timing = PARRY!</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex gap-2 mb-4">
+            <div className="flex-1 bg-yellow-500/20 rounded-xl p-2 border border-yellow-500/30">
+              <div className="text-xl">⚡</div>
+              <div className="text-[9px] text-yellow-300 font-medium">Watch for<br/>warnings!</div>
+            </div>
+            <div className="flex-1 bg-pink-500/20 rounded-xl p-2 border border-pink-500/30">
+              <div className="text-xl">🔥</div>
+              <div className="text-[9px] text-pink-300 font-medium">Build<br/>combos!</div>
+            </div>
+            <div className="flex-1 bg-cyan-500/20 rounded-xl p-2 border border-cyan-500/30">
+              <div className="text-xl">✨</div>
+              <div className="text-[9px] text-cyan-300 font-medium">Parry for<br/>bonus DMG!</div>
+            </div>
+          </div>
+
+          <motion.button
+            onClick={startCountdown}
+            className="w-full py-4 bg-gradient-to-r from-purple-600 via-pink-600 to-red-600 text-white rounded-2xl font-bold text-lg shadow-xl"
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+          >
+            <motion.span
+              animate={{ scale: [1, 1.05, 1] }}
+              transition={{ duration: 1, repeat: Infinity }}
+            >
+              BEGIN THE BATTLE! ⚔️
+            </motion.span>
+          </motion.button>
+        </motion.div>
+      </div>
+    );
+  }
+
+  // Countdown
+  if (phase === "countdown") {
+    return (
+      <div className="fixed inset-0 bg-gradient-to-b from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center">
+        <motion.div
+          key={countdownNum}
+          initial={{ scale: 3, opacity: 0, rotate: -20 }}
+          animate={{ scale: 1, opacity: 1, rotate: 0 }}
+          exit={{ scale: 0, opacity: 0 }}
+          transition={{ type: "spring", stiffness: 300, damping: 20 }}
+          className="text-[120px] font-black text-purple-400 drop-shadow-[0_0_30px_rgba(168,85,247,0.5)]"
+        >
+          {countdownNum || "⚔️"}
+        </motion.div>
+      </div>
+    );
+  }
+
+  // Victory screen
+  if (phase === "victory") {
+    const rating = perfectParries >= 5 ? "S" : perfectParries >= 3 ? "A" : perfectParries >= 1 ? "B" : maxCombo >= 10 ? "B" : "C";
+    const ratingColors: Record<string, string> = {
+      S: "from-yellow-400 to-amber-500",
+      A: "from-green-400 to-emerald-500",
+      B: "from-blue-400 to-cyan-500",
+      C: "from-purple-400 to-violet-500",
     };
 
-    setCompliments(prev => [...prev.slice(-4), newCompliment]);
-
-    setBossHP(hp => {
-      const newHP = Math.max(0, hp - 12);
-      if (newHP <= 0 && !gameEndedRef.current) {
-        gameEndedRef.current = true;
-        setPhase("victory");
-        setTimeout(() => onCompleteRef.current(true), 2000);
-      }
-      return newHP;
-    });
-
-    setTimeout(() => {
-      setCompliments(prev => prev.filter(c => c.id !== newCompliment.id));
-    }, 1000);
-  }, []);
-
-  const activateShield = useCallback(() => {
-    if (shieldCooldown > 0) return;
-    setShieldCooldown(5);
-  }, [shieldCooldown]);
-
-  if (phase === "intro") {
     return (
-      <div className="fixed inset-0 bg-gradient-to-b from-slate-900 to-purple-900 flex flex-col items-center justify-center p-6">
-        <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} className="text-center">
+      <div className="fixed inset-0 bg-gradient-to-b from-pink-500 via-rose-600 to-purple-700 flex flex-col items-center justify-center p-4 overflow-hidden">
+        {/* Victory particles */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          {Array.from({ length: 30 }).map((_, i) => (
+            <motion.div
+              key={i}
+              className="absolute text-3xl"
+              style={{ left: `${Math.random() * 100}%`, top: `${Math.random() * 100}%` }}
+              initial={{ opacity: 0, scale: 0 }}
+              animate={{
+                opacity: [0, 1, 0],
+                scale: [0, 1.5, 0],
+                y: [0, -50],
+              }}
+              transition={{ duration: 2, repeat: Infinity, delay: i * 0.1 }}
+            >
+              {["💖", "✨", "🌟", "💕", "👑"][i % 5]}
+            </motion.div>
+          ))}
+        </div>
+
+        <motion.div
+          initial={{ scale: 0, y: 50 }}
+          animate={{ scale: 1, y: 0 }}
+          transition={{ type: "spring", stiffness: 200 }}
+          className="bg-white/95 backdrop-blur-xl rounded-3xl p-6 max-w-sm text-center shadow-2xl border border-pink-200 relative z-10"
+        >
           <motion.div
-            animate={{ y: [0, -10, 0], rotate: [0, -5, 5, 0] }}
+            className="text-8xl mb-3"
+            animate={{ scale: [1, 1.2, 1], rotate: [0, 10, -10, 0] }}
+            transition={{ duration: 1.5, repeat: Infinity }}
+          >
+            😻
+          </motion.div>
+
+          <h2 className="text-3xl font-black bg-gradient-to-r from-pink-600 to-purple-600 bg-clip-text text-transparent mb-2">
+            VICTORY!
+          </h2>
+          <p className="text-slate-600 mb-4 text-sm">
+            "Fine... I'll accept your love... 💕"
+          </p>
+
+          {/* Rating */}
+          <motion.div
+            className={cn("w-20 h-20 mx-auto rounded-2xl bg-gradient-to-br flex items-center justify-center mb-4 shadow-lg", ratingColors[rating])}
+            initial={{ scale: 0, rotate: -180 }}
+            animate={{ scale: 1, rotate: 0 }}
+            transition={{ delay: 0.3, type: "spring" }}
+          >
+            <span className="text-4xl font-black text-white">{rating}</span>
+          </motion.div>
+
+          {/* Stats */}
+          <div className="grid grid-cols-2 gap-2 mb-4">
+            <div className="bg-pink-100 rounded-xl p-2">
+              <div className="text-2xl">💖</div>
+              <div className="text-xs text-pink-600 font-bold">Love Sent</div>
+              <div className="text-lg font-black text-pink-700">{loveSent}</div>
+            </div>
+            <div className="bg-purple-100 rounded-xl p-2">
+              <div className="text-2xl">💥</div>
+              <div className="text-xs text-purple-600 font-bold">Total DMG</div>
+              <div className="text-lg font-black text-purple-700">{totalDamageDealt}</div>
+            </div>
+            <div className="bg-amber-100 rounded-xl p-2">
+              <div className="text-2xl">🔥</div>
+              <div className="text-xs text-amber-600 font-bold">Max Combo</div>
+              <div className="text-lg font-black text-amber-700">{maxCombo}</div>
+            </div>
+            <div className="bg-cyan-100 rounded-xl p-2">
+              <div className="text-2xl">✨</div>
+              <div className="text-xs text-cyan-600 font-bold">Parries</div>
+              <div className="text-lg font-black text-cyan-700">{perfectParries}</div>
+            </div>
+          </div>
+
+          <div className="text-sm text-slate-500">
+            The Drama King has been defeated!
+          </div>
+        </motion.div>
+      </div>
+    );
+  }
+
+  // Defeat screen
+  if (phase === "defeat") {
+    return (
+      <div className="fixed inset-0 bg-gradient-to-b from-slate-800 via-slate-900 to-black flex flex-col items-center justify-center p-4 overflow-hidden">
+        {/* Defeat particles */}
+        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+          {Array.from({ length: 15 }).map((_, i) => (
+            <motion.div
+              key={i}
+              className="absolute text-2xl opacity-30"
+              style={{ left: `${Math.random() * 100}%`, top: `${Math.random() * 100}%` }}
+              animate={{ y: [0, 20], opacity: [0.3, 0] }}
+              transition={{ duration: 3, repeat: Infinity, delay: i * 0.2 }}
+            >
+              💔
+            </motion.div>
+          ))}
+        </div>
+
+        <motion.div
+          initial={{ scale: 0, y: 50 }}
+          animate={{ scale: 1, y: 0 }}
+          transition={{ type: "spring", stiffness: 200 }}
+          className="bg-slate-800/95 backdrop-blur-xl rounded-3xl p-6 max-w-sm text-center shadow-2xl border border-slate-700 relative z-10"
+        >
+          <motion.div
+            className="text-8xl mb-3"
+            animate={{ y: [0, -5, 0] }}
             transition={{ duration: 2, repeat: Infinity }}
-            className="text-8xl mb-6"
           >
             😾
           </motion.div>
-          <h1 className="text-3xl font-bold text-white mb-4">THE DRAMA KING</h1>
-          <p className="text-purple-300 mb-2 text-lg">The most dramatic cat appears!</p>
-          <p className="text-purple-400 mb-8 text-sm">
-            "You DARE try to say YES to me?!<br/>PROVE YOUR DEVOTION!" 👑
+          <div className="text-4xl absolute top-8 left-1/2 -translate-x-1/2">👑</div>
+
+          <h2 className="text-3xl font-black text-red-500 mb-2">
+            DEFEATED!
+          </h2>
+          <p className="text-slate-400 mb-4 text-sm">
+            "I KNEW you couldn't handle my drama!" 👑
           </p>
-          <button
-            onClick={startBattle}
-            className="px-8 py-4 bg-gradient-to-r from-red-500 to-pink-500 text-white rounded-2xl font-bold text-xl shadow-lg active:scale-95 transition-transform"
-          >
-            SHOWER WITH LOVE! 💖
-          </button>
+
+          <div className="bg-slate-700/50 rounded-xl p-4 mb-4">
+            <p className="text-slate-300 text-xs mb-2">Your Stats:</p>
+            <div className="flex justify-center gap-4">
+              <div>
+                <div className="text-lg font-bold text-pink-400">{loveSent}</div>
+                <div className="text-xs text-slate-500">Love Sent</div>
+              </div>
+              <div>
+                <div className="text-lg font-bold text-amber-400">{maxCombo}</div>
+                <div className="text-xs text-slate-500">Max Combo</div>
+              </div>
+              <div>
+                <div className="text-lg font-bold text-cyan-400">{perfectParries}</div>
+                <div className="text-xs text-slate-500">Parries</div>
+              </div>
+            </div>
+          </div>
+
+          <p className="text-slate-500 text-xs">
+            Try again... the cat awaits your devotion!
+          </p>
         </motion.div>
       </div>
     );
   }
 
-  if (phase === "victory") {
-    return (
-      <div className="fixed inset-0 bg-gradient-to-b from-pink-400 to-rose-500 flex flex-col items-center justify-center p-6">
-        <motion.div initial={{ scale: 0 }} animate={{ scale: 1, rotate: [0, 10, -10, 0] }} className="text-center">
-          <div className="text-8xl mb-6">😻</div>
-          <h1 className="text-3xl font-bold text-white mb-4">DRAMA DEFEATED!</h1>
-          <p className="text-pink-100 mb-2 text-lg">Your love overwhelmed the drama!</p>
-          <p className="text-pink-200 text-sm">"Fine... I'll accept your love... 💕"</p>
-        </motion.div>
-      </div>
-    );
-  }
-
-  if (phase === "defeat") {
-    return (
-      <div className="fixed inset-0 bg-gradient-to-b from-slate-800 to-slate-900 flex flex-col items-center justify-center p-6">
-        <div className="text-center">
-          <div className="text-8xl mb-6">😾</div>
-          <h1 className="text-3xl font-bold text-white mb-4">OVERWHELMED!</h1>
-          <p className="text-slate-300 mb-2 text-lg">The drama was too powerful!</p>
-          <p className="text-slate-400 text-sm">"I KNEW you couldn't handle me!" 👑</p>
-        </div>
-      </div>
-    );
-  }
-
+  // Battle screen
   return (
-    <div className="fixed inset-0 bg-gradient-to-b from-slate-900 to-purple-900 overflow-hidden select-none">
+    <div
+      className={cn(
+        "fixed inset-0 overflow-hidden select-none transition-colors duration-300",
+        bgIntensity === 0 ? "bg-gradient-to-b from-slate-900 via-purple-900 to-slate-900" :
+        bgIntensity === 1 ? "bg-gradient-to-b from-slate-900 via-red-900 to-purple-900" :
+        "bg-gradient-to-b from-red-900 via-purple-900 to-black"
+      )}
+      style={{
+        transform: screenShake ? `translate(${(Math.random() - 0.5) * screenShake}px, ${(Math.random() - 0.5) * screenShake}px)` : undefined
+      }}
+    >
+      {/* Lightning flash */}
+      {lightning && <div className="absolute inset-0 bg-white/30 z-50 pointer-events-none" />}
+
+      {/* Hit flash overlays */}
+      {hitFlash === "player" && <div className="absolute inset-0 bg-red-500/30 z-40 pointer-events-none" />}
+      {hitFlash === "boss" && <div className="absolute inset-0 bg-pink-500/20 z-40 pointer-events-none" />}
+
+      {/* Animated background particles */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        {Array.from({ length: 12 }).map((_, i) => (
+          <motion.div
+            key={i}
+            className="absolute text-2xl opacity-10"
+            style={{ left: `${(i * 15) % 100}%`, top: `${(i * 20) % 100}%` }}
+            animate={{
+              y: [0, -20, 0],
+              opacity: [0.1, 0.2, 0.1],
+            }}
+            transition={{ duration: 4 + i % 3, repeat: Infinity, delay: i * 0.3 }}
+          >
+            {bossPhase === "phase3" ? "👑" : bossPhase === "phase2" ? "💢" : "💔"}
+          </motion.div>
+        ))}
+      </div>
+
       {/* HP Bars */}
       <div className="absolute top-4 left-4 right-4 flex flex-col gap-2 z-20">
+        {/* Boss HP */}
         <div className="flex items-center gap-2">
-          <span className="text-2xl">👑</span>
-          <div className="flex-1 h-6 bg-slate-700 rounded-full overflow-hidden">
-            <div className="h-full bg-gradient-to-r from-red-500 to-orange-500 transition-all" style={{ width: `${bossHP}%` }} />
+          <span className="text-xl">👑</span>
+          <div className="flex-1 h-5 bg-slate-800 rounded-full overflow-hidden border border-slate-600">
+            <motion.div
+              className={cn(
+                "h-full transition-all duration-300",
+                bossPhase === "phase3" ? "bg-gradient-to-r from-red-600 to-orange-500" :
+                bossPhase === "phase2" ? "bg-gradient-to-r from-purple-600 to-red-500" :
+                "bg-gradient-to-r from-purple-500 to-pink-500"
+              )}
+              style={{ width: `${bossHP}%` }}
+              animate={bossAction === "stunned" ? { opacity: [1, 0.5, 1] } : {}}
+              transition={{ duration: 0.3, repeat: bossAction === "stunned" ? Infinity : 0 }}
+            />
           </div>
-          <span className="text-white text-sm w-12">{bossHP}%</span>
+          <span className="text-white text-xs font-bold w-10 text-right">{Math.ceil(bossHP)}%</span>
         </div>
+
+        {/* Phase indicator */}
+        <div className="flex justify-center gap-1 mb-1">
+          {["phase1", "phase2", "phase3"].map((p, i) => (
+            <div
+              key={p}
+              className={cn(
+                "w-16 h-1 rounded-full transition-colors",
+                bossPhase === p ? "bg-purple-400" :
+                (bossPhase === "phase2" && i === 0) || (bossPhase === "phase3" && i <= 1) ? "bg-slate-600" :
+                "bg-slate-700"
+              )}
+            />
+          ))}
+        </div>
+
+        {/* Player HP */}
         <div className="flex items-center gap-2">
-          <span className="text-2xl">💖</span>
-          <div className="flex-1 h-6 bg-slate-700 rounded-full overflow-hidden">
-            <div className="h-full bg-gradient-to-r from-pink-500 to-rose-500 transition-all" style={{ width: `${playerLove}%` }} />
+          <span className="text-xl">💖</span>
+          <div className="flex-1 h-5 bg-slate-800 rounded-full overflow-hidden border border-slate-600">
+            <motion.div
+              className="h-full bg-gradient-to-r from-pink-500 to-rose-500 transition-all duration-300"
+              style={{ width: `${playerHP}%` }}
+            />
           </div>
-          <span className="text-white text-sm w-12">{playerLove}%</span>
+          <span className="text-white text-xs font-bold w-10 text-right">{Math.ceil(playerHP)}%</span>
         </div>
-      </div>
 
-      {/* Boss */}
-      <div className="absolute top-32 left-1/2 -translate-x-1/2">
-        <motion.div
-          animate={
-            bossAction === "attacking" ? { scale: [1, 1.4, 1], x: [0, -20, 20, 0] } :
-            bossAction === "charging" ? { scale: [1, 1.1, 1] } : {}
-          }
-          transition={{ duration: 0.5, repeat: bossAction === "charging" ? Infinity : 0 }}
-          className="text-8xl"
-        >
-          {bossAction === "attacking" ? "😾" : bossAction === "charging" ? "🙀" : "😼"}
-        </motion.div>
-        <div className="text-4xl absolute -top-2 left-1/2 -translate-x-1/2">👑</div>
-
-        {currentAttack && (
+        {/* Combo counter */}
+        {combo > 0 && (
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="absolute -bottom-16 left-1/2 -translate-x-1/2 whitespace-nowrap bg-red-500/90 text-white px-4 py-2 rounded-full text-sm font-bold"
+            key={combo}
+            initial={{ scale: 1.5, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="text-center"
           >
-            {currentAttack}
+            <span className={cn(
+              "font-black text-sm",
+              combo >= 10 ? "text-yellow-400" : combo >= 5 ? "text-pink-400" : "text-purple-400"
+            )}>
+              {combo} COMBO! {combo >= 10 ? "🔥" : combo >= 5 ? "✨" : ""}
+            </span>
           </motion.div>
         )}
       </div>
 
-      {/* Shield indicator */}
-      {shieldCooldown > 0 && (
-        <div className="absolute top-1/3 left-1/2 -translate-x-1/2 text-6xl">🛡️</div>
+      {/* Boss area */}
+      <div className="absolute top-32 left-1/2 -translate-x-1/2 flex flex-col items-center">
+        {/* Charge bar */}
+        {bossAction === "charging" && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-2 w-32"
+          >
+            <div className="h-2 bg-slate-700 rounded-full overflow-hidden">
+              <motion.div
+                className={cn(
+                  "h-full",
+                  parryWindow ? "bg-yellow-400" : "bg-red-500"
+                )}
+                style={{ width: `${chargeProgress * 100}%` }}
+              />
+            </div>
+            {parryWindow && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: [1, 0.5, 1] }}
+                transition={{ duration: 0.2, repeat: Infinity }}
+                className="text-center text-yellow-400 text-xs font-bold mt-1"
+              >
+                PARRY NOW!
+              </motion.div>
+            )}
+          </motion.div>
+        )}
+
+        {/* Boss character */}
+        <div className="relative">
+          {/* Crown */}
+          <motion.div
+            className="text-4xl absolute -top-8 left-1/2 -translate-x-1/2 z-10"
+            animate={{
+              y: bossAction === "stunned" ? [0, -5, 0] : [0, -3, 0],
+              rotate: bossAction === "stunned" ? [0, -20, 20, 0] : [0, -5, 5, 0],
+            }}
+            transition={{ duration: bossAction === "stunned" ? 0.3 : 1.5, repeat: Infinity }}
+          >
+            👑
+          </motion.div>
+
+          {/* Boss emoji */}
+          <motion.div
+            animate={
+              bossAction === "attacking" ? { scale: [1, 1.5, 1], x: [0, -30, 30, 0], rotate: [0, -10, 10, 0] } :
+              bossAction === "charging" ? { scale: [1, 1.15, 1] } :
+              bossAction === "stunned" ? { rotate: [0, -15, 15, 0], scale: [1, 0.9, 1] } :
+              { y: [0, -5, 0] }
+            }
+            transition={{
+              duration: bossAction === "attacking" ? 0.4 : bossAction === "stunned" ? 0.3 : 1,
+              repeat: bossAction === "idle" ? Infinity : bossAction === "charging" || bossAction === "stunned" ? Infinity : 0
+            }}
+            className={cn(
+              "text-8xl transition-all",
+              bossAction === "stunned" && "grayscale"
+            )}
+          >
+            {getBossEmoji()}
+          </motion.div>
+
+          {/* Boss aura for phase 3 */}
+          {bossPhase === "phase3" && bossAction !== "stunned" && (
+            <motion.div
+              className="absolute inset-0 -z-10 rounded-full"
+              animate={{
+                boxShadow: [
+                  "0 0 20px 10px rgba(239,68,68,0.3)",
+                  "0 0 40px 20px rgba(239,68,68,0.5)",
+                  "0 0 20px 10px rgba(239,68,68,0.3)",
+                ],
+              }}
+              transition={{ duration: 1, repeat: Infinity }}
+            />
+          )}
+        </div>
+
+        {/* Attack name */}
+        {currentAttack !== "rest" && (
+          <motion.div
+            initial={{ opacity: 0, y: 20, scale: 0.8 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            className={cn(
+              "mt-4 px-4 py-2 rounded-full font-bold text-white text-sm shadow-lg",
+              bossAction === "attacking" ? "bg-red-600" : "bg-purple-600"
+            )}
+          >
+            {BOSS_ATTACKS[currentAttack].emoji} {BOSS_ATTACKS[currentAttack].name}
+          </motion.div>
+        )}
+
+        {/* Stunned indicator */}
+        {bossAction === "stunned" && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="mt-4 px-4 py-2 rounded-full font-bold text-yellow-300 text-sm bg-yellow-600/30 border border-yellow-500"
+          >
+            ⭐ STUNNED! ⭐
+          </motion.div>
+        )}
+      </div>
+
+      {/* Shield effect */}
+      {shieldActive && (
+        <motion.div
+          initial={{ scale: 0, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          exit={{ scale: 0, opacity: 0 }}
+          className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-32 h-32 rounded-full border-4 border-cyan-400 bg-cyan-400/20 z-30"
+        />
       )}
 
-      {/* Flying compliments */}
-      {compliments.map(c => (
+      {/* Parry success effect */}
+      {parrySuccess && (
         <motion.div
-          key={c.id}
-          initial={{ opacity: 1, y: 0 }}
-          animate={{ opacity: 0, y: -100 }}
-          transition={{ duration: 1 }}
-          className="absolute text-xl font-bold text-pink-300 pointer-events-none"
-          style={{ left: `${c.x}%`, top: `${c.y}%` }}
+          initial={{ scale: 0 }}
+          animate={{ scale: [0, 1.5, 1], opacity: [0, 1, 0] }}
+          transition={{ duration: 0.5 }}
+          className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-6xl z-40"
         >
-          {c.text}
+          ✨
         </motion.div>
+      )}
+
+      {/* Particles */}
+      {particles.map(p => (
+        <div
+          key={p.id}
+          className="absolute pointer-events-none text-lg"
+          style={{
+            left: `${p.x}%`,
+            top: `${p.y}%`,
+            opacity: p.life,
+            transform: `rotate(${p.rotation}deg) scale(${p.size / 10})`,
+            color: p.color,
+          }}
+        >
+          {p.type === "heart" ? "💖" : p.type === "star" ? "⭐" : p.type === "spark" ? "✨" :
+           p.type === "drama" ? "💢" : p.type === "crown" ? "👑" : p.type === "shield" ? "🛡️" : "💚"}
+        </div>
       ))}
 
+      {/* Floating texts */}
+      <AnimatePresence>
+        {floatingTexts.map(t => (
+          <motion.div
+            key={t.id}
+            initial={{ opacity: 0, y: 0, scale: 0.5 }}
+            animate={{ opacity: 1, y: -30, scale: 1 }}
+            exit={{ opacity: 0, y: -60 }}
+            transition={{ duration: 1.5 }}
+            className={cn(
+              "absolute left-1/2 -translate-x-1/2 font-black pointer-events-none whitespace-nowrap z-30",
+              t.size === "sm" ? "text-sm" : t.size === "lg" ? "text-2xl" : "text-lg"
+            )}
+            style={{ top: `${t.y}%`, color: t.color }}
+          >
+            {t.text}
+          </motion.div>
+        ))}
+      </AnimatePresence>
+
+      {/* Score popups */}
+      <AnimatePresence>
+        {scorePopups.map(p => (
+          <motion.div
+            key={p.id}
+            initial={{ opacity: 0, y: 0, scale: 0 }}
+            animate={{ opacity: 1, y: -40, scale: 1 }}
+            exit={{ opacity: 0, y: -60 }}
+            transition={{ duration: 1 }}
+            className={cn(
+              "absolute left-1/2 -translate-x-1/2 font-black pointer-events-none z-30",
+              p.type === "damage" ? "text-pink-400" :
+              p.type === "parry" ? "text-yellow-400" :
+              p.type === "combo" ? "text-orange-400" :
+              "text-green-400"
+            )}
+            style={{ top: `${p.y}%`, left: `${p.x}%` }}
+          >
+            +{p.value}
+            {p.type === "parry" && " PARRY!"}
+            {p.type === "combo" && " 🔥"}
+          </motion.div>
+        ))}
+      </AnimatePresence>
+
       {/* Action buttons */}
-      <div className="absolute bottom-8 left-0 right-0 flex justify-center gap-4 px-4">
-        <button
-          onClick={sendCompliment}
-          className="flex-1 max-w-[150px] py-4 bg-gradient-to-r from-pink-500 to-rose-500 text-white rounded-2xl font-bold text-lg shadow-lg active:scale-95 transition-transform"
+      <div className="absolute bottom-6 left-0 right-0 flex justify-center gap-4 px-4 z-20">
+        {/* Love button */}
+        <motion.button
+          onClick={sendLove}
+          disabled={attackCooldown > 0}
+          className={cn(
+            "flex-1 max-w-[140px] py-5 rounded-2xl font-bold text-lg shadow-xl transition-all relative overflow-hidden",
+            attackCooldown > 0
+              ? "bg-slate-600 text-slate-400"
+              : "bg-gradient-to-br from-pink-500 to-rose-600 text-white active:scale-95"
+          )}
+          whileTap={attackCooldown > 0 ? {} : { scale: 0.95 }}
         >
-          💖 LOVE!
-        </button>
-        <button
+          <span className="text-2xl">💖</span>
+          <div className="text-sm">LOVE!</div>
+          {attackCooldown > 0 && (
+            <div
+              className="absolute bottom-0 left-0 h-1 bg-pink-400"
+              style={{ width: `${(1 - attackCooldown / 0.3) * 100}%` }}
+            />
+          )}
+        </motion.button>
+
+        {/* Shield button */}
+        <motion.button
           onClick={activateShield}
           disabled={shieldCooldown > 0}
           className={cn(
-            "flex-1 max-w-[150px] py-4 rounded-2xl font-bold text-lg shadow-lg transition-all",
-            shieldCooldown > 0 ? "bg-gray-500 text-gray-300" : "bg-blue-500 text-white active:scale-95"
+            "flex-1 max-w-[140px] py-5 rounded-2xl font-bold text-lg shadow-xl transition-all relative overflow-hidden",
+            shieldCooldown > 0
+              ? "bg-slate-600 text-slate-400"
+              : parryWindow
+              ? "bg-gradient-to-br from-yellow-400 to-amber-500 text-white active:scale-95 animate-pulse"
+              : "bg-gradient-to-br from-cyan-500 to-blue-600 text-white active:scale-95"
           )}
+          whileTap={shieldCooldown > 0 ? {} : { scale: 0.95 }}
         >
-          🛡️ {shieldCooldown > 0 ? shieldCooldown : "SHIELD"}
-        </button>
+          <span className="text-2xl">🛡️</span>
+          <div className="text-sm">{shieldCooldown > 0 ? `${Math.ceil(shieldCooldown)}s` : parryWindow ? "PARRY!" : "SHIELD"}</div>
+          {shieldCooldown > 0 && (
+            <div
+              className="absolute bottom-0 left-0 h-1 bg-cyan-400"
+              style={{ width: `${(1 - shieldCooldown / 3) * 100}%` }}
+            />
+          )}
+        </motion.button>
       </div>
 
-      {/* Instructions */}
-      <div className="absolute bottom-28 left-0 right-0 text-center">
-        <p className="text-white/60 text-sm">Tap 💖 to compliment! Use 🛡️ when cat attacks!</p>
+      {/* Phase indicator text */}
+      <div className="absolute bottom-24 left-0 right-0 text-center z-10">
+        <span className={cn(
+          "text-xs font-medium px-3 py-1 rounded-full",
+          bossPhase === "phase3" ? "bg-red-500/30 text-red-300" :
+          bossPhase === "phase2" ? "bg-purple-500/30 text-purple-300" :
+          "bg-slate-500/30 text-slate-400"
+        )}>
+          {bossPhase === "phase3" ? "⚠️ FINAL PHASE" : bossPhase === "phase2" ? "PHASE 2" : "PHASE 1"}
+        </span>
       </div>
     </div>
   );
