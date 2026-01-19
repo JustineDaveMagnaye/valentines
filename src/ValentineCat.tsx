@@ -6132,41 +6132,21 @@ const RejectLettersGame = memo(function RejectLettersGame({ onComplete }: { onCo
 });
 
 // ============================================================================
-// BOSS BATTLE - RHYTHM ACTION STYLE
+// BOSS BATTLE - TAP & SWIPE (Mobile Portrait Optimized)
 // ============================================================================
-// Swipe to dodge attacks, tap rhythm targets to deal damage, complete QTE for special!
+// TAP to attack! SWIPE to dodge! Simple and satisfying!
 
 type BossPhase = "phase1" | "phase2" | "phase3";
-type Lane = "left" | "center" | "right";
+type SwipeDirection = "left" | "right" | "up" | "down";
 
-// Attack coming from the boss - dodge these!
-interface BossProjectile {
+// Incoming attack that requires a swipe to dodge
+interface IncomingAttack {
   id: number;
-  lane: Lane;
-  y: number; // 0 = top, 100 = hit zone
-  speed: number;
-  type: "heart" | "bomb" | "laser";
+  direction: SwipeDirection;
+  timeLeft: number; // seconds until it hits
+  duration: number; // total time
   emoji: string;
   damage: number;
-}
-
-// Targets for player to tap - attacks the boss!
-interface AttackTarget {
-  id: number;
-  lane: Lane;
-  y: number; // 100 = spawn, 0 = hit zone at bottom
-  speed: number;
-  points: number;
-  emoji: string;
-  perfect: boolean;
-}
-
-// QTE button sequence
-interface QTEState {
-  sequence: string[];
-  current: number;
-  timeLeft: number;
-  active: boolean;
 }
 
 
@@ -6178,66 +6158,72 @@ const DramaKingBattle = memo(function DramaKingBattle({ onComplete }: { onComple
   // Boss state
   const [bossHP, setBossHP] = useState(100);
   const [bossPhase, setBossPhase] = useState<BossPhase>("phase1");
-  const [bossEmotion, setBossEmotion] = useState<"smug" | "angry" | "hurt" | "defeated">("smug");
+  const [bossEmotion, setBossEmotion] = useState<"smug" | "angry" | "hurt" | "charging" | "defeated">("smug");
   const [bossMessage, setBossMessage] = useState("");
   const [bossShaking, setBossShaking] = useState(false);
 
   // Player state
   const [playerHP, setPlayerHP] = useState(100);
-  const [playerLane, setPlayerLane] = useState<Lane>("center");
   const [combo, setCombo] = useState(0);
   const [maxCombo, setMaxCombo] = useState(0);
   const [score, setScore] = useState(0);
-  const [perfectCount, setPerfectCount] = useState(0);
+  const [superMeter, setSuperMeter] = useState(0);
 
-  // Game objects
-  const [projectiles, setProjectiles] = useState<BossProjectile[]>([]);
-  const [targets, setTargets] = useState<AttackTarget[]>([]);
-  const [qte, setQte] = useState<QTEState>({ sequence: [], current: 0, timeLeft: 0, active: false });
-  const [qteCharge, setQteCharge] = useState(0);
+  // Attack state - boss attack that player must dodge
+  const [currentAttack, setCurrentAttack] = useState<IncomingAttack | null>(null);
+  const [canTap, setCanTap] = useState(true);
+  const [lastDodgeResult, setLastDodgeResult] = useState<"none" | "perfect" | "good" | "miss">("none");
+
+  // QTE state
+  const [qteSequence, setQteSequence] = useState<string[]>([]);
+  const [qteIndex, setQteIndex] = useState(0);
+  const [qteTimeLeft, setQteTimeLeft] = useState(0);
 
   // Visual effects
   const [particles, setParticles] = useState<Array<{ id: number; x: number; y: number; emoji: string; vx: number; vy: number; life: number }>>([]);
   const [floatingTexts, setFloatingTexts] = useState<Array<{ id: number; x: number; y: number; text: string; color: string }>>([]);
   const [screenShake, setScreenShake] = useState(0);
   const [flashColor, setFlashColor] = useState<string | null>(null);
-  const [playerDodging, setPlayerDodging] = useState(false);
 
   // Refs
   const onCompleteRef = useRef(onComplete);
   const gameEndedRef = useRef(false);
   const bossHPRef = useRef(100);
   const playerHPRef = useRef(100);
-  const playerLaneRef = useRef<Lane>("center");
   const comboRef = useRef(0);
-  const rafRef = useRef(0);
-  const lastSpawnRef = useRef(0);
-  const lastTargetSpawnRef = useRef(0);
-  const touchStartRef = useRef<{ x: number; time: number } | null>(null);
+  const touchStartRef = useRef<{ x: number; y: number; time: number } | null>(null);
+  const lastAttackTimeRef = useRef(0);
 
   // Sync refs
   useEffect(() => { onCompleteRef.current = onComplete; }, [onComplete]);
   useEffect(() => { bossHPRef.current = bossHP; }, [bossHP]);
   useEffect(() => { playerHPRef.current = playerHP; }, [playerHP]);
-  useEffect(() => { playerLaneRef.current = playerLane; }, [playerLane]);
   useEffect(() => { comboRef.current = combo; }, [combo]);
+
+  // Direction arrows
+  const DIRECTION_ARROWS: Record<SwipeDirection, string> = {
+    left: "⬅️",
+    right: "➡️",
+    up: "⬆️",
+    down: "⬇️",
+  };
 
   // Spawn particles helper
   const spawnParticles = useCallback((x: number, y: number, emoji: string, count: number) => {
     const newParticles = Array.from({ length: count }, (_, i) => ({
       id: Date.now() + i + Math.random() * 1000,
       x, y, emoji,
-      vx: (Math.random() - 0.5) * 8,
-      vy: (Math.random() - 0.5) * 8 - 3,
+      vx: (Math.random() - 0.5) * 10,
+      vy: (Math.random() - 0.5) * 10 - 5,
       life: 1,
     }));
     setParticles(prev => [...prev.slice(-20), ...newParticles]);
   }, []);
 
-  // Spawn floating text helper
+  // Spawn floating text
   const spawnText = useCallback((x: number, y: number, text: string, color: string) => {
-    setFloatingTexts(prev => [...prev.slice(-5), { id: Date.now() + Math.random() * 1000, x, y, text, color }]);
-    setTimeout(() => setFloatingTexts(prev => prev.slice(1)), 800);
+    setFloatingTexts(prev => [...prev.slice(-5), { id: Date.now() + Math.random(), x, y, text, color }]);
+    setTimeout(() => setFloatingTexts(prev => prev.slice(1)), 1000);
   }, []);
 
   // Trigger screen shake
@@ -6268,12 +6254,7 @@ const DramaKingBattle = memo(function DramaKingBattle({ onComplete }: { onComple
       comboRef.current = 0;
       setMaxCombo(0);
       setScore(0);
-      setPerfectCount(0);
-      setQteCharge(0);
-      setProjectiles([]);
-      setTargets([]);
-      setPlayerLane("center");
-      playerLaneRef.current = "center";
+      setSuperMeter(0);
       setBossPhase("phase1");
       setBossEmotion("smug");
       setBossMessage("You DARE challenge ME?! 😾");
@@ -6286,299 +6267,220 @@ const DramaKingBattle = memo(function DramaKingBattle({ onComplete }: { onComple
     return () => clearTimeout(timer);
   }, [phase, countdownNum]);
 
-  // Get lane X position
-  const getLaneX = useCallback((lane: Lane) => {
-    return lane === "left" ? 20 : lane === "right" ? 80 : 50;
-  }, []);
+  // Handle player tap attack
+  const handleTapAttack = useCallback(() => {
+    if (phase !== "battle" || gameEndedRef.current || !canTap || currentAttack) return;
 
-  // Main game loop
-  useEffect(() => {
-    if (phase !== "battle") return;
+    // Cooldown between taps
+    setCanTap(false);
+    setTimeout(() => setCanTap(true), 150);
 
-    let lastTime = performance.now();
-    const phaseSettings = {
-      phase1: { spawnRate: 1500, targetRate: 800, speed: 1.0, bombChance: 0.1 },
-      phase2: { spawnRate: 1000, targetRate: 600, speed: 1.4, bombChance: 0.2 },
-      phase3: { spawnRate: 700, targetRate: 500, speed: 1.8, bombChance: 0.3 },
-    };
+    // Deal damage
+    const baseDamage = 2;
+    const comboBonus = Math.floor(comboRef.current / 5);
+    const damage = baseDamage + comboBonus;
 
-    const gameLoop = (currentTime: number) => {
-      const deltaTime = Math.min((currentTime - lastTime) / 1000, 0.1);
-      lastTime = currentTime;
+    soundManager.bossHit();
+    spawnParticles(50, 30, "💖", 3);
+    spawnText(50 + (Math.random() - 0.5) * 20, 35, `${damage}`, "#ff69b4");
 
-      const settings = phaseSettings[bossHPRef.current > 60 ? "phase1" : bossHPRef.current > 30 ? "phase2" : "phase3"];
+    setBossHP(hp => {
+      const newHP = Math.max(0, hp - damage);
+      bossHPRef.current = newHP;
 
-      // Update boss phase based on HP
-      if (bossHPRef.current <= 30 && bossHPRef.current > 0) {
+      // Check for victory
+      if (newHP <= 0 && !gameEndedRef.current) {
+        gameEndedRef.current = true;
+        soundManager.victory();
+        soundManager.stopMusic();
+        setBossEmotion("defeated");
+        setBossMessage("IMPOSSIBLE! 😿💔");
+        spawnParticles(50, 30, "⭐", 15);
+        spawnParticles(50, 30, "✨", 10);
+        setPhase("victory");
+        setTimeout(() => onCompleteRef.current(true), 2500);
+      }
+
+      // Update boss phase
+      if (newHP <= 30 && newHP > 0) {
         setBossPhase("phase3");
-        setBossEmotion("angry");
-      } else if (bossHPRef.current <= 60) {
+      } else if (newHP <= 60) {
         setBossPhase("phase2");
       }
 
-      // Spawn boss projectiles
-      if (currentTime - lastSpawnRef.current > settings.spawnRate) {
-        lastSpawnRef.current = currentTime;
-        const lanes: Lane[] = ["left", "center", "right"];
-        const lane = lanes[Math.floor(Math.random() * 3)];
-        const isBomb = Math.random() < settings.bombChance;
+      return newHP;
+    });
 
-        setProjectiles(prev => [...prev.slice(-15), {
-          id: currentTime + Math.random() * 1000,
-          lane,
-          y: 0,
-          speed: settings.speed * (0.8 + Math.random() * 0.4),
-          type: isBomb ? "bomb" : "heart",
-          emoji: isBomb ? "💣" : ["💕", "💗", "💖"][Math.floor(Math.random() * 3)],
-          damage: isBomb ? 25 : 10,
-        }]);
-      }
+    // Update combo and score
+    setCombo(c => {
+      const newCombo = c + 1;
+      if (newCombo > maxCombo) setMaxCombo(newCombo);
+      return newCombo;
+    });
+    setScore(s => s + damage * 10);
+    setSuperMeter(m => Math.min(100, m + 2));
 
-      // Spawn attack targets
-      if (currentTime - lastTargetSpawnRef.current > settings.targetRate) {
-        lastTargetSpawnRef.current = currentTime;
-        const lanes: Lane[] = ["left", "center", "right"];
-        const lane = lanes[Math.floor(Math.random() * 3)];
+    // Boss reaction
+    if (Math.random() < 0.1) {
+      setBossShaking(true);
+      setTimeout(() => setBossShaking(false), 200);
+      setBossEmotion("hurt");
+      setTimeout(() => setBossEmotion(bossHPRef.current > 30 ? "smug" : "angry"), 300);
+    }
+  }, [phase, canTap, currentAttack, maxCombo, spawnParticles, spawnText]);
 
-        setTargets(prev => [...prev.slice(-10), {
-          id: currentTime + Math.random() * 1000,
-          lane,
-          y: 0,
-          speed: settings.speed * 0.9,
-          points: 10,
-          emoji: ["⭐", "✨", "💫"][Math.floor(Math.random() * 3)],
-          perfect: false,
-        }]);
-      }
+  // Launch boss attack (player must swipe to dodge)
+  const launchBossAttack = useCallback(() => {
+    if (phase !== "battle" || gameEndedRef.current || currentAttack) return;
 
-      // Update projectiles
-      setProjectiles(prev => {
-        const updated = prev.map(p => ({ ...p, y: p.y + p.speed * deltaTime * 60 }));
+    const directions: SwipeDirection[] = ["left", "right", "up", "down"];
+    const direction = directions[Math.floor(Math.random() * directions.length)];
 
-        // Check for hits
-        updated.forEach(p => {
-          if (p.y >= 85 && p.y <= 95 && p.lane === playerLaneRef.current) {
-            // Player got hit!
-            soundManager.hit();
-            setPlayerHP(h => {
-              const newHP = Math.max(0, h - p.damage);
-              playerHPRef.current = newHP;
-              if (newHP <= 0 && !gameEndedRef.current) {
-                gameEndedRef.current = true;
-                soundManager.gameOver();
-                soundManager.stopMusic();
-                setPhase("defeat");
-                setTimeout(() => onCompleteRef.current(false), 2500);
-              }
-              return newHP;
-            });
-            setCombo(0);
-            comboRef.current = 0;
-            setFlashColor("rgba(255, 0, 0, 0.3)");
-            setTimeout(() => setFlashColor(null), 150);
-            triggerShake(10);
-            spawnText(getLaneX(p.lane), 85, "-" + p.damage, "#ff4444");
-            setBossMessage(["Got you! 😼", "Feel my love! 💕", "Can't escape! 😈"][Math.floor(Math.random() * 3)]);
-            setTimeout(() => setBossMessage(""), 1000);
-          }
-        });
+    const phaseSpeed = bossPhase === "phase3" ? 1.2 : bossPhase === "phase2" ? 1.5 : 2.0;
+    const damage = bossPhase === "phase3" ? 20 : bossPhase === "phase2" ? 15 : 10;
 
-        return updated.filter(p => p.y < 100);
-      });
+    soundManager.bossAttack();
+    setBossEmotion("charging");
+    setBossMessage(["Feel my DRAMA! 😾", "TAKE THIS! 💢", "Can't dodge THIS! 😈"][Math.floor(Math.random() * 3)]);
 
-      // Update targets
-      setTargets(prev => {
-        return prev.map(t => {
-          const newY = t.y + t.speed * deltaTime * 60;
-          const isPerfect = newY >= 75 && newY <= 85;
-          return { ...t, y: newY, perfect: isPerfect };
-        }).filter(t => t.y < 95);
-      });
+    setCurrentAttack({
+      id: Date.now(),
+      direction,
+      timeLeft: phaseSpeed,
+      duration: phaseSpeed,
+      emoji: DIRECTION_ARROWS[direction],
+      damage,
+    });
+  }, [phase, currentAttack, bossPhase, DIRECTION_ARROWS]);
 
-      // Update particles
-      setParticles(prev => prev.map(p => ({
-        ...p,
-        x: p.x + p.vx * deltaTime * 60,
-        y: p.y + p.vy * deltaTime * 60,
-        vy: p.vy + deltaTime * 20,
-        life: p.life - deltaTime * 1.5,
-      })).filter(p => p.life > 0));
-
-      rafRef.current = requestAnimationFrame(gameLoop);
-    };
-
-    rafRef.current = requestAnimationFrame(gameLoop);
-    return () => cancelAnimationFrame(rafRef.current);
-  }, [phase, getLaneX, spawnText, triggerShake]);
-
-  // Handle lane tap - both dodge and attack
-  const handleLaneTap = useCallback((lane: Lane) => {
+  // Boss attack timer
+  useEffect(() => {
     if (phase !== "battle" || gameEndedRef.current) return;
 
-    // Move player to lane (dodge)
-    setPlayerLane(lane);
-    playerLaneRef.current = lane;
-    setPlayerDodging(true);
-    setTimeout(() => setPlayerDodging(false), 150);
-
-    // Check for target hits in this lane
-    setTargets(prev => {
-      let hitTarget: AttackTarget | null = null;
-      const remaining = prev.filter(t => {
-        if (t.lane === lane && t.y >= 65 && t.y <= 95) {
-          if (!hitTarget || t.y > hitTarget.y) {
-            hitTarget = t;
-          }
-        }
-        return true;
-      });
-
-      if (hitTarget !== null) {
-        const target = hitTarget as AttackTarget;
-        const isPerfect = target.perfect;
-        const damage = isPerfect ? 8 : 5;
-        const points = isPerfect ? 15 : 10;
-
-        // Deal damage to boss
-        soundManager.bossHit();
-        if (isPerfect) soundManager.criticalHit();
-
-        setBossHP(h => {
-          const newHP = Math.max(0, h - damage);
-          bossHPRef.current = newHP;
-          if (newHP <= 0 && !gameEndedRef.current) {
-            gameEndedRef.current = true;
-            soundManager.victory();
-            soundManager.stopMusic();
-            setBossEmotion("defeated");
-            setBossMessage("IMPOSSIBLE! 😿💔");
-            setPhase("victory");
-            setTimeout(() => onCompleteRef.current(true), 2500);
-          }
-          return newHP;
-        });
-
-        // Update combo and score
-        const newCombo = comboRef.current + 1;
-        setCombo(newCombo);
-        comboRef.current = newCombo;
-        setMaxCombo(m => Math.max(m, newCombo));
-        setScore(s => s + points + Math.floor(newCombo / 5) * 5);
-
-        // Charge QTE meter
-        setQteCharge(c => Math.min(100, c + (isPerfect ? 12 : 8)));
-
-        // Visual feedback
-        const x = getLaneX(lane);
-        spawnParticles(x, 80, isPerfect ? "💥" : "✨", isPerfect ? 5 : 3);
-        spawnText(x, 75, isPerfect ? "PERFECT!" : "GREAT!", isPerfect ? "#FFD700" : "#00FF00");
-
-        if (isPerfect) {
-          setPerfectCount(p => p + 1);
-          setFlashColor("rgba(255, 215, 0, 0.2)");
-          setTimeout(() => setFlashColor(null), 100);
-        }
-
-        // Boss reaction
-        setBossShaking(true);
-        setTimeout(() => setBossShaking(false), 200);
-        setBossEmotion("hurt");
-        setTimeout(() => setBossEmotion(bossHPRef.current > 30 ? "angry" : "angry"), 300);
-
-        if (newCombo % 10 === 0) {
-          setBossMessage(["OW OW OW! 😿", "STOP IT! 😾", "That HURTS! 🙀"][Math.floor(Math.random() * 3)]);
-          setTimeout(() => setBossMessage(""), 1000);
-        }
-
-        return remaining.filter(t => t.id !== target.id);
-      }
-
-      return remaining;
-    });
-  }, [phase, getLaneX, spawnParticles, spawnText]);
-
-  // Handle QTE activation
-  const activateQTE = useCallback(() => {
-    if (qteCharge < 100 || phase !== "battle") return;
-
-    soundManager.specialAttack();
-    setQteCharge(0);
-    const buttons = ["💖", "⭐", "✨", "💕"];
-    const sequence = Array.from({ length: 4 }, () => buttons[Math.floor(Math.random() * buttons.length)]);
-    setQte({ sequence, current: 0, timeLeft: 3, active: true });
-    setPhase("qte");
-  }, [qteCharge, phase]);
-
-  // QTE countdown
-  useEffect(() => {
-    if (phase !== "qte" || !qte.active) return;
+    const attackInterval = bossPhase === "phase3" ? 2000 : bossPhase === "phase2" ? 2500 : 3500;
 
     const timer = setInterval(() => {
-      setQte(prev => {
-        if (prev.timeLeft <= 0.1) {
-          soundManager.damage();
-          setPhase("battle");
-          setBossMessage("Too SLOW! 😼");
-          setTimeout(() => setBossMessage(""), 1000);
-          return { ...prev, active: false, timeLeft: 0 };
-        }
-        return { ...prev, timeLeft: prev.timeLeft - 0.1 };
-      });
-    }, 100);
+      if (!currentAttack && Date.now() - lastAttackTimeRef.current > attackInterval) {
+        lastAttackTimeRef.current = Date.now();
+        launchBossAttack();
+      }
+    }, 500);
 
     return () => clearInterval(timer);
-  }, [phase, qte.active]);
+  }, [phase, bossPhase, currentAttack, launchBossAttack]);
 
-  // Handle QTE button press
-  const handleQTEPress = useCallback((button: string) => {
-    if (!qte.active) return;
+  // Current attack countdown
+  useEffect(() => {
+    if (!currentAttack) return;
 
-    if (qte.sequence[qte.current] === button) {
-      soundManager.collect();
-      if (qte.current === qte.sequence.length - 1) {
-        // QTE Success! Deal massive damage
-        soundManager.specialAttack();
+    const timer = setInterval(() => {
+      setCurrentAttack(prev => {
+        if (!prev) return null;
+        const newTimeLeft = prev.timeLeft - 0.05;
+
+        if (newTimeLeft <= 0) {
+          // Player failed to dodge - take damage!
+          soundManager.damage();
+          setPlayerHP(hp => {
+            const newHP = Math.max(0, hp - prev.damage);
+            playerHPRef.current = newHP;
+            if (newHP <= 0 && !gameEndedRef.current) {
+              gameEndedRef.current = true;
+              soundManager.gameOver();
+              soundManager.stopMusic();
+              setPhase("defeat");
+              setTimeout(() => onCompleteRef.current(false), 2500);
+            }
+            return newHP;
+          });
+          setFlashColor("rgba(255,0,0,0.4)");
+          setTimeout(() => setFlashColor(null), 200);
+          triggerShake(15);
+          setCombo(0);
+          comboRef.current = 0;
+          setLastDodgeResult("miss");
+          spawnText(50, 60, "OUCH! -" + prev.damage, "#ff4444");
+          setBossMessage("Got you! 😼");
+          setBossEmotion("smug");
+          setTimeout(() => setBossMessage(""), 1000);
+          return null;
+        }
+
+        return { ...prev, timeLeft: newTimeLeft };
+      });
+    }, 50);
+
+    return () => clearInterval(timer);
+  }, [currentAttack, triggerShake, spawnText]);
+
+  // Update particles
+  useEffect(() => {
+    if (particles.length === 0) return;
+    const timer = setInterval(() => {
+      setParticles(prev => prev.map(p => ({
+        ...p,
+        x: p.x + p.vx * 0.1,
+        y: p.y + p.vy * 0.1,
+        vy: p.vy + 0.5,
+        life: p.life - 0.03,
+      })).filter(p => p.life > 0));
+    }, 30);
+    return () => clearInterval(timer);
+  }, [particles.length]);
+
+  // Handle swipe to dodge
+  const handleSwipe = useCallback((direction: SwipeDirection) => {
+    if (!currentAttack || phase !== "battle") return;
+
+    if (direction === currentAttack.direction) {
+      // Successful dodge!
+      const timeRatio = currentAttack.timeLeft / currentAttack.duration;
+      const isPerfect = timeRatio < 0.3; // Dodged at last moment
+
+      soundManager.parry();
+      setCurrentAttack(null);
+      setBossEmotion("hurt");
+      setTimeout(() => setBossEmotion(bossHPRef.current > 30 ? "smug" : "angry"), 500);
+
+      if (isPerfect) {
+        // Perfect dodge - counter attack!
         soundManager.criticalHit();
-        const damage = 25;
-        setBossHP(h => {
-          const newHP = Math.max(0, h - damage);
-          bossHPRef.current = newHP;
-          if (newHP <= 0 && !gameEndedRef.current) {
-            gameEndedRef.current = true;
-            soundManager.victory();
-            soundManager.stopMusic();
-            setBossEmotion("defeated");
-            setPhase("victory");
-            setTimeout(() => onCompleteRef.current(true), 2500);
-          }
-          return newHP;
-        });
-        spawnParticles(50, 30, "💥", 10);
+        const counterDamage = 10;
+        setBossHP(hp => Math.max(0, hp - counterDamage));
         spawnParticles(50, 30, "⭐", 8);
-        spawnText(50, 40, "SUPER ATTACK! -25", "#FFD700");
-        triggerShake(15);
-        setBossShaking(true);
-        setTimeout(() => setBossShaking(false), 500);
-        setBossMessage("NOOOO! 😭💔");
-        setTimeout(() => setBossMessage(""), 1500);
-        setQte({ ...qte, active: false });
-        setPhase("battle");
+        spawnText(50, 40, "PERFECT! +" + counterDamage, "#FFD700");
+        setFlashColor("rgba(255,215,0,0.3)");
+        setTimeout(() => setFlashColor(null), 150);
+        setLastDodgeResult("perfect");
+        setCombo(c => c + 5);
+        setSuperMeter(m => Math.min(100, m + 15));
+        setScore(s => s + 500);
+        setBossMessage("WHAT?! 😱");
       } else {
-        setQte(prev => ({ ...prev, current: prev.current + 1 }));
+        // Good dodge
+        spawnParticles(50, 50, "✨", 5);
+        spawnText(50, 50, "DODGED!", "#00ff00");
+        setLastDodgeResult("good");
+        setCombo(c => c + 1);
+        setSuperMeter(m => Math.min(100, m + 5));
+        setScore(s => s + 100);
+        setBossMessage("Tch! 😾");
       }
+      setTimeout(() => {
+        setBossMessage("");
+        setLastDodgeResult("none");
+      }, 1000);
     } else {
-      soundManager.damage();
-      setQte({ ...qte, active: false });
-      setPhase("battle");
-      setBossMessage("WRONG! 😼");
-      setTimeout(() => setBossMessage(""), 1000);
+      // Wrong direction!
+      soundManager.hit();
+      spawnText(50, 50, "WRONG WAY!", "#ff6666");
     }
-  }, [qte, spawnParticles, spawnText, triggerShake]);
+  }, [currentAttack, phase, spawnParticles, spawnText]);
 
-  // Touch/swipe handlers
+  // Touch handlers
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
     const touch = e.touches[0];
-    touchStartRef.current = { x: touch.clientX, time: Date.now() };
+    touchStartRef.current = { x: touch.clientX, y: touch.clientY, time: Date.now() };
   }, []);
 
   const handleTouchEnd = useCallback((e: React.TouchEvent) => {
@@ -6586,60 +6488,117 @@ const DramaKingBattle = memo(function DramaKingBattle({ onComplete }: { onComple
 
     const touch = e.changedTouches[0];
     const dx = touch.clientX - touchStartRef.current.x;
+    const dy = touch.clientY - touchStartRef.current.y;
     const dt = Date.now() - touchStartRef.current.time;
-
-    // Quick tap - attack current lane
-    if (Math.abs(dx) < 30 && dt < 200) {
-      const rect = (e.target as HTMLElement).getBoundingClientRect();
-      const x = touch.clientX - rect.left;
-      const width = rect.width;
-      const lane: Lane = x < width * 0.33 ? "left" : x > width * 0.67 ? "right" : "center";
-      handleLaneTap(lane);
-    }
-    // Swipe - change lane
-    else if (Math.abs(dx) > 50) {
-      const currentLane = playerLaneRef.current;
-      let newLane: Lane = currentLane;
-      if (dx > 0) {
-        newLane = currentLane === "left" ? "center" : currentLane === "center" ? "right" : "right";
-      } else {
-        newLane = currentLane === "right" ? "center" : currentLane === "center" ? "left" : "left";
-      }
-      handleLaneTap(newLane);
-    }
-
     touchStartRef.current = null;
-  }, [handleLaneTap]);
 
+    const minSwipeDistance = 50;
+    const maxTapDistance = 20;
 
+    // Check if it's a swipe
+    if (Math.abs(dx) > minSwipeDistance || Math.abs(dy) > minSwipeDistance) {
+      let direction: SwipeDirection;
+      if (Math.abs(dx) > Math.abs(dy)) {
+        direction = dx > 0 ? "right" : "left";
+      } else {
+        direction = dy > 0 ? "down" : "up";
+      }
+      handleSwipe(direction);
+    }
+    // Check if it's a tap
+    else if (Math.abs(dx) < maxTapDistance && Math.abs(dy) < maxTapDistance && dt < 300) {
+      handleTapAttack();
+    }
+  }, [handleSwipe, handleTapAttack]);
 
-  // Tutorial screen
+  // Activate super attack (QTE)
+  const activateSuper = useCallback(() => {
+    if (superMeter < 100 || phase !== "battle") return;
+
+    soundManager.specialAttack();
+    setSuperMeter(0);
+    const buttons = ["💖", "⭐", "✨", "💕"];
+    const sequence = Array.from({ length: 4 }, () => buttons[Math.floor(Math.random() * 4)]);
+    setQteSequence(sequence);
+    setQteIndex(0);
+    setQteTimeLeft(4);
+    setPhase("qte");
+  }, [superMeter, phase]);
+
+  // QTE countdown
+  useEffect(() => {
+    if (phase !== "qte") return;
+
+    const timer = setInterval(() => {
+      setQteTimeLeft(t => {
+        if (t <= 0.1) {
+          soundManager.damage();
+          setPhase("battle");
+          setBossMessage("Too slow! 😼");
+          setTimeout(() => setBossMessage(""), 1000);
+          return 0;
+        }
+        return t - 0.1;
+      });
+    }, 100);
+
+    return () => clearInterval(timer);
+  }, [phase]);
+
+  // Handle QTE button press
+  const handleQTEPress = useCallback((button: string) => {
+    if (phase !== "qte") return;
+
+    if (qteSequence[qteIndex] === button) {
+      soundManager.collect();
+      if (qteIndex === qteSequence.length - 1) {
+        // QTE Success!
+        soundManager.specialAttack();
+        soundManager.criticalHit();
+        const damage = 30;
+        setBossHP(hp => {
+          const newHP = Math.max(0, hp - damage);
+          bossHPRef.current = newHP;
+          if (newHP <= 0 && !gameEndedRef.current) {
+            gameEndedRef.current = true;
+            soundManager.victory();
+            soundManager.stopMusic();
+            setBossEmotion("defeated");
+            setPhase("victory");
+            setTimeout(() => onCompleteRef.current(true), 2500);
+          }
+          return newHP;
+        });
+        spawnParticles(50, 30, "💥", 15);
+        spawnParticles(50, 30, "⭐", 10);
+        spawnText(50, 35, "SUPER! -" + damage, "#FFD700");
+        triggerShake(20);
+        setBossShaking(true);
+        setTimeout(() => setBossShaking(false), 500);
+        setBossMessage("NOOOOO! 😭");
+        setTimeout(() => setBossMessage(""), 1500);
+        setScore(s => s + 2000);
+        setPhase("battle");
+      } else {
+        setQteIndex(i => i + 1);
+      }
+    } else {
+      soundManager.damage();
+      setPhase("battle");
+      setBossMessage("WRONG! 😼");
+      setTimeout(() => setBossMessage(""), 1000);
+    }
+  }, [phase, qteSequence, qteIndex, spawnParticles, spawnText, triggerShake]);
+
+  // TUTORIAL SCREEN
   if (phase === "tutorial") {
     return (
-      <div className="fixed inset-0 bg-gradient-to-b from-slate-900 via-purple-950 to-slate-900 flex items-center justify-center p-4 overflow-hidden">
-        {/* Animated background */}
-        <div className="absolute inset-0 pointer-events-none overflow-hidden">
-          {Array.from({ length: 8 }).map((_, i) => (
-            <div
-              key={i}
-              className="absolute text-2xl opacity-20"
-              style={{
-                left: `${(i * 12) % 100}%`,
-                animation: `floatDown ${8 + (i % 3)}s linear infinite`,
-                animationDelay: `${i * 0.4}s`,
-              }}
-            >
-              {["💔", "😾", "👑", "⚡"][i % 4]}
-            </div>
-          ))}
-        </div>
-
+      <div className="fixed inset-0 bg-gradient-to-b from-slate-900 via-purple-950 to-slate-900 flex items-center justify-center p-4">
         <motion.div
           initial={{ scale: 0.8, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
           className="bg-slate-800/95 backdrop-blur-xl rounded-3xl p-6 max-w-sm w-full text-center shadow-2xl border-2 border-purple-500/50"
         >
-          {/* Boss preview */}
           <motion.div
             className="text-6xl mb-4"
             animate={{ scale: [1, 1.1, 1], rotate: [0, -5, 5, 0] }}
@@ -6652,31 +6611,38 @@ const DramaKingBattle = memo(function DramaKingBattle({ onComplete }: { onComple
             THE DRAMA KING
           </h2>
           <p className="text-purple-300 text-sm mb-4">
-            "You DARE reject my love?!<br/>
-            <span className="font-bold text-pink-400">FEEL MY WRATH!</span>"
+            "You DARE challenge me?!<br />
+            <span className="font-bold text-pink-400">PROVE YOUR LOVE!</span>"
           </p>
 
-          {/* Controls explanation */}
-          <div className="bg-slate-700/60 rounded-2xl p-4 mb-4 space-y-3">
+          <div className="bg-slate-700/60 rounded-2xl p-4 mb-4 space-y-4">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-red-500/30 rounded-xl flex items-center justify-center text-xl">💕</div>
+              <div className="w-12 h-12 bg-pink-500/30 rounded-xl flex items-center justify-center">
+                <span className="text-2xl">👆</span>
+              </div>
               <div className="text-left">
-                <div className="text-white text-sm font-bold">Dodge Hearts</div>
-                <div className="text-slate-400 text-xs">Tap lanes to move & avoid damage!</div>
+                <div className="text-white text-sm font-bold">TAP to Attack!</div>
+                <div className="text-slate-400 text-xs">Tap anywhere to send love!</div>
               </div>
             </div>
+
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-yellow-500/30 rounded-xl flex items-center justify-center text-xl">⭐</div>
+              <div className="w-12 h-12 bg-cyan-500/30 rounded-xl flex items-center justify-center">
+                <span className="text-2xl">👋</span>
+              </div>
               <div className="text-left">
-                <div className="text-white text-sm font-bold">Hit Targets</div>
-                <div className="text-slate-400 text-xs">Tap when stars reach the zone!</div>
+                <div className="text-white text-sm font-bold">SWIPE to Dodge!</div>
+                <div className="text-slate-400 text-xs">Swipe the direction shown!</div>
               </div>
             </div>
+
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-purple-500/30 rounded-xl flex items-center justify-center text-xl">💥</div>
+              <div className="w-12 h-12 bg-yellow-500/30 rounded-xl flex items-center justify-center">
+                <span className="text-2xl">⚡</span>
+              </div>
               <div className="text-left">
-                <div className="text-white text-sm font-bold">Super Attack</div>
-                <div className="text-slate-400 text-xs">Fill meter, then tap for QTE!</div>
+                <div className="text-white text-sm font-bold">SUPER Attack!</div>
+                <div className="text-slate-400 text-xs">Fill meter for mega damage!</div>
               </div>
             </div>
           </div>
@@ -6687,36 +6653,34 @@ const DramaKingBattle = memo(function DramaKingBattle({ onComplete }: { onComple
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
           >
-            ⚔️ FIGHT! ⚔️
+            FIGHT! ⚔️
           </motion.button>
         </motion.div>
       </div>
     );
   }
 
-  // Countdown screen
+  // COUNTDOWN SCREEN
   if (phase === "countdown") {
     return (
       <div className="fixed inset-0 bg-gradient-to-b from-slate-900 via-purple-950 to-slate-900 flex items-center justify-center">
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={countdownNum}
-            initial={{ scale: 0, rotate: -180 }}
-            animate={{ scale: 1, rotate: 0 }}
-            exit={{ scale: 2, opacity: 0 }}
-            className="text-[120px] font-black text-white drop-shadow-2xl"
-          >
-            {countdownNum || "FIGHT!"}
-          </motion.div>
-        </AnimatePresence>
+        <motion.div
+          key={countdownNum}
+          initial={{ scale: 0, rotate: -180 }}
+          animate={{ scale: 1, rotate: 0 }}
+          exit={{ scale: 2, opacity: 0 }}
+          className="text-[120px] font-black text-white drop-shadow-2xl"
+        >
+          {countdownNum || "FIGHT!"}
+        </motion.div>
       </div>
     );
   }
 
-  // Victory screen
+  // VICTORY SCREEN
   if (phase === "victory") {
     return (
-      <div className="fixed inset-0 bg-gradient-to-b from-yellow-400 via-pink-500 to-purple-600 flex items-center justify-center p-4">
+      <div className="fixed inset-0 bg-gradient-to-b from-yellow-500 via-pink-500 to-purple-600 flex items-center justify-center p-4">
         <motion.div
           initial={{ scale: 0 }}
           animate={{ scale: 1 }}
@@ -6732,21 +6696,17 @@ const DramaKingBattle = memo(function DramaKingBattle({ onComplete }: { onComple
           <h2 className="text-3xl font-black bg-gradient-to-r from-yellow-500 to-pink-500 bg-clip-text text-transparent mb-4">
             VICTORY!
           </h2>
-          <div className="space-y-2 text-slate-600">
+          <p className="text-slate-600 mb-2">"Fine... I accept your love... 💕"</p>
+          <div className="space-y-1 text-slate-500">
             <p>Score: <span className="font-bold text-pink-500">{score}</span></p>
             <p>Max Combo: <span className="font-bold text-purple-500">{maxCombo}</span></p>
-            <p>Perfect Hits: <span className="font-bold text-yellow-500">{perfectCount}</span></p>
-          </div>
-
-          <div className="text-sm text-slate-500">
-            The Drama King has been defeated!
           </div>
         </motion.div>
       </div>
     );
   }
 
-  // Defeat screen
+  // DEFEAT SCREEN
   if (phase === "defeat") {
     return (
       <div className="fixed inset-0 bg-gradient-to-b from-slate-900 via-red-950 to-slate-900 flex items-center justify-center p-4">
@@ -6755,23 +6715,23 @@ const DramaKingBattle = memo(function DramaKingBattle({ onComplete }: { onComple
           animate={{ scale: 1 }}
           className="bg-slate-800/95 backdrop-blur-xl rounded-3xl p-8 max-w-sm w-full text-center shadow-2xl border-2 border-red-500/50"
         >
-          <motion.div className="text-6xl mb-4">😿💔</motion.div>
+          <div className="text-6xl mb-4">😿💔</div>
           <h2 className="text-3xl font-black text-red-400 mb-4">DEFEATED...</h2>
-          <p className="text-slate-400 mb-4">The Drama King wins this round!</p>
+          <p className="text-slate-400 mb-2">"I KNEW you couldn't handle my drama!" 👑</p>
           <p className="text-slate-500">Score: {score}</p>
         </motion.div>
       </div>
     );
   }
 
-  // QTE screen overlay
+  // QTE SCREEN
   if (phase === "qte") {
     return (
-      <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
+      <div className="fixed inset-0 bg-black/90 flex items-center justify-center z-50 p-4">
         <motion.div
           initial={{ scale: 0.5, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
-          className="bg-gradient-to-br from-purple-900 to-pink-900 rounded-3xl p-8 text-center"
+          className="bg-gradient-to-br from-purple-900 to-pink-900 rounded-3xl p-6 text-center w-full max-w-sm"
         >
           <h3 className="text-2xl font-bold text-white mb-4">SUPER ATTACK!</h3>
 
@@ -6779,21 +6739,19 @@ const DramaKingBattle = memo(function DramaKingBattle({ onComplete }: { onComple
           <div className="w-full h-3 bg-slate-700 rounded-full mb-6 overflow-hidden">
             <motion.div
               className="h-full bg-gradient-to-r from-yellow-400 to-red-500"
-              style={{ width: `${(qte.timeLeft / 3) * 100}%` }}
+              style={{ width: `${(qteTimeLeft / 4) * 100}%` }}
             />
           </div>
 
           {/* Sequence display */}
-          <div className="flex justify-center gap-3 mb-6">
-            {qte.sequence.map((btn, i) => (
+          <div className="flex justify-center gap-2 mb-6">
+            {qteSequence.map((btn, i) => (
               <motion.div
                 key={i}
                 className={cn(
-                  "w-14 h-14 rounded-xl flex items-center justify-center text-2xl",
-                  i < qte.current ? "bg-green-500" : i === qte.current ? "bg-yellow-400 animate-pulse" : "bg-slate-600"
+                  "w-12 h-12 rounded-xl flex items-center justify-center text-2xl",
+                  i < qteIndex ? "bg-green-500" : i === qteIndex ? "bg-yellow-400 animate-pulse" : "bg-slate-600"
                 )}
-                animate={i === qte.current ? { scale: [1, 1.1, 1] } : {}}
-                transition={{ duration: 0.3, repeat: Infinity }}
               >
                 {btn}
               </motion.div>
@@ -6801,12 +6759,12 @@ const DramaKingBattle = memo(function DramaKingBattle({ onComplete }: { onComple
           </div>
 
           {/* Input buttons */}
-          <div className="flex justify-center gap-3">
+          <div className="grid grid-cols-4 gap-2">
             {["💖", "⭐", "✨", "💕"].map(btn => (
               <motion.button
                 key={btn}
                 onClick={() => handleQTEPress(btn)}
-                className="w-16 h-16 bg-gradient-to-br from-pink-500 to-purple-600 rounded-xl text-3xl shadow-lg active:scale-95"
+                className="h-16 bg-gradient-to-br from-pink-500 to-purple-600 rounded-xl text-2xl shadow-lg active:scale-95"
                 whileTap={{ scale: 0.9 }}
               >
                 {btn}
@@ -6818,10 +6776,10 @@ const DramaKingBattle = memo(function DramaKingBattle({ onComplete }: { onComple
     );
   }
 
-  // Main battle screen
+  // MAIN BATTLE SCREEN
   return (
     <div
-      className="fixed inset-0 bg-gradient-to-b from-slate-900 via-purple-950 to-slate-900 overflow-hidden touch-none select-none"
+      className="fixed inset-0 bg-gradient-to-b from-slate-900 via-purple-950 to-slate-900 overflow-hidden select-none"
       style={{
         transform: screenShake ? `translate(${(Math.random() - 0.5) * screenShake}px, ${(Math.random() - 0.5) * screenShake}px)` : undefined,
       }}
@@ -6833,11 +6791,11 @@ const DramaKingBattle = memo(function DramaKingBattle({ onComplete }: { onComple
         <div className="absolute inset-0 z-50 pointer-events-none" style={{ backgroundColor: flashColor }} />
       )}
 
-      {/* Top HUD - HP bars and score */}
+      {/* HP Bars - Top */}
       <div className="absolute top-4 left-4 right-4 z-30 space-y-2">
         {/* Boss HP */}
         <div className="flex items-center gap-2">
-          <span className="text-xl">👑</span>
+          <span className="text-lg">👑</span>
           <div className="flex-1 h-4 bg-slate-800 rounded-full overflow-hidden border border-slate-600">
             <motion.div
               className={cn(
@@ -6854,7 +6812,7 @@ const DramaKingBattle = memo(function DramaKingBattle({ onComplete }: { onComple
 
         {/* Player HP */}
         <div className="flex items-center gap-2">
-          <span className="text-xl">💖</span>
+          <span className="text-lg">💖</span>
           <div className="flex-1 h-4 bg-slate-800 rounded-full overflow-hidden border border-slate-600">
             <div
               className="h-full bg-gradient-to-r from-pink-500 to-rose-500 transition-all duration-200"
@@ -6864,9 +6822,9 @@ const DramaKingBattle = memo(function DramaKingBattle({ onComplete }: { onComple
           <span className="text-white text-xs font-bold w-8">{Math.ceil(playerHP)}%</span>
         </div>
 
-        {/* Score and combo */}
+        {/* Score and Combo */}
         <div className="flex justify-between items-center">
-          <span className="text-white text-sm font-bold">Score: {score}</span>
+          <span className="text-white text-sm">Score: {score}</span>
           {combo > 0 && (
             <motion.span
               key={combo}
@@ -6874,124 +6832,107 @@ const DramaKingBattle = memo(function DramaKingBattle({ onComplete }: { onComple
               animate={{ scale: 1 }}
               className={cn(
                 "font-bold text-sm",
-                combo >= 10 ? "text-yellow-400" : combo >= 5 ? "text-pink-400" : "text-purple-400"
+                combo >= 20 ? "text-yellow-400" : combo >= 10 ? "text-pink-400" : "text-purple-400"
               )}
             >
-              {combo} COMBO! {combo >= 10 ? "🔥" : ""}
+              {combo} COMBO! {combo >= 20 ? "🔥🔥" : combo >= 10 ? "🔥" : ""}
             </motion.span>
           )}
         </div>
       </div>
 
-      {/* Boss area */}
-      <div className="absolute top-28 left-1/2 -translate-x-1/2 flex flex-col items-center z-20">
+      {/* Boss Area - Center */}
+      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 flex flex-col items-center z-20">
         <motion.div
-          className="text-6xl"
-          animate={bossShaking ? { x: [-5, 5, -5, 5, 0] } : { y: [0, -5, 0] }}
-          transition={{ duration: bossShaking ? 0.2 : 1.5, repeat: bossShaking ? 0 : Infinity }}
+          className="text-7xl text-center"
+          animate={bossShaking ? { x: [-10, 10, -10, 10, 0] } : { y: [0, -8, 0] }}
+          transition={{ duration: bossShaking ? 0.3 : 2, repeat: bossShaking ? 0 : Infinity }}
         >
-          👑
-          <br />
-          {bossEmotion === "defeated" ? "😵" : bossEmotion === "hurt" ? "😿" : bossEmotion === "angry" ? "😾" : "😼"}
+          <div className="text-4xl">👑</div>
+          <div>
+            {bossEmotion === "defeated" ? "😵" :
+             bossEmotion === "hurt" ? "😿" :
+             bossEmotion === "charging" ? "😈" :
+             bossEmotion === "angry" ? "😾" : "😼"}
+          </div>
         </motion.div>
 
+        {/* Boss message */}
         {bossMessage && (
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            className="mt-2 px-3 py-1 bg-slate-800/90 rounded-lg border border-purple-500/50"
+            className="mt-3 px-4 py-2 bg-slate-800/90 rounded-xl border border-purple-500/50"
           >
-            <p className="text-purple-200 text-sm">{bossMessage}</p>
+            <p className="text-purple-200 text-sm font-medium">{bossMessage}</p>
           </motion.div>
         )}
+
+        {/* Phase indicator */}
+        <div className="mt-2">
+          <span className={cn(
+            "text-xs font-medium px-3 py-1 rounded-full",
+            bossPhase === "phase3" ? "bg-red-500/30 text-red-300" :
+            bossPhase === "phase2" ? "bg-purple-500/30 text-purple-300" :
+            "bg-slate-500/30 text-slate-400"
+          )}>
+            {bossPhase === "phase3" ? "⚠️ FINAL PHASE" : bossPhase === "phase2" ? "PHASE 2" : "PHASE 1"}
+          </span>
+        </div>
       </div>
 
-      {/* Three lane game area */}
-      <div className="absolute inset-x-0 top-1/3 bottom-32 z-10">
-        {/* Lane dividers */}
-        <div className="absolute inset-0 flex">
-          <div className="flex-1 border-r border-slate-700/50" />
-          <div className="flex-1 border-r border-slate-700/50" />
-          <div className="flex-1" />
-        </div>
-
-        {/* Hit zone indicator */}
-        <div className="absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-purple-500/30 to-transparent border-t-2 border-purple-500/50">
-          <div className="text-center text-purple-300 text-xs mt-1">TAP ZONE</div>
-        </div>
-
-        {/* Perfect zone indicator */}
-        <div className="absolute bottom-12 left-0 right-0 h-8 border-t border-b border-yellow-500/30 bg-yellow-500/10">
-          <div className="text-center text-yellow-300/50 text-[10px]">PERFECT</div>
-        </div>
-
-        {/* Boss projectiles (dodge these) */}
-        {projectiles.map(p => (
-          <motion.div
-            key={p.id}
-            className="absolute text-3xl pointer-events-none"
-            style={{
-              left: `${getLaneX(p.lane)}%`,
-              top: `${p.y}%`,
-              transform: "translateX(-50%)",
-            }}
-          >
-            {p.emoji}
-          </motion.div>
-        ))}
-
-        {/* Attack targets (tap these) */}
-        {targets.map(t => (
-          <motion.div
-            key={t.id}
-            className={cn(
-              "absolute text-2xl pointer-events-none",
-              t.perfect && "scale-125"
-            )}
-            style={{
-              left: `${getLaneX(t.lane)}%`,
-              top: `${t.y}%`,
-              transform: "translateX(-50%)",
-            }}
-          >
-            {t.emoji}
-          </motion.div>
-        ))}
-
-        {/* Player position indicator */}
+      {/* Attack Warning - Center */}
+      {currentAttack && (
         <motion.div
-          className="absolute bottom-2 text-4xl"
-          animate={{ x: playerDodging ? [-10, 10, 0] : 0 }}
-          transition={{ duration: 0.1 }}
-          style={{
-            left: `${getLaneX(playerLane)}%`,
-            transform: "translateX(-50%)",
-          }}
+          initial={{ scale: 0, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-40"
         >
-          💝
+          <motion.div
+            className="text-center"
+            animate={{ scale: [1, 1.2, 1] }}
+            transition={{ duration: 0.3, repeat: Infinity }}
+          >
+            <div className="text-8xl mb-2">{currentAttack.emoji}</div>
+            <div className="text-white font-bold text-lg">SWIPE {currentAttack.direction.toUpperCase()}!</div>
+            <div className="w-32 h-2 bg-slate-700 rounded-full mt-2 mx-auto overflow-hidden">
+              <motion.div
+                className="h-full bg-gradient-to-r from-red-500 to-yellow-500"
+                style={{ width: `${(currentAttack.timeLeft / currentAttack.duration) * 100}%` }}
+              />
+            </div>
+          </motion.div>
         </motion.div>
-      </div>
+      )}
 
-      {/* Lane tap buttons */}
-      <div className="absolute inset-x-0 top-1/3 bottom-32 flex z-20">
-        {(["left", "center", "right"] as Lane[]).map(lane => (
-          <button
-            key={lane}
-            className="flex-1 active:bg-white/10"
-            onClick={() => handleLaneTap(lane)}
-          />
-        ))}
-      </div>
+      {/* Dodge result feedback */}
+      {lastDodgeResult !== "none" && (
+        <motion.div
+          initial={{ scale: 0 }}
+          animate={{ scale: 1 }}
+          className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-30 pointer-events-none"
+        >
+          <span className={cn(
+            "text-4xl font-black",
+            lastDodgeResult === "perfect" ? "text-yellow-400" :
+            lastDodgeResult === "good" ? "text-green-400" : "text-red-400"
+          )}>
+            {lastDodgeResult === "perfect" ? "PERFECT! ⭐" :
+             lastDodgeResult === "good" ? "DODGED! ✨" : "OUCH! 💔"}
+          </span>
+        </motion.div>
+      )}
 
       {/* Floating texts */}
       <AnimatePresence>
         {floatingTexts.map(t => (
           <motion.div
             key={t.id}
-            initial={{ opacity: 0, y: 0, scale: 0.5 }}
-            animate={{ opacity: 1, y: -30, scale: 1 }}
+            initial={{ opacity: 1, y: 0 }}
+            animate={{ opacity: 0, y: -50 }}
             exit={{ opacity: 0 }}
-            className="absolute font-black pointer-events-none z-40"
+            transition={{ duration: 1 }}
+            className="absolute font-black text-xl pointer-events-none z-40"
             style={{ left: `${t.x}%`, top: `${t.y}%`, color: t.color, transform: "translateX(-50%)" }}
           >
             {t.text}
@@ -7003,49 +6944,48 @@ const DramaKingBattle = memo(function DramaKingBattle({ onComplete }: { onComple
       {particles.map(p => (
         <div
           key={p.id}
-          className="absolute text-xl pointer-events-none z-30"
-          style={{ left: `${p.x}%`, top: `${p.y}%`, opacity: p.life }}
+          className="absolute text-2xl pointer-events-none z-30"
+          style={{ left: `${p.x}%`, top: `${p.y}%`, opacity: p.life, transform: "translate(-50%, -50%)" }}
         >
           {p.emoji}
         </div>
       ))}
 
-      {/* Bottom HUD - QTE meter and controls */}
-      <div className="absolute bottom-4 left-4 right-4 z-30">
-        {/* QTE charge meter */}
+      {/* Bottom Area - Tap hint and Super meter */}
+      <div className="absolute bottom-0 left-0 right-0 p-4 z-30">
+        {/* Super meter */}
         <div className="mb-3">
-          <div className="flex items-center gap-2 mb-1">
-            <span className="text-xs text-purple-300">SUPER</span>
-            <div className="flex-1 h-3 bg-slate-800 rounded-full overflow-hidden border border-purple-500/50">
+          <div className="flex items-center gap-2">
+            <span className="text-yellow-400 text-sm font-bold">SUPER</span>
+            <div className="flex-1 h-4 bg-slate-800 rounded-full overflow-hidden border border-yellow-500/50">
               <motion.div
-                className="h-full bg-gradient-to-r from-purple-500 to-pink-500"
-                style={{ width: `${qteCharge}%` }}
+                className="h-full bg-gradient-to-r from-yellow-500 to-orange-500"
+                style={{ width: `${superMeter}%` }}
               />
             </div>
-            {qteCharge >= 100 && (
+            {superMeter >= 100 && (
               <motion.button
-                onClick={activateQTE}
-                className="px-3 py-1 bg-gradient-to-r from-yellow-400 to-orange-500 rounded-full text-xs font-bold text-white"
+                onClick={activateSuper}
+                className="px-4 py-2 bg-gradient-to-r from-yellow-400 to-orange-500 rounded-full font-bold text-white text-sm shadow-lg"
                 animate={{ scale: [1, 1.1, 1] }}
                 transition={{ duration: 0.5, repeat: Infinity }}
               >
-                💥 GO!
+                ⚡ GO!
               </motion.button>
             )}
           </div>
         </div>
 
-        {/* Phase indicator */}
-        <div className="text-center">
-          <span className={cn(
-            "text-xs font-medium px-3 py-1 rounded-full",
-            bossPhase === "phase3" ? "bg-red-500/30 text-red-300" :
-            bossPhase === "phase2" ? "bg-purple-500/30 text-purple-300" :
-            "bg-slate-500/30 text-slate-400"
-          )}>
-            {bossPhase === "phase3" ? "⚠️ FINAL PHASE" : bossPhase === "phase2" ? "PHASE 2" : "PHASE 1"}
-          </span>
-        </div>
+        {/* Tap hint */}
+        {!currentAttack && (
+          <motion.div
+            className="text-center text-slate-400 text-sm"
+            animate={{ opacity: [0.5, 1, 0.5] }}
+            transition={{ duration: 1.5, repeat: Infinity }}
+          >
+            👆 TAP to attack! 👆
+          </motion.div>
+        )}
       </div>
     </div>
   );
