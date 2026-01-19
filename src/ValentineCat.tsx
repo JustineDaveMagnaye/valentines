@@ -6131,529 +6131,237 @@ const RejectLettersGame = memo(function RejectLettersGame({ onComplete }: { onCo
   );
 });
 
-// BOSS BATTLE - ULTIMATE EDITION with Enhanced Mechanics
-type BossAttackType = "drama_bomb" | "tantrum_wave" | "guilt_trip" | "love_laser" | "ultimate_meow" | "heart_rain" | "jealousy_spiral" | "attention_beam" | "cuddle_crush" | "rest";
-type BossPhaseType = "phase1" | "phase2" | "phase3" | "rage";
+// ============================================================================
+// BOSS BATTLE - RHYTHM ACTION STYLE
+// ============================================================================
+// Swipe to dodge attacks, tap rhythm targets to deal damage, complete QTE for special!
 
-// Enhanced boss attacks with more variety
-const BOSS_ATTACKS: Record<BossAttackType, { name: string; emoji: string; damage: number; chargeTime: number; warning: string; special?: string }> = {
-  drama_bomb: { name: "Drama Bomb!", emoji: "💣", damage: 8, chargeTime: 1200, warning: "💥" },
-  tantrum_wave: { name: "Tantrum Wave!", emoji: "🌊", damage: 6, chargeTime: 1000, warning: "〰️" },
-  guilt_trip: { name: "Guilt Trip!", emoji: "😿", damage: 10, chargeTime: 1400, warning: "💔", special: "slow" },
-  love_laser: { name: "Love Laser!", emoji: "💘", damage: 12, chargeTime: 1800, warning: "⚡", special: "pierce" },
-  ultimate_meow: { name: "ULTIMATE MEOW!", emoji: "🔊", damage: 20, chargeTime: 2500, warning: "☠️", special: "stun" },
-  heart_rain: { name: "Heart Rain!", emoji: "💕", damage: 4, chargeTime: 800, warning: "🌧️", special: "multi" },
-  jealousy_spiral: { name: "Jealousy Spiral!", emoji: "💚", damage: 8, chargeTime: 1300, warning: "🌀", special: "dot" },
-  attention_beam: { name: "LOOK AT ME!", emoji: "👁️", damage: 12, chargeTime: 2000, warning: "👀", special: "track" },
-  cuddle_crush: { name: "Cuddle Crush!", emoji: "🤗", damage: 15, chargeTime: 2200, warning: "💪", special: "grab" },
-  rest: { name: "", emoji: "", damage: 0, chargeTime: 0, warning: "" },
-};
+type BossPhase = "phase1" | "phase2" | "phase3";
+type Lane = "left" | "center" | "right";
 
-// Boss taunts during battle
-const BOSS_TAUNTS = [
-  "You call that love?! 😾", "PATHETIC! 😤", "I've seen better! 🙀",
-  "Is that ALL?! 😼", "TRY HARDER! 💢", "WEAK! 😾",
-  "My grandma hits harder! 👵", "BORING! 😴", "YAWN! 🥱"
-];
+// Attack coming from the boss - dodge these!
+interface BossProjectile {
+  id: number;
+  lane: Lane;
+  y: number; // 0 = top, 100 = hit zone
+  speed: number;
+  type: "heart" | "bomb" | "laser";
+  emoji: string;
+  damage: number;
+}
 
-const RAGE_TAUNTS = [
-  "NOW YOU'VE DONE IT! 🔥", "MAXIMUM DRAMA! 💥", "FEEL MY WRATH! ⚡",
-  "I AM UNSTOPPABLE! 👿", "THIS ISN'T EVEN MY FINAL FORM! 😈"
-];
+// Targets for player to tap - attacks the boss!
+interface AttackTarget {
+  id: number;
+  lane: Lane;
+  y: number; // 100 = spawn, 0 = hit zone at bottom
+  speed: number;
+  points: number;
+  emoji: string;
+  perfect: boolean;
+}
 
-const PARRY_MESSAGES = ["PERFECT! ✨", "DEFLECTED! 🛡️", "COUNTERED! 💫", "PARRIED! 🌟", "REFLECTED! ⚡"];
-const CRITICAL_MESSAGES = ["CRITICAL! 💥", "SUPER! ⭐", "DEVASTATING! 🔥", "MASSIVE! 💪"];
+// QTE button sequence
+interface QTEState {
+  sequence: string[];
+  current: number;
+  timeLeft: number;
+  active: boolean;
+}
 
-const LOVE_ATTACKS = [
-  { text: "You're purrfect! 💕", damage: 8, crit: 18 },
-  { text: "So fluffy! ✨", damage: 7, crit: 16 },
-  { text: "Best cat ever! 💖", damage: 8, crit: 17 },
-  { text: "I love you! 😻", damage: 10, crit: 22 },
-  { text: "Cutest kitty! 🌟", damage: 7, crit: 16 },
-  { text: "My favorite! 💝", damage: 8, crit: 18 },
-  { text: "So precious! 🥰", damage: 8, crit: 17 },
-  { text: "Adorable! 💗", damage: 7, crit: 16 },
-  { text: "SUPER LOVE! 💖✨", damage: 12, crit: 25 },
-  { text: "Maximum cuddles! 🤗", damage: 10, crit: 20 },
-];
 
 const DramaKingBattle = memo(function DramaKingBattle({ onComplete }: { onComplete: (won: boolean) => void }) {
-  const [phase, setPhase] = useState<"tutorial" | "countdown" | "battle" | "victory" | "defeat">("tutorial");
+  // Game phase
+  const [phase, setPhase] = useState<"tutorial" | "countdown" | "battle" | "qte" | "victory" | "defeat">("tutorial");
   const [countdownNum, setCountdownNum] = useState(3);
 
-  // Boss state - balanced: 100 HP
+  // Boss state
   const [bossHP, setBossHP] = useState(100);
-  const [bossMaxHP] = useState(100);
-  const [bossPhase, setBossPhase] = useState<BossPhaseType>("phase1");
-  const [bossAction, setBossAction] = useState<"idle" | "charging" | "attacking" | "stunned" | "enraged" | "healing">("idle");
-  const [currentAttack, setCurrentAttack] = useState<BossAttackType>("rest");
-  const [bossEmotion, setBossEmotion] = useState<"smug" | "angry" | "charging" | "hurt" | "defeated" | "rage">("smug");
-  const [attackQueue, setAttackQueue] = useState<BossAttackType[]>([]);
+  const [bossPhase, setBossPhase] = useState<BossPhase>("phase1");
+  const [bossEmotion, setBossEmotion] = useState<"smug" | "angry" | "hurt" | "defeated">("smug");
   const [bossMessage, setBossMessage] = useState("");
+  const [bossShaking, setBossShaking] = useState(false);
 
   // Player state
   const [playerHP, setPlayerHP] = useState(100);
-  const [playerMaxHP] = useState(100);
+  const [playerLane, setPlayerLane] = useState<Lane>("center");
   const [combo, setCombo] = useState(0);
   const [maxCombo, setMaxCombo] = useState(0);
-  const [totalDamageDealt, setTotalDamageDealt] = useState(0);
-  const [perfectParries, setPerfectParries] = useState(0);
-  const [loveSent, setLoveSent] = useState(0);
-  const [criticalHits, setCriticalHits] = useState(0);
-  const [dodges, setDodges] = useState(0);
+  const [score, setScore] = useState(0);
+  const [perfectCount, setPerfectCount] = useState(0);
 
-  // Battle mechanics
-  const [shieldActive, setShieldActive] = useState(false);
-  const [shieldCooldown, setShieldCooldown] = useState(0);
-  const [parryWindow, setParryWindow] = useState(false);
-  const [parrySuccess, setParrySuccess] = useState(false);
-  const [attackCooldown, setAttackCooldown] = useState(0);
-  const [chargeProgress, setChargeProgress] = useState(0);
-  const [specialCooldown, setSpecialCooldown] = useState(0);
-  const [specialReady, setSpecialReady] = useState(false);
-  const [playerStunned, setPlayerStunned] = useState(false);
-  const [playerSlowed, setPlayerSlowed] = useState(false);
-  const [dotDamage, setDotDamage] = useState(0);
-
-  // Projectiles for multi-hit attacks
-  const [projectiles, setProjectiles] = useState<Array<{
-    id: number;
-    x: number;
-    y: number;
-    vx: number;
-    vy: number;
-    type: string;
-    damage: number;
-  }>>([]);
+  // Game objects
+  const [projectiles, setProjectiles] = useState<BossProjectile[]>([]);
+  const [targets, setTargets] = useState<AttackTarget[]>([]);
+  const [qte, setQte] = useState<QTEState>({ sequence: [], current: 0, timeLeft: 0, active: false });
+  const [qteCharge, setQteCharge] = useState(0);
 
   // Visual effects
+  const [particles, setParticles] = useState<Array<{ id: number; x: number; y: number; emoji: string; vx: number; vy: number; life: number }>>([]);
+  const [floatingTexts, setFloatingTexts] = useState<Array<{ id: number; x: number; y: number; text: string; color: string }>>([]);
   const [screenShake, setScreenShake] = useState(0);
-  const [hitFlash, setHitFlash] = useState<"none" | "player" | "boss" | "crit">("none");
-  const [particles, setParticles] = useState<Array<{
-    id: number;
-    x: number;
-    y: number;
-    vx: number;
-    vy: number;
-    type: "heart" | "star" | "spark" | "drama" | "crown" | "shield" | "heal" | "fire" | "poison";
-    life: number;
-    size: number;
-    color: string;
-    rotation: number;
-  }>>([]);
-  const [floatingTexts, setFloatingTexts] = useState<Array<{
-    id: number;
-    x: number;
-    y: number;
-    text: string;
-    color: string;
-    size: "sm" | "md" | "lg" | "xl";
-  }>>([]);
-  const [scorePopups, setScorePopups] = useState<Array<{
-    id: number;
-    x: number;
-    y: number;
-    value: number;
-    type: "damage" | "parry" | "combo" | "heal" | "crit";
-  }>>([]);
+  const [flashColor, setFlashColor] = useState<string | null>(null);
+  const [playerDodging, setPlayerDodging] = useState(false);
 
-  // Background effects
-  const [bgIntensity, setBgIntensity] = useState(0);
-  const [lightning, setLightning] = useState(false);
-  const [rageMode, setRageMode] = useState(false);
-  const [battleTime, setBattleTime] = useState(0);
-
-  // Refs for smooth animations
+  // Refs
   const onCompleteRef = useRef(onComplete);
   const gameEndedRef = useRef(false);
   const bossHPRef = useRef(100);
   const playerHPRef = useRef(100);
+  const playerLaneRef = useRef<Lane>("center");
   const comboRef = useRef(0);
-  const shieldActiveRef = useRef(false);
-  const parryWindowRef = useRef(false);
-  const lastAttackTime = useRef(0);
-  const rafRef = useRef<number>(0);
-  const bossPhaseRef = useRef<BossPhaseType>("phase1");
+  const rafRef = useRef(0);
+  const lastSpawnRef = useRef(0);
+  const lastTargetSpawnRef = useRef(0);
+  const touchStartRef = useRef<{ x: number; time: number } | null>(null);
 
+  // Sync refs
   useEffect(() => { onCompleteRef.current = onComplete; }, [onComplete]);
   useEffect(() => { bossHPRef.current = bossHP; }, [bossHP]);
   useEffect(() => { playerHPRef.current = playerHP; }, [playerHP]);
+  useEffect(() => { playerLaneRef.current = playerLane; }, [playerLane]);
   useEffect(() => { comboRef.current = combo; }, [combo]);
-  useEffect(() => { shieldActiveRef.current = shieldActive; }, [shieldActive]);
-  useEffect(() => { parryWindowRef.current = parryWindow; }, [parryWindow]);
-  useEffect(() => { bossPhaseRef.current = bossPhase; }, [bossPhase]);
 
-  // Spawn particles helper - enhanced with more types
-  const spawnParticles = useCallback((
-    x: number, y: number,
-    type: "heart" | "star" | "spark" | "drama" | "crown" | "shield" | "heal" | "fire" | "poison",
-    count: number,
-    spread: number = 1
-  ) => {
-    const colors: Record<string, string[]> = {
-      heart: ["#ff6b9d", "#ff4081", "#e91e63", "#f48fb1"],
-      star: ["#ffd700", "#ffeb3b", "#ffc107", "#ff9800"],
-      spark: ["#00bcd4", "#03a9f4", "#2196f3", "#3f51b5"],
-      drama: ["#9c27b0", "#673ab7", "#7c4dff", "#e040fb"],
-      crown: ["#ffd700", "#ffb300", "#ff8f00", "#ff6f00"],
-      shield: ["#4fc3f7", "#29b6f6", "#03a9f4", "#0288d1"],
-      heal: ["#66bb6a", "#4caf50", "#43a047", "#2e7d32"],
-      fire: ["#ff5722", "#ff9800", "#ffeb3b", "#f44336"],
-      poison: ["#4caf50", "#8bc34a", "#cddc39", "#00e676"],
-    };
-    const newParticles = Array.from({ length: Math.min(count, 5) }, (_, i) => ({
-      id: performance.now() + i + Math.random() * 1000,
-      x, y,
-      vx: (Math.random() - 0.5) * 12 * spread,
-      vy: (Math.random() - 0.5) * 12 * spread - 3,
-      type,
+  // Spawn particles helper
+  const spawnParticles = useCallback((x: number, y: number, emoji: string, count: number) => {
+    const newParticles = Array.from({ length: count }, (_, i) => ({
+      id: Date.now() + i + Math.random() * 1000,
+      x, y, emoji,
+      vx: (Math.random() - 0.5) * 8,
+      vy: (Math.random() - 0.5) * 8 - 3,
       life: 1,
-      size: 5 + Math.random() * 8,
-      color: colors[type][Math.floor(Math.random() * colors[type].length)],
-      rotation: Math.random() * 360,
     }));
     setParticles(prev => [...prev.slice(-20), ...newParticles]);
   }, []);
 
-  // Spawn floating text - optimized
-  const spawnFloatingText = useCallback((x: number, y: number, text: string, color: string, size: "sm" | "md" | "lg" | "xl" = "md") => {
-    setFloatingTexts(prev => [...prev.slice(-3), { id: performance.now() + Math.random(), x, y, text, color, size }]);
-    setTimeout(() => setFloatingTexts(prev => prev.slice(1)), 900);
+  // Spawn floating text helper
+  const spawnText = useCallback((x: number, y: number, text: string, color: string) => {
+    setFloatingTexts(prev => [...prev.slice(-5), { id: Date.now() + Math.random() * 1000, x, y, text, color }]);
+    setTimeout(() => setFloatingTexts(prev => prev.slice(1)), 800);
   }, []);
 
-  // Spawn score popup - optimized
-  const spawnScorePopup = useCallback((x: number, y: number, value: number, type: "damage" | "parry" | "combo" | "heal" | "crit") => {
-    setScorePopups(prev => [...prev.slice(-3), { id: performance.now() + Math.random(), x, y, value, type }]);
-    setTimeout(() => setScorePopups(prev => prev.slice(1)), 600);
-  }, []);
-
-  // Screen shake helper
+  // Trigger screen shake
   const triggerShake = useCallback((intensity: number) => {
     setScreenShake(intensity);
-    setTimeout(() => setScreenShake(0), 350);
-  }, []);
-
-  // Lightning flash
-  const triggerLightning = useCallback(() => {
-    setLightning(true);
-    setTimeout(() => setLightning(false), 120);
-  }, []);
-
-  // Show boss message
-  const showBossMessage = useCallback((msg: string, duration = 2000) => {
-    setBossMessage(msg);
-    setTimeout(() => setBossMessage(""), duration);
+    setTimeout(() => setScreenShake(0), 200);
   }, []);
 
   // Start countdown
   const startCountdown = useCallback(() => {
     soundManager.buttonPress();
-    soundManager.startBattleMusic();
     setPhase("countdown");
     setCountdownNum(3);
   }, []);
 
-  // Countdown effect with sounds
+  // Countdown effect
   useEffect(() => {
     if (phase !== "countdown") return;
     if (countdownNum === 0) {
       soundManager.countdownGo();
+      soundManager.startBattleMusic();
       gameEndedRef.current = false;
       setBossHP(100);
       bossHPRef.current = 100;
       setPlayerHP(100);
       playerHPRef.current = 100;
-      setBossPhase("phase1");
-      bossPhaseRef.current = "phase1";
-      setBossAction("idle");
-      setBossEmotion("smug");
-      setCurrentAttack("rest");
-      setAttackQueue([]);
       setCombo(0);
       comboRef.current = 0;
       setMaxCombo(0);
-      setTotalDamageDealt(0);
-      setPerfectParries(0);
-      setLoveSent(0);
-      setCriticalHits(0);
-      setDodges(0);
-      setShieldActive(false);
-      setShieldCooldown(0);
-      setAttackCooldown(0);
-      setSpecialCooldown(0);
-      setSpecialReady(false);
-      setChargeProgress(0);
-      setParticles([]);
-      setFloatingTexts([]);
-      setScorePopups([]);
+      setScore(0);
+      setPerfectCount(0);
+      setQteCharge(0);
       setProjectiles([]);
-      setBgIntensity(0);
-      setRageMode(false);
-      setBattleTime(0);
-      setPlayerStunned(false);
-      setPlayerSlowed(false);
-      setDotDamage(0);
-      lastAttackTime.current = performance.now();
+      setTargets([]);
+      setPlayerLane("center");
+      playerLaneRef.current = "center";
+      setBossPhase("phase1");
+      setBossEmotion("smug");
+      setBossMessage("You DARE challenge ME?! 😾");
+      setTimeout(() => setBossMessage(""), 2000);
       setPhase("battle");
       return;
     }
     soundManager.countdown();
-    const timer = setTimeout(() => setCountdownNum(c => c - 1), 700);
+    const timer = setTimeout(() => setCountdownNum(c => c - 1), 800);
     return () => clearTimeout(timer);
   }, [phase, countdownNum]);
 
-  // Main game loop using RAF for smooth updates - optimized
+  // Get lane X position
+  const getLaneX = useCallback((lane: Lane) => {
+    return lane === "left" ? 20 : lane === "right" ? 80 : 50;
+  }, []);
+
+  // Main game loop
   useEffect(() => {
     if (phase !== "battle") return;
 
     let lastTime = performance.now();
-    let frameCount = 0;
+    const phaseSettings = {
+      phase1: { spawnRate: 1500, targetRate: 800, speed: 1.0, bombChance: 0.1 },
+      phase2: { spawnRate: 1000, targetRate: 600, speed: 1.4, bombChance: 0.2 },
+      phase3: { spawnRate: 700, targetRate: 500, speed: 1.8, bombChance: 0.3 },
+    };
 
     const gameLoop = (currentTime: number) => {
-      if (gameEndedRef.current) return;
-
-      const deltaTime = (currentTime - lastTime) / 1000;
+      const deltaTime = Math.min((currentTime - lastTime) / 1000, 0.1);
       lastTime = currentTime;
-      frameCount++;
 
-      // Update battle time every frame
-      setBattleTime(t => t + deltaTime);
+      const settings = phaseSettings[bossHPRef.current > 60 ? "phase1" : bossHPRef.current > 30 ? "phase2" : "phase3"];
 
-      // Update particles every 2nd frame for better performance
-      if (frameCount % 2 === 0) {
-        setParticles(prev => {
-          if (prev.length === 0) return prev;
-          return prev.map(p => ({
-            ...p,
-            x: p.x + p.vx * deltaTime * 60,
-            y: p.y + p.vy * deltaTime * 60,
-            vy: p.vy + 30 * deltaTime,
-            life: p.life - deltaTime * 2,
-            rotation: p.rotation + p.vx * deltaTime * 100,
-          })).filter(p => p.life > 0);
-        });
+      // Update boss phase based on HP
+      if (bossHPRef.current <= 30 && bossHPRef.current > 0) {
+        setBossPhase("phase3");
+        setBossEmotion("angry");
+      } else if (bossHPRef.current <= 60) {
+        setBossPhase("phase2");
+      }
+
+      // Spawn boss projectiles
+      if (currentTime - lastSpawnRef.current > settings.spawnRate) {
+        lastSpawnRef.current = currentTime;
+        const lanes: Lane[] = ["left", "center", "right"];
+        const lane = lanes[Math.floor(Math.random() * 3)];
+        const isBomb = Math.random() < settings.bombChance;
+
+        setProjectiles(prev => [...prev.slice(-15), {
+          id: currentTime + Math.random() * 1000,
+          lane,
+          y: 0,
+          speed: settings.speed * (0.8 + Math.random() * 0.4),
+          type: isBomb ? "bomb" : "heart",
+          emoji: isBomb ? "💣" : ["💕", "💗", "💖"][Math.floor(Math.random() * 3)],
+          damage: isBomb ? 25 : 10,
+        }]);
+      }
+
+      // Spawn attack targets
+      if (currentTime - lastTargetSpawnRef.current > settings.targetRate) {
+        lastTargetSpawnRef.current = currentTime;
+        const lanes: Lane[] = ["left", "center", "right"];
+        const lane = lanes[Math.floor(Math.random() * 3)];
+
+        setTargets(prev => [...prev.slice(-10), {
+          id: currentTime + Math.random() * 1000,
+          lane,
+          y: 0,
+          speed: settings.speed * 0.9,
+          points: 10,
+          emoji: ["⭐", "✨", "💫"][Math.floor(Math.random() * 3)],
+          perfect: false,
+        }]);
       }
 
       // Update projectiles
       setProjectiles(prev => {
-        const updated = prev.map(p => ({
-          ...p,
-          x: p.x + p.vx * deltaTime * 60,
-          y: p.y + p.vy * deltaTime * 60,
-        })).filter(p => p.y < 100 && p.y > 0 && p.x > 0 && p.x < 100);
+        const updated = prev.map(p => ({ ...p, y: p.y + p.speed * deltaTime * 60 }));
 
-        // Check projectile collisions with player area (bottom center)
+        // Check for hits
         updated.forEach(p => {
-          if (p.y > 65 && p.y < 85 && p.x > 35 && p.x < 65) {
-            if (!shieldActiveRef.current) {
-              setPlayerHP(hp => {
-                const newHP = Math.max(0, hp - p.damage);
-                playerHPRef.current = newHP;
-                if (newHP <= 0 && !gameEndedRef.current) {
-                  gameEndedRef.current = true;
-                  setPhase("defeat");
-                  setTimeout(() => onCompleteRef.current(false), 2500);
-                }
-                return newHP;
-              });
-              spawnFloatingText(50, 70, `-${p.damage}`, "#ff1744", "md");
-              setCombo(0);
-              comboRef.current = 0;
-            } else {
-              spawnParticles(50, 70, "shield", 4, 0.5);
-              setDodges(d => d + 1);
-            }
-            // Remove this projectile
-            p.y = -100;
-          }
-        });
-
-        return updated.filter(p => p.y > 0);
-      });
-
-      // DOT damage tick
-      if (dotDamage > 0) {
-        setDotDamage(d => Math.max(0, d - deltaTime * 2));
-        if (Math.random() < deltaTime * 3) {
-          setPlayerHP(hp => {
-            const newHP = Math.max(0, hp - 1);
-            playerHPRef.current = newHP;
-            return newHP;
-          });
-          spawnParticles(50, 75, "poison", 2, 0.3);
-        }
-      }
-
-      // Boss heals slowly if player doesn't attack for 7+ seconds
-      if (currentTime - lastAttackTime.current > 7000 && bossHPRef.current < 100 && bossHPRef.current > 0) {
-        setBossHP(hp => {
-          const newHP = Math.min(100, hp + deltaTime * 1.5);
-          bossHPRef.current = newHP;
-          return newHP;
-        });
-        if (Math.random() < deltaTime * 2) {
-          spawnParticles(50, 30, "heal", 2, 0.3);
-          showBossMessage("*healing* 😌");
-        }
-      }
-
-      rafRef.current = requestAnimationFrame(gameLoop);
-    };
-
-    rafRef.current = requestAnimationFrame(gameLoop);
-    return () => cancelAnimationFrame(rafRef.current);
-  }, [phase, dotDamage, spawnParticles, spawnFloatingText, showBossMessage]);
-
-  // Boss phase transitions - enhanced
-  useEffect(() => {
-    if (phase !== "battle") return;
-    const hpPercent = (bossHP / bossMaxHP) * 100;
-
-    if (hpPercent <= 15 && !rageMode) {
-      soundManager.bossPhaseChange();
-      setRageMode(true);
-      setBossPhase("rage");
-      bossPhaseRef.current = "rage";
-      setBossEmotion("rage");
-      setBgIntensity(3);
-      triggerShake(20);
-      triggerLightning();
-      spawnParticles(50, 25, "fire", 30, 2.5);
-      spawnParticles(50, 25, "crown", 20, 2);
-      spawnFloatingText(50, 30, "RAGE MODE! 🔥👿🔥", "#ff0000", "xl");
-      showBossMessage(pick(RAGE_TAUNTS));
-    } else if (hpPercent <= 35 && hpPercent > 15 && bossPhase !== "phase3" && bossPhase !== "rage") {
-      soundManager.bossPhaseChange();
-      setBossPhase("phase3");
-      bossPhaseRef.current = "phase3";
-      setBossEmotion("angry");
-      setBgIntensity(2);
-      triggerShake(15);
-      triggerLightning();
-      spawnParticles(50, 25, "crown", 20, 2);
-      spawnFloatingText(50, 30, "FINAL FORM! 👑", "#ffd700", "lg");
-      showBossMessage("THIS IS MY FINAL FORM! 😾");
-    } else if (hpPercent <= 65 && hpPercent > 35 && bossPhase === "phase1") {
-      soundManager.bossPhaseChange();
-      setBossPhase("phase2");
-      bossPhaseRef.current = "phase2";
-      setBossEmotion("angry");
-      setBgIntensity(1);
-      triggerShake(10);
-      spawnParticles(50, 25, "drama", 15, 1.5);
-      spawnFloatingText(50, 30, "ENRAGED! 😾", "#e040fb", "lg");
-      showBossMessage(pick(BOSS_TAUNTS));
-    }
-  }, [bossHP, bossMaxHP, bossPhase, phase, rageMode, triggerShake, triggerLightning, spawnParticles, spawnFloatingText, showBossMessage]);
-
-  // Boss attack loop - enhanced with more attacks and combos
-  useEffect(() => {
-    if (phase !== "battle" || gameEndedRef.current) return;
-
-    const getAttackSpeed = (): number => {
-      switch (bossPhaseRef.current) {
-        case "phase1": return 2800 + Math.random() * 1500;
-        case "phase2": return 2200 + Math.random() * 1000;
-        case "phase3": return 1800 + Math.random() * 800;
-        case "rage": return 1400 + Math.random() * 600;
-        default: return 2500;
-      }
-    };
-
-    const getRandomAttack = (): BossAttackType => {
-      const phase = bossPhaseRef.current;
-      let attacks: BossAttackType[];
-
-      if (phase === "rage") {
-        attacks = ["ultimate_meow", "cuddle_crush", "attention_beam", "love_laser", "jealousy_spiral", "heart_rain"];
-      } else if (phase === "phase3") {
-        attacks = ["drama_bomb", "tantrum_wave", "guilt_trip", "love_laser", "ultimate_meow", "heart_rain", "jealousy_spiral"];
-      } else if (phase === "phase2") {
-        attacks = ["drama_bomb", "tantrum_wave", "guilt_trip", "love_laser", "heart_rain", "attention_beam"];
-      } else {
-        attacks = ["drama_bomb", "tantrum_wave", "guilt_trip", "heart_rain"];
-      }
-      return attacks[Math.floor(Math.random() * attacks.length)];
-    };
-
-    const executeAttack = () => {
-      if (gameEndedRef.current || bossAction === "stunned") return;
-
-      const attack = getRandomAttack();
-      const attackData = BOSS_ATTACKS[attack];
-
-      setCurrentAttack(attack);
-      setBossAction("charging");
-      setBossEmotion("charging");
-      setChargeProgress(0);
-
-      // Show warning with attack name
-      spawnFloatingText(50, 40, attackData.warning + " " + attackData.name, "#ff5722", "md");
-
-      // Taunt occasionally
-      if (Math.random() < 0.3) {
-        const taunt = bossPhaseRef.current === "rage" ? pick(RAGE_TAUNTS) : pick(BOSS_TAUNTS);
-        showBossMessage(taunt);
-      }
-
-      // Charge animation
-      let progress = 0;
-      const chargeSpeed = bossPhaseRef.current === "rage" ? 0.7 : 1;
-      const chargeInterval = setInterval(() => {
-        progress += (50 / attackData.chargeTime) * chargeSpeed;
-        setChargeProgress(Math.min(progress, 1));
-
-        // Parry window - slightly before attack lands
-        if (progress >= 0.75 && progress < 0.82) {
-          setParryWindow(true);
-          parryWindowRef.current = true;
-        }
-
-        if (progress >= 1) {
-          clearInterval(chargeInterval);
-          setChargeProgress(0);
-          setParryWindow(false);
-          parryWindowRef.current = false;
-
-          // Execute attack based on type
-          soundManager.bossAttack();
-          setBossAction("attacking");
-          setBossEmotion("angry");
-          triggerShake(attackData.damage > 20 ? 15 : 8);
-          spawnParticles(50, 35, attackData.special === "dot" ? "poison" : "drama", 12, 1.5);
-
-          // Handle special attack effects
-          if (attackData.special === "multi") {
-            // Heart rain - spawn multiple projectiles
-            for (let i = 0; i < 5; i++) {
-              setTimeout(() => {
-                if (gameEndedRef.current) return;
-                setProjectiles(prev => [...prev, {
-                  id: performance.now() + i,
-                  x: 20 + Math.random() * 60,
-                  y: 20,
-                  vx: (Math.random() - 0.5) * 0.3,
-                  vy: 0.8 + Math.random() * 0.3,
-                  type: "heart",
-                  damage: 5,
-                }]);
-              }, i * 200);
-            }
-          } else if (attackData.special === "dot") {
-            // Jealousy spiral - apply DOT
-            if (!shieldActiveRef.current) {
-              setDotDamage(8);
-              spawnFloatingText(50, 65, "POISONED! 🤢", "#4caf50", "md");
-            }
-          }
-
-          // Check if player blocked
-          if (!shieldActiveRef.current) {
-            // Player takes damage
-            soundManager.damage();
-            const damage = bossPhaseRef.current === "rage" ? Math.floor(attackData.damage * 1.3) : attackData.damage;
-            setPlayerHP(hp => {
-              const newHP = Math.max(0, hp - damage);
+          if (p.y >= 85 && p.y <= 95 && p.lane === playerLaneRef.current) {
+            // Player got hit!
+            soundManager.hit();
+            setPlayerHP(h => {
+              const newHP = Math.max(0, h - p.damage);
               playerHPRef.current = newHP;
               if (newHP <= 0 && !gameEndedRef.current) {
                 gameEndedRef.current = true;
@@ -6664,523 +6372,370 @@ const DramaKingBattle = memo(function DramaKingBattle({ onComplete }: { onComple
               }
               return newHP;
             });
-            setHitFlash("player");
-            setTimeout(() => setHitFlash("none"), 200);
             setCombo(0);
             comboRef.current = 0;
-            spawnFloatingText(50, 70, `-${damage}`, "#ff1744", "lg");
-
-            // Special effects on player
-            if (attackData.special === "stun") {
-              setPlayerStunned(true);
-              spawnFloatingText(50, 60, "STUNNED! 💫", "#9c27b0", "lg");
-              setTimeout(() => setPlayerStunned(false), 2000);
-            } else if (attackData.special === "slow") {
-              setPlayerSlowed(true);
-              setTimeout(() => setPlayerSlowed(false), 3000);
-            }
-          } else {
-            // Blocked
-            spawnParticles(50, 60, "shield", 10);
-            spawnFloatingText(50, 60, "BLOCKED!", "#29b6f6", "md");
-            setDodges(d => d + 1);
+            setFlashColor("rgba(255, 0, 0, 0.3)");
+            setTimeout(() => setFlashColor(null), 150);
+            triggerShake(10);
+            spawnText(getLaneX(p.lane), 85, "-" + p.damage, "#ff4444");
+            setBossMessage(["Got you! 😼", "Feel my love! 💕", "Can't escape! 😈"][Math.floor(Math.random() * 3)]);
+            setTimeout(() => setBossMessage(""), 1000);
           }
+        });
 
-          // Combo attacks in rage mode
-          if (bossPhaseRef.current === "rage" && Math.random() < 0.4) {
-            setTimeout(() => {
-              if (!gameEndedRef.current) {
-                executeAttack();
-              }
-            }, 400);
-          }
+        return updated.filter(p => p.y < 100);
+      });
 
-          // Reset after attack
-          setTimeout(() => {
-            if (gameEndedRef.current) return;
-            setBossAction("idle");
-            setBossEmotion(bossPhaseRef.current === "rage" ? "rage" : "smug");
-            setCurrentAttack("rest");
-            setTimeout(executeAttack, getAttackSpeed());
-          }, 600);
-        }
-      }, 50);
+      // Update targets
+      setTargets(prev => {
+        return prev.map(t => {
+          const newY = t.y + t.speed * deltaTime * 60;
+          const isPerfect = newY >= 75 && newY <= 85;
+          return { ...t, y: newY, perfect: isPerfect };
+        }).filter(t => t.y < 95);
+      });
 
-      return () => clearInterval(chargeInterval);
+      // Update particles
+      setParticles(prev => prev.map(p => ({
+        ...p,
+        x: p.x + p.vx * deltaTime * 60,
+        y: p.y + p.vy * deltaTime * 60,
+        vy: p.vy + deltaTime * 20,
+        life: p.life - deltaTime * 1.5,
+      })).filter(p => p.life > 0));
+
+      rafRef.current = requestAnimationFrame(gameLoop);
     };
 
-    const timeout = setTimeout(executeAttack, 1200);
-    return () => clearTimeout(timeout);
-  }, [phase, bossAction, triggerShake, spawnParticles, spawnFloatingText, showBossMessage]);
+    rafRef.current = requestAnimationFrame(gameLoop);
+    return () => cancelAnimationFrame(rafRef.current);
+  }, [phase, getLaneX, spawnText, triggerShake]);
 
-  // Cooldown updates
-  useEffect(() => {
-    if (phase !== "battle") return;
-    const timer = setInterval(() => {
-      if (shieldCooldown > 0) setShieldCooldown(c => Math.max(0, c - 0.1));
-      if (attackCooldown > 0) setAttackCooldown(c => Math.max(0, c - 0.1));
-      if (specialCooldown > 0) {
-        setSpecialCooldown(c => {
-          const newC = Math.max(0, c - 0.1);
-          if (newC === 0) setSpecialReady(true);
-          return newC;
-        });
-      }
-    }, 100);
-    return () => clearInterval(timer);
-  }, [phase, shieldCooldown, attackCooldown, specialCooldown]);
+  // Handle lane tap - both dodge and attack
+  const handleLaneTap = useCallback((lane: Lane) => {
+    if (phase !== "battle" || gameEndedRef.current) return;
 
-  // Build special meter based on combo
-  useEffect(() => {
-    if (combo >= 10 && !specialReady && specialCooldown === 0) {
-      setSpecialReady(true);
-    }
-  }, [combo, specialReady, specialCooldown]);
+    // Move player to lane (dodge)
+    setPlayerLane(lane);
+    playerLaneRef.current = lane;
+    setPlayerDodging(true);
+    setTimeout(() => setPlayerDodging(false), 150);
 
-  // Send love attack - enhanced with crits
-  const sendLove = useCallback(() => {
-    if (gameEndedRef.current || attackCooldown > 0 || playerStunned) return;
-
-    lastAttackTime.current = performance.now();
-
-    const loveAttack = LOVE_ATTACKS[Math.floor(Math.random() * LOVE_ATTACKS.length)];
-
-    // Critical hit chance - 15% base, +5% per 5 combo
-    const critChance = 0.15 + Math.floor(comboRef.current / 5) * 0.05;
-    const isCritical = Math.random() < critChance;
-
-    const baseDamage = isCritical ? loveAttack.crit : loveAttack.damage;
-    const comboBonus = Math.floor(comboRef.current / 4);
-    const stunBonus = bossAction === "stunned" ? 5 : 0;
-    const totalDamage = baseDamage + comboBonus + stunBonus;
-
-    setLoveSent(l => l + 1);
-    setAttackCooldown(playerSlowed ? 0.5 : 0.25);
-
-    // Spawn particles towards boss
-    spawnParticles(50, 55, isCritical ? "star" : "heart", isCritical ? 10 : 5, isCritical ? 1 : 0.5);
-
-    // Floating love text
-    const textX = 50 + (Math.random() - 0.5) * 30;
-    if (isCritical) {
-      soundManager.criticalHit();
-      setCriticalHits(c => c + 1);
-      spawnFloatingText(textX, 38, pick(CRITICAL_MESSAGES), "#ffd700", "lg");
-      spawnFloatingText(textX, 45, loveAttack.text, "#ff4081", "sm");
-      triggerShake(5);
-      setHitFlash("crit");
-    } else {
-      soundManager.bossHit();
-      spawnFloatingText(textX, 40, loveAttack.text, "#ff4081", "sm");
-      setHitFlash("boss");
-    }
-    setTimeout(() => setHitFlash("none"), 100);
-
-    // Deal damage
-    setBossHP(hp => {
-      const newHP = Math.max(0, hp - totalDamage);
-      bossHPRef.current = newHP;
-      if (newHP <= 0 && !gameEndedRef.current) {
-        gameEndedRef.current = true;
-        soundManager.victory();
-        soundManager.stopMusic();
-        triggerShake(25);
-        triggerLightning();
-        spawnParticles(50, 25, "star", 40, 2.5);
-        spawnParticles(50, 25, "crown", 20, 2);
-        spawnParticles(50, 25, "heart", 30, 2);
-        setTimeout(() => setPhase("victory"), 1200);
-        setTimeout(() => onCompleteRef.current(true), 3800);
-      }
-      return newHP;
-    });
-
-    setTotalDamageDealt(d => d + totalDamage);
-    setCombo(c => {
-      const newCombo = c + 1;
-      if (newCombo > maxCombo) setMaxCombo(newCombo);
-      return newCombo;
-    });
-
-    // Score popup
-    spawnScorePopup(
-      50 + (Math.random() - 0.5) * 20,
-      35,
-      totalDamage,
-      isCritical ? "crit" : comboRef.current >= 5 ? "combo" : "damage"
-    );
-
-    // Boss react
-    if (isCritical || Math.random() < 0.15) {
-      setBossEmotion("hurt");
-      setTimeout(() => {
-        if (!gameEndedRef.current && bossAction === "idle") {
-          setBossEmotion(bossPhaseRef.current === "rage" ? "rage" : "smug");
+    // Check for target hits in this lane
+    setTargets(prev => {
+      let hitTarget: AttackTarget | null = null;
+      const remaining = prev.filter(t => {
+        if (t.lane === lane && t.y >= 65 && t.y <= 95) {
+          if (!hitTarget || t.y > hitTarget.y) {
+            hitTarget = t;
+          }
         }
-      }, 250);
-    }
-  }, [attackCooldown, maxCombo, bossAction, playerStunned, playerSlowed, triggerShake, triggerLightning, spawnParticles, spawnFloatingText, spawnScorePopup]);
+        return true;
+      });
 
-  // Special attack - uses combo meter
-  const useSpecialAttack = useCallback(() => {
-    if (!specialReady || gameEndedRef.current || playerStunned) return;
+      if (hitTarget !== null) {
+        const target = hitTarget as AttackTarget;
+        const isPerfect = target.perfect;
+        const damage = isPerfect ? 8 : 5;
+        const points = isPerfect ? 15 : 10;
+
+        // Deal damage to boss
+        soundManager.bossHit();
+        if (isPerfect) soundManager.criticalHit();
+
+        setBossHP(h => {
+          const newHP = Math.max(0, h - damage);
+          bossHPRef.current = newHP;
+          if (newHP <= 0 && !gameEndedRef.current) {
+            gameEndedRef.current = true;
+            soundManager.victory();
+            soundManager.stopMusic();
+            setBossEmotion("defeated");
+            setBossMessage("IMPOSSIBLE! 😿💔");
+            setPhase("victory");
+            setTimeout(() => onCompleteRef.current(true), 2500);
+          }
+          return newHP;
+        });
+
+        // Update combo and score
+        const newCombo = comboRef.current + 1;
+        setCombo(newCombo);
+        comboRef.current = newCombo;
+        setMaxCombo(m => Math.max(m, newCombo));
+        setScore(s => s + points + Math.floor(newCombo / 5) * 5);
+
+        // Charge QTE meter
+        setQteCharge(c => Math.min(100, c + (isPerfect ? 12 : 8)));
+
+        // Visual feedback
+        const x = getLaneX(lane);
+        spawnParticles(x, 80, isPerfect ? "💥" : "✨", isPerfect ? 5 : 3);
+        spawnText(x, 75, isPerfect ? "PERFECT!" : "GREAT!", isPerfect ? "#FFD700" : "#00FF00");
+
+        if (isPerfect) {
+          setPerfectCount(p => p + 1);
+          setFlashColor("rgba(255, 215, 0, 0.2)");
+          setTimeout(() => setFlashColor(null), 100);
+        }
+
+        // Boss reaction
+        setBossShaking(true);
+        setTimeout(() => setBossShaking(false), 200);
+        setBossEmotion("hurt");
+        setTimeout(() => setBossEmotion(bossHPRef.current > 30 ? "angry" : "angry"), 300);
+
+        if (newCombo % 10 === 0) {
+          setBossMessage(["OW OW OW! 😿", "STOP IT! 😾", "That HURTS! 🙀"][Math.floor(Math.random() * 3)]);
+          setTimeout(() => setBossMessage(""), 1000);
+        }
+
+        return remaining.filter(t => t.id !== target.id);
+      }
+
+      return remaining;
+    });
+  }, [phase, getLaneX, spawnParticles, spawnText]);
+
+  // Handle QTE activation
+  const activateQTE = useCallback(() => {
+    if (qteCharge < 100 || phase !== "battle") return;
 
     soundManager.specialAttack();
-    setSpecialReady(false);
-    setSpecialCooldown(10);
+    setQteCharge(0);
+    const buttons = ["💖", "⭐", "✨", "💕"];
+    const sequence = Array.from({ length: 4 }, () => buttons[Math.floor(Math.random() * buttons.length)]);
+    setQte({ sequence, current: 0, timeLeft: 3, active: true });
+    setPhase("qte");
+  }, [qteCharge, phase]);
 
-    // Mega love attack!
-    const megaDamage = 25 + Math.floor(comboRef.current / 2);
+  // QTE countdown
+  useEffect(() => {
+    if (phase !== "qte" || !qte.active) return;
 
-    triggerShake(15);
-    triggerLightning();
-    spawnParticles(50, 50, "star", 25, 2);
-    spawnParticles(50, 50, "heart", 20, 2);
-    spawnFloatingText(50, 35, "💖 MEGA LOVE! 💖", "#ff1493", "xl");
-    spawnScorePopup(50, 30, megaDamage, "crit");
-
-    setBossHP(hp => {
-      const newHP = Math.max(0, hp - megaDamage);
-      bossHPRef.current = newHP;
-      if (newHP <= 0 && !gameEndedRef.current) {
-        gameEndedRef.current = true;
-        setTimeout(() => setPhase("victory"), 1000);
-        setTimeout(() => onCompleteRef.current(true), 3500);
-      }
-      return newHP;
-    });
-
-    setTotalDamageDealt(d => d + megaDamage);
-    setBossEmotion("hurt");
-    showBossMessage("THAT ACTUALLY HURT! 😿");
-
-    // Stun boss briefly
-    setBossAction("stunned");
-    setTimeout(() => {
-      if (!gameEndedRef.current) {
-        setBossAction("idle");
-        setBossEmotion(bossPhaseRef.current === "rage" ? "rage" : "angry");
-      }
-    }, 1500);
-
-    setCombo(0);
-    comboRef.current = 0;
-  }, [specialReady, playerStunned, triggerShake, triggerLightning, spawnParticles, spawnFloatingText, spawnScorePopup, showBossMessage]);
-
-  // Activate shield / parry
-  const activateShield = useCallback(() => {
-    if (gameEndedRef.current || shieldCooldown > 0 || playerStunned) return;
-
-    // Check for perfect parry
-    if (parryWindowRef.current && bossAction === "charging") {
-      // Perfect parry!
-      soundManager.parry();
-      setParrySuccess(true);
-      setPerfectParries(p => p + 1);
-
-      // Stun boss
-      setBossAction("stunned");
-      setBossEmotion("hurt");
-      setCurrentAttack("rest");
-      setChargeProgress(0);
-      setParryWindow(false);
-      parryWindowRef.current = false;
-
-      // Visual feedback
-      triggerShake(15);
-      triggerLightning();
-      spawnParticles(50, 30, "star", 25, 2);
-      spawnParticles(50, 50, "shield", 20, 1.5);
-      spawnFloatingText(50, 45, pick(PARRY_MESSAGES), "#ffd700", "lg");
-
-      // Counter damage - parry deals damage back!
-      const counterDamage = 20;
-      spawnScorePopup(50, 38, counterDamage, "parry");
-      setBossHP(hp => {
-        const newHP = Math.max(0, hp - counterDamage);
-        bossHPRef.current = newHP;
-        return newHP;
+    const timer = setInterval(() => {
+      setQte(prev => {
+        if (prev.timeLeft <= 0.1) {
+          soundManager.damage();
+          setPhase("battle");
+          setBossMessage("Too SLOW! 😼");
+          setTimeout(() => setBossMessage(""), 1000);
+          return { ...prev, active: false, timeLeft: 0 };
+        }
+        return { ...prev, timeLeft: prev.timeLeft - 0.1 };
       });
-      setTotalDamageDealt(d => d + counterDamage);
-      showBossMessage("OW! MY DRAMA! 😿");
+    }, 100);
 
-      // Combo bonus for parry
-      setCombo(c => c + 3);
+    return () => clearInterval(timer);
+  }, [phase, qte.active]);
 
-      // Recover from stun
-      setTimeout(() => {
-        if (gameEndedRef.current) return;
-        setParrySuccess(false);
-        setBossAction("idle");
-        setBossEmotion(bossPhaseRef.current === "rage" ? "rage" : "angry");
-      }, 1800);
+  // Handle QTE button press
+  const handleQTEPress = useCallback((button: string) => {
+    if (!qte.active) return;
 
-      setShieldCooldown(1.5);
+    if (qte.sequence[qte.current] === button) {
+      soundManager.collect();
+      if (qte.current === qte.sequence.length - 1) {
+        // QTE Success! Deal massive damage
+        soundManager.specialAttack();
+        soundManager.criticalHit();
+        const damage = 25;
+        setBossHP(h => {
+          const newHP = Math.max(0, h - damage);
+          bossHPRef.current = newHP;
+          if (newHP <= 0 && !gameEndedRef.current) {
+            gameEndedRef.current = true;
+            soundManager.victory();
+            soundManager.stopMusic();
+            setBossEmotion("defeated");
+            setPhase("victory");
+            setTimeout(() => onCompleteRef.current(true), 2500);
+          }
+          return newHP;
+        });
+        spawnParticles(50, 30, "💥", 10);
+        spawnParticles(50, 30, "⭐", 8);
+        spawnText(50, 40, "SUPER ATTACK! -25", "#FFD700");
+        triggerShake(15);
+        setBossShaking(true);
+        setTimeout(() => setBossShaking(false), 500);
+        setBossMessage("NOOOO! 😭💔");
+        setTimeout(() => setBossMessage(""), 1500);
+        setQte({ ...qte, active: false });
+        setPhase("battle");
+      } else {
+        setQte(prev => ({ ...prev, current: prev.current + 1 }));
+      }
     } else {
-      // Normal shield
-      soundManager.shield();
-      setShieldActive(true);
-      shieldActiveRef.current = true;
-      spawnParticles(50, 60, "shield", 10, 0.5);
-
-      setTimeout(() => {
-        setShieldActive(false);
-        shieldActiveRef.current = false;
-      }, 800);
-
-      setShieldCooldown(1.5);
+      soundManager.damage();
+      setQte({ ...qte, active: false });
+      setPhase("battle");
+      setBossMessage("WRONG! 😼");
+      setTimeout(() => setBossMessage(""), 1000);
     }
-  }, [shieldCooldown, bossAction, playerStunned, triggerShake, triggerLightning, spawnParticles, spawnFloatingText, spawnScorePopup, showBossMessage]);
+  }, [qte, spawnParticles, spawnText, triggerShake]);
 
-  // Get boss emoji based on state
-  const getBossEmoji = () => {
-    if (bossEmotion === "defeated") return "😵";
-    if (bossEmotion === "hurt") return "😿";
-    if (bossEmotion === "charging") return "🙀";
-    if (bossAction === "attacking") return "😾";
-    if (bossAction === "stunned") return "😵‍💫";
-    if (bossEmotion === "rage" || rageMode) return "👿";
-    if (bossPhase === "phase3") return "😈";
-    if (bossPhase === "phase2") return "😾";
-    return "😼";
-  };
+  // Touch/swipe handlers
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    const touch = e.touches[0];
+    touchStartRef.current = { x: touch.clientX, time: Date.now() };
+  }, []);
+
+  const handleTouchEnd = useCallback((e: React.TouchEvent) => {
+    if (!touchStartRef.current) return;
+
+    const touch = e.changedTouches[0];
+    const dx = touch.clientX - touchStartRef.current.x;
+    const dt = Date.now() - touchStartRef.current.time;
+
+    // Quick tap - attack current lane
+    if (Math.abs(dx) < 30 && dt < 200) {
+      const rect = (e.target as HTMLElement).getBoundingClientRect();
+      const x = touch.clientX - rect.left;
+      const width = rect.width;
+      const lane: Lane = x < width * 0.33 ? "left" : x > width * 0.67 ? "right" : "center";
+      handleLaneTap(lane);
+    }
+    // Swipe - change lane
+    else if (Math.abs(dx) > 50) {
+      const currentLane = playerLaneRef.current;
+      let newLane: Lane = currentLane;
+      if (dx > 0) {
+        newLane = currentLane === "left" ? "center" : currentLane === "center" ? "right" : "right";
+      } else {
+        newLane = currentLane === "right" ? "center" : currentLane === "center" ? "left" : "left";
+      }
+      handleLaneTap(newLane);
+    }
+
+    touchStartRef.current = null;
+  }, [handleLaneTap]);
+
+
 
   // Tutorial screen
   if (phase === "tutorial") {
     return (
-      <div className="fixed inset-0 bg-gradient-to-b from-slate-900 via-purple-900 to-slate-900 flex flex-col items-center justify-center p-4 overflow-hidden">
-        {/* Animated background - reduced for performance */}
-        <div className="absolute inset-0 overflow-hidden pointer-events-none">
+      <div className="fixed inset-0 bg-gradient-to-b from-slate-900 via-purple-950 to-slate-900 flex items-center justify-center p-4 overflow-hidden">
+        {/* Animated background */}
+        <div className="absolute inset-0 pointer-events-none overflow-hidden">
           {Array.from({ length: 8 }).map((_, i) => (
             <div
               key={i}
-              className="absolute text-3xl opacity-20"
+              className="absolute text-2xl opacity-20"
               style={{
-                left: `${(i * 12 + 5) % 100}%`,
-                top: `${(i * 15 + 5) % 100}%`,
-                animation: `float ${3 + (i % 3)}s ease-in-out infinite`,
-                animationDelay: `${i * 0.3}s`,
+                left: `${(i * 12) % 100}%`,
+                animation: `floatDown ${8 + (i % 3)}s linear infinite`,
+                animationDelay: `${i * 0.4}s`,
               }}
             >
-              {["💔", "😾", "👑", "⚡", "💥"][i % 5]}
+              {["💔", "😾", "👑", "⚡"][i % 4]}
             </div>
           ))}
         </div>
 
         <motion.div
-          initial={{ scale: 0.8, opacity: 0, y: 30 }}
-          animate={{ scale: 1, opacity: 1, y: 0 }}
-          transition={{ type: "spring", stiffness: 200 }}
-          className="bg-slate-800/95 backdrop-blur-xl rounded-3xl p-6 max-w-sm text-center shadow-2xl relative z-10 border-2 border-purple-500/50"
+          initial={{ scale: 0.8, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          className="bg-slate-800/95 backdrop-blur-xl rounded-3xl p-6 max-w-sm w-full text-center shadow-2xl border-2 border-purple-500/50"
         >
-          {/* Crown decoration */}
+          {/* Boss preview */}
           <motion.div
-            className="absolute -top-8 left-1/2 -translate-x-1/2 text-5xl"
-            animate={{ y: [0, -5, 0], rotate: [-5, 5, -5] }}
+            className="text-6xl mb-4"
+            animate={{ scale: [1, 1.1, 1], rotate: [0, -5, 5, 0] }}
             transition={{ duration: 2, repeat: Infinity }}
           >
-            👑
+            👑😾👑
           </motion.div>
 
-          <div className="mt-4 mb-3">
-            <motion.div
-              className="text-7xl mb-2"
-              animate={{ scale: [1, 1.1, 1], rotate: [0, -5, 5, 0] }}
-              transition={{ duration: 1.5, repeat: Infinity }}
-            >
-              😾
-            </motion.div>
-          </div>
-
-          <h2 className="text-2xl font-black bg-gradient-to-r from-purple-400 via-pink-400 to-red-400 bg-clip-text text-transparent mb-2">
+          <h2 className="text-2xl font-black bg-gradient-to-r from-purple-400 via-pink-400 to-red-400 bg-clip-text text-transparent mb-3">
             THE DRAMA KING
           </h2>
-          <p className="text-purple-300 mb-4 text-sm">
-            "You DARE challenge me?!<br/>
-            <span className="font-bold text-pink-400">PROVE YOUR DEVOTION!</span>"
+          <p className="text-purple-300 text-sm mb-4">
+            "You DARE reject my love?!<br/>
+            <span className="font-bold text-pink-400">FEEL MY WRATH!</span>"
           </p>
 
-          <div className="bg-slate-700/60 rounded-2xl p-4 mb-4 text-left">
-            <p className="text-white text-sm font-bold mb-3 text-center">Battle Controls:</p>
-            <div className="space-y-3">
-              <div className="flex items-center gap-3">
-                <motion.div
-                  className="w-12 h-12 bg-gradient-to-br from-pink-500 to-rose-600 rounded-xl flex items-center justify-center shadow-lg"
-                  animate={{ scale: [1, 1.1, 1] }}
-                  transition={{ duration: 1, repeat: Infinity }}
-                >
-                  <span className="text-xl">💖</span>
-                </motion.div>
-                <div>
-                  <div className="text-white text-sm font-bold">Send Love</div>
-                  <div className="text-purple-300 text-xs">Tap rapidly to damage!</div>
-                </div>
-              </div>
-              <div className="flex items-center gap-3">
-                <motion.div
-                  className="w-12 h-12 bg-gradient-to-br from-blue-500 to-cyan-600 rounded-xl flex items-center justify-center shadow-lg"
-                  animate={{ rotate: [-5, 5, -5] }}
-                  transition={{ duration: 0.5, repeat: Infinity }}
-                >
-                  <span className="text-xl">🛡️</span>
-                </motion.div>
-                <div>
-                  <div className="text-white text-sm font-bold">Shield / Parry</div>
-                  <div className="text-purple-300 text-xs">Block attacks! Perfect timing = PARRY!</div>
-                </div>
+          {/* Controls explanation */}
+          <div className="bg-slate-700/60 rounded-2xl p-4 mb-4 space-y-3">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-red-500/30 rounded-xl flex items-center justify-center text-xl">💕</div>
+              <div className="text-left">
+                <div className="text-white text-sm font-bold">Dodge Hearts</div>
+                <div className="text-slate-400 text-xs">Tap lanes to move & avoid damage!</div>
               </div>
             </div>
-          </div>
-
-          <div className="flex gap-2 mb-4">
-            <div className="flex-1 bg-yellow-500/20 rounded-xl p-2 border border-yellow-500/30">
-              <div className="text-xl">⚡</div>
-              <div className="text-[9px] text-yellow-300 font-medium">Watch for<br/>warnings!</div>
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-yellow-500/30 rounded-xl flex items-center justify-center text-xl">⭐</div>
+              <div className="text-left">
+                <div className="text-white text-sm font-bold">Hit Targets</div>
+                <div className="text-slate-400 text-xs">Tap when stars reach the zone!</div>
+              </div>
             </div>
-            <div className="flex-1 bg-pink-500/20 rounded-xl p-2 border border-pink-500/30">
-              <div className="text-xl">🔥</div>
-              <div className="text-[9px] text-pink-300 font-medium">Build<br/>combos!</div>
-            </div>
-            <div className="flex-1 bg-cyan-500/20 rounded-xl p-2 border border-cyan-500/30">
-              <div className="text-xl">✨</div>
-              <div className="text-[9px] text-cyan-300 font-medium">Parry for<br/>bonus DMG!</div>
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-purple-500/30 rounded-xl flex items-center justify-center text-xl">💥</div>
+              <div className="text-left">
+                <div className="text-white text-sm font-bold">Super Attack</div>
+                <div className="text-slate-400 text-xs">Fill meter, then tap for QTE!</div>
+              </div>
             </div>
           </div>
 
           <motion.button
             onClick={startCountdown}
-            className="w-full py-4 bg-gradient-to-r from-purple-600 via-pink-600 to-red-600 text-white rounded-2xl font-bold text-lg shadow-xl"
+            className="w-full py-4 bg-gradient-to-r from-purple-500 via-pink-500 to-red-500 text-white rounded-2xl font-bold text-xl shadow-xl"
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98 }}
           >
-            <motion.span
-              animate={{ scale: [1, 1.05, 1] }}
-              transition={{ duration: 1, repeat: Infinity }}
-            >
-              BEGIN THE BATTLE! ⚔️
-            </motion.span>
+            ⚔️ FIGHT! ⚔️
           </motion.button>
         </motion.div>
       </div>
     );
   }
 
-  // Countdown
+  // Countdown screen
   if (phase === "countdown") {
     return (
-      <div className="fixed inset-0 bg-gradient-to-b from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center">
-        <motion.div
-          key={countdownNum}
-          initial={{ scale: 3, opacity: 0, rotate: -20 }}
-          animate={{ scale: 1, opacity: 1, rotate: 0 }}
-          exit={{ scale: 0, opacity: 0 }}
-          transition={{ type: "spring", stiffness: 300, damping: 20 }}
-          className="text-[120px] font-black text-purple-400 drop-shadow-[0_0_30px_rgba(168,85,247,0.5)]"
-        >
-          {countdownNum || "⚔️"}
-        </motion.div>
+      <div className="fixed inset-0 bg-gradient-to-b from-slate-900 via-purple-950 to-slate-900 flex items-center justify-center">
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={countdownNum}
+            initial={{ scale: 0, rotate: -180 }}
+            animate={{ scale: 1, rotate: 0 }}
+            exit={{ scale: 2, opacity: 0 }}
+            className="text-[120px] font-black text-white drop-shadow-2xl"
+          >
+            {countdownNum || "FIGHT!"}
+          </motion.div>
+        </AnimatePresence>
       </div>
     );
   }
 
   // Victory screen
   if (phase === "victory") {
-    const rating = perfectParries >= 5 ? "S" : perfectParries >= 3 ? "A" : perfectParries >= 1 ? "B" : maxCombo >= 10 ? "B" : "C";
-    const ratingColors: Record<string, string> = {
-      S: "from-yellow-400 to-amber-500",
-      A: "from-green-400 to-emerald-500",
-      B: "from-blue-400 to-cyan-500",
-      C: "from-purple-400 to-violet-500",
-    };
-
     return (
-      <div className="fixed inset-0 bg-gradient-to-b from-pink-500 via-rose-600 to-purple-700 flex flex-col items-center justify-center p-4 overflow-hidden">
-        {/* Victory particles - reduced for performance */}
-        <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          {Array.from({ length: 12 }).map((_, i) => (
-            <div
-              key={i}
-              className="absolute text-2xl"
-              style={{
-                left: `${(i * 8 + 5) % 100}%`,
-                top: `${(i * 12 + 10) % 100}%`,
-                animation: `floatUp ${2 + (i % 3)}s ease-in-out infinite`,
-                animationDelay: `${i * 0.15}s`,
-              }}
-            >
-              {["💖", "✨", "🌟", "💕", "👑"][i % 5]}
-            </div>
-          ))}
-        </div>
-
+      <div className="fixed inset-0 bg-gradient-to-b from-yellow-400 via-pink-500 to-purple-600 flex items-center justify-center p-4">
         <motion.div
-          initial={{ scale: 0, y: 50 }}
-          animate={{ scale: 1, y: 0 }}
-          transition={{ type: "spring", stiffness: 200 }}
-          className="bg-white/95 backdrop-blur-xl rounded-3xl p-6 max-w-sm text-center shadow-2xl border border-pink-200 relative z-10"
+          initial={{ scale: 0 }}
+          animate={{ scale: 1 }}
+          className="bg-white/95 backdrop-blur-xl rounded-3xl p-8 max-w-sm w-full text-center shadow-2xl"
         >
           <motion.div
-            className="text-8xl mb-3"
-            animate={{ scale: [1, 1.2, 1], rotate: [0, 10, -10, 0] }}
-            transition={{ duration: 1.5, repeat: Infinity }}
+            className="text-6xl mb-4"
+            animate={{ rotate: [0, 360] }}
+            transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
           >
-            😻
+            🏆
           </motion.div>
-
-          <h2 className="text-3xl font-black bg-gradient-to-r from-pink-600 to-purple-600 bg-clip-text text-transparent mb-2">
+          <h2 className="text-3xl font-black bg-gradient-to-r from-yellow-500 to-pink-500 bg-clip-text text-transparent mb-4">
             VICTORY!
           </h2>
-          <p className="text-slate-600 mb-4 text-sm">
-            "Fine... I'll accept your love... 💕"
-          </p>
-
-          {/* Rating */}
-          <motion.div
-            className={cn("w-20 h-20 mx-auto rounded-2xl bg-gradient-to-br flex items-center justify-center mb-4 shadow-lg", ratingColors[rating])}
-            initial={{ scale: 0, rotate: -180 }}
-            animate={{ scale: 1, rotate: 0 }}
-            transition={{ delay: 0.3, type: "spring" }}
-          >
-            <span className="text-4xl font-black text-white">{rating}</span>
-          </motion.div>
-
-          {/* Stats */}
-          <div className="grid grid-cols-3 gap-2 mb-4">
-            <div className="bg-pink-100 rounded-xl p-2">
-              <div className="text-xl">💖</div>
-              <div className="text-xs text-pink-600 font-bold">Love Sent</div>
-              <div className="text-lg font-black text-pink-700">{loveSent}</div>
-            </div>
-            <div className="bg-purple-100 rounded-xl p-2">
-              <div className="text-xl">💥</div>
-              <div className="text-xs text-purple-600 font-bold">DMG</div>
-              <div className="text-lg font-black text-purple-700">{totalDamageDealt}</div>
-            </div>
-            <div className="bg-amber-100 rounded-xl p-2">
-              <div className="text-xl">🔥</div>
-              <div className="text-xs text-amber-600 font-bold">Combo</div>
-              <div className="text-lg font-black text-amber-700">{maxCombo}</div>
-            </div>
-            <div className="bg-cyan-100 rounded-xl p-2">
-              <div className="text-xl">✨</div>
-              <div className="text-xs text-cyan-600 font-bold">Parries</div>
-              <div className="text-lg font-black text-cyan-700">{perfectParries}</div>
-            </div>
-            <div className="bg-yellow-100 rounded-xl p-2">
-              <div className="text-xl">⚡</div>
-              <div className="text-xs text-yellow-600 font-bold">Crits</div>
-              <div className="text-lg font-black text-yellow-700">{criticalHits}</div>
-            </div>
-            <div className="bg-blue-100 rounded-xl p-2">
-              <div className="text-xl">🛡️</div>
-              <div className="text-xs text-blue-600 font-bold">Dodges</div>
-              <div className="text-lg font-black text-blue-700">{dodges}</div>
-            </div>
-          </div>
-
-          {/* Battle time */}
-          <div className="text-xs text-slate-400 mb-2">
-            Battle Time: {Math.floor(battleTime)}s
+          <div className="space-y-2 text-slate-600">
+            <p>Score: <span className="font-bold text-pink-500">{score}</span></p>
+            <p>Max Combo: <span className="font-bold text-purple-500">{maxCombo}</span></p>
+            <p>Perfect Hits: <span className="font-bold text-yellow-500">{perfectCount}</span></p>
           </div>
 
           <div className="text-sm text-slate-500">
@@ -7194,359 +6749,239 @@ const DramaKingBattle = memo(function DramaKingBattle({ onComplete }: { onComple
   // Defeat screen
   if (phase === "defeat") {
     return (
-      <div className="fixed inset-0 bg-gradient-to-b from-slate-800 via-slate-900 to-black flex flex-col items-center justify-center p-4 overflow-hidden">
-        {/* Defeat particles - reduced for performance */}
-        <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          {Array.from({ length: 8 }).map((_, i) => (
-            <div
-              key={i}
-              className="absolute text-2xl opacity-30"
-              style={{
-                left: `${(i * 12 + 5) % 100}%`,
-                top: `${(i * 15 + 10) % 100}%`,
-                animation: `floatDown ${3 + (i % 2)}s ease-in-out infinite`,
-                animationDelay: `${i * 0.25}s`,
-              }}
-            >
-              💔
-            </div>
-          ))}
-        </div>
-
+      <div className="fixed inset-0 bg-gradient-to-b from-slate-900 via-red-950 to-slate-900 flex items-center justify-center p-4">
         <motion.div
-          initial={{ scale: 0, y: 50 }}
-          animate={{ scale: 1, y: 0 }}
-          transition={{ type: "spring", stiffness: 200 }}
-          className="bg-slate-800/95 backdrop-blur-xl rounded-3xl p-6 max-w-sm text-center shadow-2xl border border-slate-700 relative z-10"
+          initial={{ scale: 0 }}
+          animate={{ scale: 1 }}
+          className="bg-slate-800/95 backdrop-blur-xl rounded-3xl p-8 max-w-sm w-full text-center shadow-2xl border-2 border-red-500/50"
         >
-          <motion.div
-            className="text-8xl mb-3"
-            animate={{ y: [0, -5, 0] }}
-            transition={{ duration: 2, repeat: Infinity }}
-          >
-            😾
-          </motion.div>
-          <div className="text-4xl absolute top-8 left-1/2 -translate-x-1/2">👑</div>
-
-          <h2 className="text-3xl font-black text-red-500 mb-2">
-            DEFEATED!
-          </h2>
-          <p className="text-slate-400 mb-4 text-sm">
-            "I KNEW you couldn't handle my drama!" 👑
-          </p>
-
-          <div className="bg-slate-700/50 rounded-xl p-4 mb-4">
-            <p className="text-slate-300 text-xs mb-2">Your Stats:</p>
-            <div className="flex justify-center gap-4">
-              <div>
-                <div className="text-lg font-bold text-pink-400">{loveSent}</div>
-                <div className="text-xs text-slate-500">Love Sent</div>
-              </div>
-              <div>
-                <div className="text-lg font-bold text-amber-400">{maxCombo}</div>
-                <div className="text-xs text-slate-500">Max Combo</div>
-              </div>
-              <div>
-                <div className="text-lg font-bold text-cyan-400">{perfectParries}</div>
-                <div className="text-xs text-slate-500">Parries</div>
-              </div>
-            </div>
-          </div>
-
-          <p className="text-slate-500 text-xs">
-            Try again... the cat awaits your devotion!
-          </p>
+          <motion.div className="text-6xl mb-4">😿💔</motion.div>
+          <h2 className="text-3xl font-black text-red-400 mb-4">DEFEATED...</h2>
+          <p className="text-slate-400 mb-4">The Drama King wins this round!</p>
+          <p className="text-slate-500">Score: {score}</p>
         </motion.div>
       </div>
     );
   }
 
-  // Battle screen
+  // QTE screen overlay
+  if (phase === "qte") {
+    return (
+      <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50">
+        <motion.div
+          initial={{ scale: 0.5, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          className="bg-gradient-to-br from-purple-900 to-pink-900 rounded-3xl p-8 text-center"
+        >
+          <h3 className="text-2xl font-bold text-white mb-4">SUPER ATTACK!</h3>
+
+          {/* Timer bar */}
+          <div className="w-full h-3 bg-slate-700 rounded-full mb-6 overflow-hidden">
+            <motion.div
+              className="h-full bg-gradient-to-r from-yellow-400 to-red-500"
+              style={{ width: `${(qte.timeLeft / 3) * 100}%` }}
+            />
+          </div>
+
+          {/* Sequence display */}
+          <div className="flex justify-center gap-3 mb-6">
+            {qte.sequence.map((btn, i) => (
+              <motion.div
+                key={i}
+                className={cn(
+                  "w-14 h-14 rounded-xl flex items-center justify-center text-2xl",
+                  i < qte.current ? "bg-green-500" : i === qte.current ? "bg-yellow-400 animate-pulse" : "bg-slate-600"
+                )}
+                animate={i === qte.current ? { scale: [1, 1.1, 1] } : {}}
+                transition={{ duration: 0.3, repeat: Infinity }}
+              >
+                {btn}
+              </motion.div>
+            ))}
+          </div>
+
+          {/* Input buttons */}
+          <div className="flex justify-center gap-3">
+            {["💖", "⭐", "✨", "💕"].map(btn => (
+              <motion.button
+                key={btn}
+                onClick={() => handleQTEPress(btn)}
+                className="w-16 h-16 bg-gradient-to-br from-pink-500 to-purple-600 rounded-xl text-3xl shadow-lg active:scale-95"
+                whileTap={{ scale: 0.9 }}
+              >
+                {btn}
+              </motion.button>
+            ))}
+          </div>
+        </motion.div>
+      </div>
+    );
+  }
+
+  // Main battle screen
   return (
     <div
-      className={cn(
-        "fixed inset-0 overflow-hidden select-none transition-colors duration-300",
-        bgIntensity === 0 ? "bg-gradient-to-b from-slate-900 via-purple-900 to-slate-900" :
-        bgIntensity === 1 ? "bg-gradient-to-b from-slate-900 via-red-900 to-purple-900" :
-        "bg-gradient-to-b from-red-900 via-purple-900 to-black"
-      )}
+      className="fixed inset-0 bg-gradient-to-b from-slate-900 via-purple-950 to-slate-900 overflow-hidden touch-none select-none"
       style={{
-        transform: screenShake ? `translate(${(Math.random() - 0.5) * screenShake}px, ${(Math.random() - 0.5) * screenShake}px)` : undefined
+        transform: screenShake ? `translate(${(Math.random() - 0.5) * screenShake}px, ${(Math.random() - 0.5) * screenShake}px)` : undefined,
       }}
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
     >
-      {/* Lightning flash */}
-      {lightning && <div className="absolute inset-0 bg-white/30 z-50 pointer-events-none" />}
+      {/* Flash effect */}
+      {flashColor && (
+        <div className="absolute inset-0 z-50 pointer-events-none" style={{ backgroundColor: flashColor }} />
+      )}
 
-      {/* Hit flash overlays */}
-      {hitFlash === "player" && <div className="absolute inset-0 bg-red-500/30 z-40 pointer-events-none" />}
-      {hitFlash === "boss" && <div className="absolute inset-0 bg-pink-500/20 z-40 pointer-events-none" />}
-
-      {/* Animated background particles - reduced for performance */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        {Array.from({ length: 5 }).map((_, i) => (
-          <div
-            key={i}
-            className="absolute text-2xl opacity-10"
-            style={{
-              left: `${(i * 20) % 100}%`,
-              top: `${(i * 25) % 100}%`,
-              animation: `float ${4 + i}s ease-in-out infinite`,
-            }}
-          >
-            {bossPhase === "phase3" ? "👑" : bossPhase === "phase2" ? "💢" : "💔"}
-          </div>
-        ))}
-      </div>
-
-      {/* HP Bars */}
-      <div className="absolute top-4 left-4 right-4 flex flex-col gap-2 z-20">
+      {/* Top HUD - HP bars and score */}
+      <div className="absolute top-4 left-4 right-4 z-30 space-y-2">
         {/* Boss HP */}
         <div className="flex items-center gap-2">
           <span className="text-xl">👑</span>
-          <div className="flex-1 h-5 bg-slate-800 rounded-full overflow-hidden border border-slate-600">
+          <div className="flex-1 h-4 bg-slate-800 rounded-full overflow-hidden border border-slate-600">
             <motion.div
               className={cn(
-                "h-full transition-all duration-300",
-                bossPhase === "phase3" ? "bg-gradient-to-r from-red-600 to-orange-500" :
-                bossPhase === "phase2" ? "bg-gradient-to-r from-purple-600 to-red-500" :
-                "bg-gradient-to-r from-purple-500 to-pink-500"
+                "h-full transition-all duration-200",
+                bossPhase === "phase3" ? "bg-gradient-to-r from-red-500 to-orange-500" :
+                bossPhase === "phase2" ? "bg-gradient-to-r from-purple-500 to-red-500" :
+                "bg-gradient-to-r from-purple-400 to-pink-500"
               )}
               style={{ width: `${bossHP}%` }}
-              animate={bossAction === "stunned" ? { opacity: [1, 0.5, 1] } : {}}
-              transition={{ duration: 0.3, repeat: bossAction === "stunned" ? Infinity : 0 }}
             />
           </div>
-          <span className="text-white text-xs font-bold w-10 text-right">{Math.ceil(bossHP)}%</span>
-        </div>
-
-        {/* Phase indicator */}
-        <div className="flex justify-center gap-1 mb-1">
-          {["phase1", "phase2", "phase3"].map((p, i) => (
-            <div
-              key={p}
-              className={cn(
-                "w-16 h-1 rounded-full transition-colors",
-                bossPhase === p ? "bg-purple-400" :
-                (bossPhase === "phase2" && i === 0) || (bossPhase === "phase3" && i <= 1) ? "bg-slate-600" :
-                "bg-slate-700"
-              )}
-            />
-          ))}
+          <span className="text-white text-xs font-bold w-8">{Math.ceil(bossHP)}%</span>
         </div>
 
         {/* Player HP */}
         <div className="flex items-center gap-2">
           <span className="text-xl">💖</span>
-          <div className="flex-1 h-5 bg-slate-800 rounded-full overflow-hidden border border-slate-600">
-            <motion.div
-              className="h-full bg-gradient-to-r from-pink-500 to-rose-500 transition-all duration-300"
-              style={{ width: `${(playerHP / playerMaxHP) * 100}%` }}
+          <div className="flex-1 h-4 bg-slate-800 rounded-full overflow-hidden border border-slate-600">
+            <div
+              className="h-full bg-gradient-to-r from-pink-500 to-rose-500 transition-all duration-200"
+              style={{ width: `${playerHP}%` }}
             />
           </div>
-          <span className="text-white text-xs font-bold w-14 text-right">{Math.ceil(playerHP)}/{playerMaxHP}</span>
+          <span className="text-white text-xs font-bold w-8">{Math.ceil(playerHP)}%</span>
         </div>
 
-        {/* Attack queue indicator */}
-        {attackQueue.length > 0 && (
-          <div className="flex items-center justify-center gap-1">
-            <span className="text-xs text-red-400">Incoming:</span>
-            {attackQueue.slice(0, 3).map((atk, i) => (
-              <span key={i} className="text-sm">{BOSS_ATTACKS[atk].emoji}</span>
-            ))}
-          </div>
-        )}
-
-        {/* Combo counter */}
-        {combo > 0 && (
-          <motion.div
-            key={combo}
-            initial={{ scale: 1.5, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            className="text-center"
-          >
-            <span className={cn(
-              "font-black text-sm",
-              combo >= 10 ? "text-yellow-400" : combo >= 5 ? "text-pink-400" : "text-purple-400"
-            )}>
-              {combo} COMBO! {combo >= 10 ? "🔥" : combo >= 5 ? "✨" : ""}
-            </span>
-          </motion.div>
-        )}
+        {/* Score and combo */}
+        <div className="flex justify-between items-center">
+          <span className="text-white text-sm font-bold">Score: {score}</span>
+          {combo > 0 && (
+            <motion.span
+              key={combo}
+              initial={{ scale: 1.5 }}
+              animate={{ scale: 1 }}
+              className={cn(
+                "font-bold text-sm",
+                combo >= 10 ? "text-yellow-400" : combo >= 5 ? "text-pink-400" : "text-purple-400"
+              )}
+            >
+              {combo} COMBO! {combo >= 10 ? "🔥" : ""}
+            </motion.span>
+          )}
+        </div>
       </div>
 
       {/* Boss area */}
-      <div className="absolute top-32 left-1/2 -translate-x-1/2 flex flex-col items-center">
-        {/* Charge bar */}
-        {bossAction === "charging" && (
-          <motion.div
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="mb-2 w-32"
-          >
-            <div className="h-2 bg-slate-700 rounded-full overflow-hidden">
-              <motion.div
-                className={cn(
-                  "h-full",
-                  parryWindow ? "bg-yellow-400" : "bg-red-500"
-                )}
-                style={{ width: `${chargeProgress * 100}%` }}
-              />
-            </div>
-            {parryWindow && (
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: [1, 0.5, 1] }}
-                transition={{ duration: 0.2, repeat: Infinity }}
-                className="text-center text-yellow-400 text-xs font-bold mt-1"
-              >
-                PARRY NOW!
-              </motion.div>
-            )}
-          </motion.div>
-        )}
+      <div className="absolute top-28 left-1/2 -translate-x-1/2 flex flex-col items-center z-20">
+        <motion.div
+          className="text-6xl"
+          animate={bossShaking ? { x: [-5, 5, -5, 5, 0] } : { y: [0, -5, 0] }}
+          transition={{ duration: bossShaking ? 0.2 : 1.5, repeat: bossShaking ? 0 : Infinity }}
+        >
+          👑
+          <br />
+          {bossEmotion === "defeated" ? "😵" : bossEmotion === "hurt" ? "😿" : bossEmotion === "angry" ? "😾" : "😼"}
+        </motion.div>
 
-        {/* Boss character */}
-        <div className="relative">
-          {/* Crown */}
-          <motion.div
-            className="text-4xl absolute -top-8 left-1/2 -translate-x-1/2 z-10"
-            animate={{
-              y: bossAction === "stunned" ? [0, -5, 0] : [0, -3, 0],
-              rotate: bossAction === "stunned" ? [0, -20, 20, 0] : [0, -5, 5, 0],
-            }}
-            transition={{ duration: bossAction === "stunned" ? 0.3 : 1.5, repeat: Infinity }}
-          >
-            👑
-          </motion.div>
-
-          {/* Boss emoji */}
-          <motion.div
-            animate={
-              bossAction === "attacking" ? { scale: [1, 1.5, 1], x: [0, -30, 30, 0], rotate: [0, -10, 10, 0] } :
-              bossAction === "charging" ? { scale: [1, 1.15, 1] } :
-              bossAction === "stunned" ? { rotate: [0, -15, 15, 0], scale: [1, 0.9, 1] } :
-              { y: [0, -5, 0] }
-            }
-            transition={{
-              duration: bossAction === "attacking" ? 0.4 : bossAction === "stunned" ? 0.3 : 1,
-              repeat: bossAction === "idle" ? Infinity : bossAction === "charging" || bossAction === "stunned" ? Infinity : 0
-            }}
-            className={cn(
-              "text-8xl transition-all",
-              bossAction === "stunned" && "grayscale"
-            )}
-          >
-            {getBossEmoji()}
-          </motion.div>
-
-          {/* Boss aura for phase 3 */}
-          {bossPhase === "phase3" && bossAction !== "stunned" && (
-            <motion.div
-              className="absolute inset-0 -z-10 rounded-full"
-              animate={{
-                boxShadow: [
-                  "0 0 20px 10px rgba(239,68,68,0.3)",
-                  "0 0 40px 20px rgba(239,68,68,0.5)",
-                  "0 0 20px 10px rgba(239,68,68,0.3)",
-                ],
-              }}
-              transition={{ duration: 1, repeat: Infinity }}
-            />
-          )}
-        </div>
-
-        {/* Attack name */}
-        {currentAttack !== "rest" && (
-          <motion.div
-            initial={{ opacity: 0, y: 20, scale: 0.8 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            className={cn(
-              "mt-4 px-4 py-2 rounded-full font-bold text-white text-sm shadow-lg",
-              bossAction === "attacking" ? "bg-red-600" : "bg-purple-600"
-            )}
-          >
-            {BOSS_ATTACKS[currentAttack].emoji} {BOSS_ATTACKS[currentAttack].name}
-          </motion.div>
-        )}
-
-        {/* Stunned indicator */}
-        {bossAction === "stunned" && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="mt-4 px-4 py-2 rounded-full font-bold text-yellow-300 text-sm bg-yellow-600/30 border border-yellow-500"
-          >
-            ⭐ STUNNED! ⭐
-          </motion.div>
-        )}
-
-        {/* Boss message */}
         {bossMessage && (
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0 }}
-            className="mt-3 px-4 py-2 bg-slate-800/90 rounded-lg border border-purple-500/50 max-w-[200px]"
+            className="mt-2 px-3 py-1 bg-slate-800/90 rounded-lg border border-purple-500/50"
           >
-            <p className="text-purple-200 text-sm font-medium text-center">{bossMessage}</p>
+            <p className="text-purple-200 text-sm">{bossMessage}</p>
           </motion.div>
         )}
       </div>
 
-      {/* Shield effect */}
-      {shieldActive && (
-        <motion.div
-          initial={{ scale: 0, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          exit={{ scale: 0, opacity: 0 }}
-          className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-32 h-32 rounded-full border-4 border-cyan-400 bg-cyan-400/20 z-30"
-        />
-      )}
-
-      {/* Parry success effect */}
-      {parrySuccess && (
-        <motion.div
-          initial={{ scale: 0 }}
-          animate={{ scale: [0, 1.5, 1], opacity: [0, 1, 0] }}
-          transition={{ duration: 0.5 }}
-          className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-6xl z-40"
-        >
-          ✨
-        </motion.div>
-      )}
-
-      {/* Particles - optimized with colored divs instead of emoji */}
-      {particles.map(p => (
-        <div
-          key={p.id}
-          className="absolute pointer-events-none rounded-full"
-          style={{
-            left: `${p.x}%`,
-            top: `${p.y}%`,
-            width: p.size,
-            height: p.size,
-            opacity: p.life,
-            transform: `rotate(${p.rotation}deg)`,
-            backgroundColor: p.color,
-            boxShadow: (p.type === "star" || p.type === "spark" || p.type === "crown") ? `0 0 ${p.size}px ${p.color}` : undefined,
-          }}
-        />
-      ))}
-
-      {/* Projectiles - CSS animation for better performance */}
-      {projectiles.map(proj => (
-        <div
-          key={proj.id}
-          className="absolute pointer-events-none text-2xl z-20"
-          style={{
-            left: `${proj.x}%`,
-            top: `${proj.y}%`,
-            animation: "spin 0.5s linear infinite",
-          }}
-        >
-          {proj.type === "heart" ? "💔" : proj.type === "jealousy" ? "💚" : "💢"}
+      {/* Three lane game area */}
+      <div className="absolute inset-x-0 top-1/3 bottom-32 z-10">
+        {/* Lane dividers */}
+        <div className="absolute inset-0 flex">
+          <div className="flex-1 border-r border-slate-700/50" />
+          <div className="flex-1 border-r border-slate-700/50" />
+          <div className="flex-1" />
         </div>
-      ))}
+
+        {/* Hit zone indicator */}
+        <div className="absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-purple-500/30 to-transparent border-t-2 border-purple-500/50">
+          <div className="text-center text-purple-300 text-xs mt-1">TAP ZONE</div>
+        </div>
+
+        {/* Perfect zone indicator */}
+        <div className="absolute bottom-12 left-0 right-0 h-8 border-t border-b border-yellow-500/30 bg-yellow-500/10">
+          <div className="text-center text-yellow-300/50 text-[10px]">PERFECT</div>
+        </div>
+
+        {/* Boss projectiles (dodge these) */}
+        {projectiles.map(p => (
+          <motion.div
+            key={p.id}
+            className="absolute text-3xl pointer-events-none"
+            style={{
+              left: `${getLaneX(p.lane)}%`,
+              top: `${p.y}%`,
+              transform: "translateX(-50%)",
+            }}
+          >
+            {p.emoji}
+          </motion.div>
+        ))}
+
+        {/* Attack targets (tap these) */}
+        {targets.map(t => (
+          <motion.div
+            key={t.id}
+            className={cn(
+              "absolute text-2xl pointer-events-none",
+              t.perfect && "scale-125"
+            )}
+            style={{
+              left: `${getLaneX(t.lane)}%`,
+              top: `${t.y}%`,
+              transform: "translateX(-50%)",
+            }}
+          >
+            {t.emoji}
+          </motion.div>
+        ))}
+
+        {/* Player position indicator */}
+        <motion.div
+          className="absolute bottom-2 text-4xl"
+          animate={{ x: playerDodging ? [-10, 10, 0] : 0 }}
+          transition={{ duration: 0.1 }}
+          style={{
+            left: `${getLaneX(playerLane)}%`,
+            transform: "translateX(-50%)",
+          }}
+        >
+          💝
+        </motion.div>
+      </div>
+
+      {/* Lane tap buttons */}
+      <div className="absolute inset-x-0 top-1/3 bottom-32 flex z-20">
+        {(["left", "center", "right"] as Lane[]).map(lane => (
+          <button
+            key={lane}
+            className="flex-1 active:bg-white/10"
+            onClick={() => handleLaneTap(lane)}
+          />
+        ))}
+      </div>
 
       {/* Floating texts */}
       <AnimatePresence>
@@ -7555,125 +6990,62 @@ const DramaKingBattle = memo(function DramaKingBattle({ onComplete }: { onComple
             key={t.id}
             initial={{ opacity: 0, y: 0, scale: 0.5 }}
             animate={{ opacity: 1, y: -30, scale: 1 }}
-            exit={{ opacity: 0, y: -60 }}
-            transition={{ duration: 1.5 }}
-            className={cn(
-              "absolute left-1/2 -translate-x-1/2 font-black pointer-events-none whitespace-nowrap z-30",
-              t.size === "sm" ? "text-sm" : t.size === "lg" ? "text-2xl" : "text-lg"
-            )}
-            style={{ top: `${t.y}%`, color: t.color }}
+            exit={{ opacity: 0 }}
+            className="absolute font-black pointer-events-none z-40"
+            style={{ left: `${t.x}%`, top: `${t.y}%`, color: t.color, transform: "translateX(-50%)" }}
           >
             {t.text}
           </motion.div>
         ))}
       </AnimatePresence>
 
-      {/* Score popups */}
-      <AnimatePresence>
-        {scorePopups.map(p => (
-          <motion.div
-            key={p.id}
-            initial={{ opacity: 0, y: 0, scale: 0 }}
-            animate={{ opacity: 1, y: -40, scale: 1 }}
-            exit={{ opacity: 0, y: -60 }}
-            transition={{ duration: 1 }}
-            className={cn(
-              "absolute left-1/2 -translate-x-1/2 font-black pointer-events-none z-30",
-              p.type === "damage" ? "text-pink-400" :
-              p.type === "parry" ? "text-yellow-400" :
-              p.type === "combo" ? "text-orange-400" :
-              "text-green-400"
+      {/* Particles */}
+      {particles.map(p => (
+        <div
+          key={p.id}
+          className="absolute text-xl pointer-events-none z-30"
+          style={{ left: `${p.x}%`, top: `${p.y}%`, opacity: p.life }}
+        >
+          {p.emoji}
+        </div>
+      ))}
+
+      {/* Bottom HUD - QTE meter and controls */}
+      <div className="absolute bottom-4 left-4 right-4 z-30">
+        {/* QTE charge meter */}
+        <div className="mb-3">
+          <div className="flex items-center gap-2 mb-1">
+            <span className="text-xs text-purple-300">SUPER</span>
+            <div className="flex-1 h-3 bg-slate-800 rounded-full overflow-hidden border border-purple-500/50">
+              <motion.div
+                className="h-full bg-gradient-to-r from-purple-500 to-pink-500"
+                style={{ width: `${qteCharge}%` }}
+              />
+            </div>
+            {qteCharge >= 100 && (
+              <motion.button
+                onClick={activateQTE}
+                className="px-3 py-1 bg-gradient-to-r from-yellow-400 to-orange-500 rounded-full text-xs font-bold text-white"
+                animate={{ scale: [1, 1.1, 1] }}
+                transition={{ duration: 0.5, repeat: Infinity }}
+              >
+                💥 GO!
+              </motion.button>
             )}
-            style={{ top: `${p.y}%`, left: `${p.x}%` }}
-          >
-            +{p.value}
-            {p.type === "parry" && " PARRY!"}
-            {p.type === "combo" && " 🔥"}
-          </motion.div>
-        ))}
-      </AnimatePresence>
+          </div>
+        </div>
 
-      {/* Action buttons */}
-      <div className="absolute bottom-6 left-0 right-0 flex justify-center gap-3 px-4 z-20">
-        {/* Love button */}
-        <motion.button
-          onClick={sendLove}
-          disabled={attackCooldown > 0 || playerStunned}
-          className={cn(
-            "flex-1 max-w-[100px] py-4 rounded-2xl font-bold text-lg shadow-xl transition-all relative overflow-hidden",
-            attackCooldown > 0 || playerStunned
-              ? "bg-slate-600 text-slate-400"
-              : "bg-gradient-to-br from-pink-500 to-rose-600 text-white active:scale-95"
-          )}
-          whileTap={attackCooldown > 0 || playerStunned ? {} : { scale: 0.95 }}
-        >
-          <span className="text-xl">💖</span>
-          <div className="text-xs">LOVE!</div>
-          {attackCooldown > 0 && (
-            <div
-              className="absolute bottom-0 left-0 h-1 bg-pink-400"
-              style={{ width: `${(1 - attackCooldown / 0.3) * 100}%` }}
-            />
-          )}
-        </motion.button>
-
-        {/* Special attack button */}
-        <motion.button
-          onClick={useSpecialAttack}
-          disabled={!specialReady || playerStunned}
-          className={cn(
-            "flex-1 max-w-[100px] py-4 rounded-2xl font-bold text-lg shadow-xl transition-all relative overflow-hidden",
-            !specialReady || playerStunned
-              ? "bg-slate-700 text-slate-500"
-              : "bg-gradient-to-br from-amber-400 via-orange-500 to-red-500 text-white active:scale-95 animate-pulse"
-          )}
-          whileTap={!specialReady || playerStunned ? {} : { scale: 0.95 }}
-        >
-          <span className="text-xl">⚡</span>
-          <div className="text-xs">{specialReady ? "MEGA!" : `${Math.max(0, 10 - combo)}`}</div>
-          {!specialReady && combo > 0 && (
-            <div
-              className="absolute bottom-0 left-0 h-1 bg-amber-400"
-              style={{ width: `${Math.min(100, (combo / 10) * 100)}%` }}
-            />
-          )}
-        </motion.button>
-
-        {/* Shield button */}
-        <motion.button
-          onClick={activateShield}
-          disabled={shieldCooldown > 0 || playerStunned}
-          className={cn(
-            "flex-1 max-w-[100px] py-4 rounded-2xl font-bold text-lg shadow-xl transition-all relative overflow-hidden",
-            shieldCooldown > 0 || playerStunned
-              ? "bg-slate-600 text-slate-400"
-              : parryWindow
-              ? "bg-gradient-to-br from-yellow-400 to-amber-500 text-white active:scale-95 animate-pulse"
-              : "bg-gradient-to-br from-cyan-500 to-blue-600 text-white active:scale-95"
-          )}
-          whileTap={shieldCooldown > 0 || playerStunned ? {} : { scale: 0.95 }}
-        >
-          <span className="text-xl">🛡️</span>
-          <div className="text-xs">{shieldCooldown > 0 ? `${Math.ceil(shieldCooldown)}s` : parryWindow ? "PARRY!" : "SHIELD"}</div>
-          {shieldCooldown > 0 && (
-            <div
-              className="absolute bottom-0 left-0 h-1 bg-cyan-400"
-              style={{ width: `${(1 - shieldCooldown / 3) * 100}%` }}
-            />
-          )}
-        </motion.button>
-      </div>
-
-      {/* Phase indicator text */}
-      <div className="absolute bottom-24 left-0 right-0 text-center z-10">
-        <span className={cn(
-          "text-xs font-medium px-3 py-1 rounded-full",
-          bossPhase === "phase3" ? "bg-red-500/30 text-red-300" :
-          bossPhase === "phase2" ? "bg-purple-500/30 text-purple-300" :
-          "bg-slate-500/30 text-slate-400"
-        )}>
-          {bossPhase === "phase3" ? "⚠️ FINAL PHASE" : bossPhase === "phase2" ? "PHASE 2" : "PHASE 1"}
-        </span>
+        {/* Phase indicator */}
+        <div className="text-center">
+          <span className={cn(
+            "text-xs font-medium px-3 py-1 rounded-full",
+            bossPhase === "phase3" ? "bg-red-500/30 text-red-300" :
+            bossPhase === "phase2" ? "bg-purple-500/30 text-purple-300" :
+            "bg-slate-500/30 text-slate-400"
+          )}>
+            {bossPhase === "phase3" ? "⚠️ FINAL PHASE" : bossPhase === "phase2" ? "PHASE 2" : "PHASE 1"}
+          </span>
+        </div>
       </div>
     </div>
   );
