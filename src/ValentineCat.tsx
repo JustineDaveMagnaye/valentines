@@ -6477,7 +6477,7 @@ const DramaKingBattle = memo(function DramaKingBattle({ onComplete }: { onComple
     }
   }, [currentAttack, phase, spawnParticles, spawnText]);
 
-  // Touch handlers
+  // Touch handlers (mobile)
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
     const touch = e.touches[0];
     touchStartRef.current = { x: touch.clientX, y: touch.clientY, time: Date.now() };
@@ -6511,39 +6511,39 @@ const DramaKingBattle = memo(function DramaKingBattle({ onComplete }: { onComple
     }
   }, [handleSwipe, handleTapAttack]);
 
-  // Activate super attack (QTE)
-  const activateSuper = useCallback(() => {
-    if (superMeter < 100 || phase !== "battle") return;
+  // Mouse handlers (desktop/laptop)
+  const mouseStartRef = useRef<{ x: number; y: number; time: number } | null>(null);
 
-    soundManager.specialAttack();
-    setSuperMeter(0);
-    const buttons = ["💖", "⭐", "✨", "💕"];
-    const sequence = Array.from({ length: 4 }, () => buttons[Math.floor(Math.random() * 4)]);
-    setQteSequence(sequence);
-    setQteIndex(0);
-    setQteTimeLeft(4);
-    setPhase("qte");
-  }, [superMeter, phase]);
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    mouseStartRef.current = { x: e.clientX, y: e.clientY, time: Date.now() };
+  }, []);
 
-  // QTE countdown
-  useEffect(() => {
-    if (phase !== "qte") return;
+  const handleMouseUp = useCallback((e: React.MouseEvent) => {
+    if (!mouseStartRef.current) return;
 
-    const timer = setInterval(() => {
-      setQteTimeLeft(t => {
-        if (t <= 0.1) {
-          soundManager.damage();
-          setPhase("battle");
-          setBossMessage("Too slow! 😼");
-          setTimeout(() => setBossMessage(""), 1000);
-          return 0;
-        }
-        return t - 0.1;
-      });
-    }, 100);
+    const dx = e.clientX - mouseStartRef.current.x;
+    const dy = e.clientY - mouseStartRef.current.y;
+    const dt = Date.now() - mouseStartRef.current.time;
+    mouseStartRef.current = null;
 
-    return () => clearInterval(timer);
-  }, [phase]);
+    const minSwipeDistance = 50;
+    const maxTapDistance = 20;
+
+    // Check if it's a drag (swipe)
+    if (Math.abs(dx) > minSwipeDistance || Math.abs(dy) > minSwipeDistance) {
+      let direction: SwipeDirection;
+      if (Math.abs(dx) > Math.abs(dy)) {
+        direction = dx > 0 ? "right" : "left";
+      } else {
+        direction = dy > 0 ? "down" : "up";
+      }
+      handleSwipe(direction);
+    }
+    // Check if it's a click (tap)
+    else if (Math.abs(dx) < maxTapDistance && Math.abs(dy) < maxTapDistance && dt < 300) {
+      handleTapAttack();
+    }
+  }, [handleSwipe, handleTapAttack]);
 
   // Handle QTE button press
   const handleQTEPress = useCallback((button: string) => {
@@ -6589,6 +6589,97 @@ const DramaKingBattle = memo(function DramaKingBattle({ onComplete }: { onComple
       setTimeout(() => setBossMessage(""), 1000);
     }
   }, [phase, qteSequence, qteIndex, spawnParticles, spawnText, triggerShake]);
+
+  // Keyboard handlers (desktop/laptop)
+  useEffect(() => {
+    if (phase !== "battle" && phase !== "qte") return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Arrow keys or WASD for dodging
+      if (phase === "battle") {
+        switch (e.key) {
+          case "ArrowLeft":
+          case "a":
+          case "A":
+            handleSwipe("left");
+            break;
+          case "ArrowRight":
+          case "d":
+          case "D":
+            handleSwipe("right");
+            break;
+          case "ArrowUp":
+          case "w":
+          case "W":
+            handleSwipe("up");
+            break;
+          case "ArrowDown":
+          case "s":
+          case "S":
+            handleSwipe("down");
+            break;
+          case " ": // Spacebar for attack
+            e.preventDefault();
+            handleTapAttack();
+            break;
+        }
+      }
+      // QTE button shortcuts
+      if (phase === "qte") {
+        switch (e.key) {
+          case "1":
+            handleQTEPress("💖");
+            break;
+          case "2":
+            handleQTEPress("⭐");
+            break;
+          case "3":
+            handleQTEPress("✨");
+            break;
+          case "4":
+            handleQTEPress("💕");
+            break;
+        }
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [phase, handleSwipe, handleTapAttack, handleQTEPress]);
+
+  // Activate super attack (QTE)
+  const activateSuper = useCallback(() => {
+    if (superMeter < 100 || phase !== "battle") return;
+
+    soundManager.specialAttack();
+    setSuperMeter(0);
+    const buttons = ["💖", "⭐", "✨", "💕"];
+    const sequence = Array.from({ length: 4 }, () => buttons[Math.floor(Math.random() * 4)]);
+    setQteSequence(sequence);
+    setQteIndex(0);
+    setQteTimeLeft(4);
+    setPhase("qte");
+  }, [superMeter, phase]);
+
+  // QTE countdown
+  useEffect(() => {
+    if (phase !== "qte") return;
+
+    const timer = setInterval(() => {
+      setQteTimeLeft(t => {
+        if (t <= 0.1) {
+          soundManager.damage();
+          setPhase("battle");
+          setBossMessage("Too slow! 😼");
+          setTimeout(() => setBossMessage(""), 1000);
+          return 0;
+        }
+        return t - 0.1;
+      });
+    }, 100);
+
+    return () => clearInterval(timer);
+  }, [phase]);
 
   // TUTORIAL SCREEN
   if (phase === "tutorial") {
@@ -6785,6 +6876,8 @@ const DramaKingBattle = memo(function DramaKingBattle({ onComplete }: { onComple
       }}
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
+      onMouseDown={handleMouseDown}
+      onMouseUp={handleMouseUp}
     >
       {/* Flash effect */}
       {flashColor && (
