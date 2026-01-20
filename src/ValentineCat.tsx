@@ -1096,42 +1096,141 @@ const ChapterTitle = memo(function ChapterTitle({ chapter, onComplete }: { chapt
   const data = CHAPTER_TITLES[chapter];
 
   useEffect(() => {
-    const timer = setTimeout(onComplete, 3000);
+    const timer = setTimeout(onComplete, 3500);
     return () => clearTimeout(timer);
   }, [onComplete]);
 
   return (
     <motion.div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black"
+      className="fixed inset-0 z-50 flex items-center justify-center overflow-hidden"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
     >
-      <div className="text-center text-white">
+      {/* Super premium animated gradient background */}
+      <motion.div
+        className="absolute inset-0"
+        style={{
+          background: "linear-gradient(135deg, #0f0f23 0%, #1a1a3e 25%, #2d1b4e 50%, #1a1a3e 75%, #0f0f23 100%)",
+          backgroundSize: "400% 400%"
+        }}
+        animate={{ backgroundPosition: ["0% 0%", "100% 100%", "0% 0%"] }}
+        transition={{ duration: 10, repeat: Infinity, ease: "linear" }}
+      />
+
+      {/* Animated nebula orbs */}
+      <div className="absolute inset-0 pointer-events-none overflow-hidden">
         <motion.div
-          initial={{ scale: 0, rotate: -180 }}
-          animate={{ scale: 1, rotate: 0 }}
-          transition={{ type: "spring", stiffness: 200, delay: 0.2 }}
-          className="text-6xl mb-4"
+          className="absolute w-[600px] h-[600px] rounded-full blur-[120px] opacity-30"
+          style={{ background: "radial-gradient(circle, rgba(236,72,153,0.6) 0%, transparent 70%)", left: "-15%", top: "-20%" }}
+          animate={{ x: [0, 100, 0], y: [0, 50, 0], scale: [1, 1.4, 1] }}
+          transition={{ duration: 8, repeat: Infinity }}
+        />
+        <motion.div
+          className="absolute w-[500px] h-[500px] rounded-full blur-[100px] opacity-25"
+          style={{ background: "radial-gradient(circle, rgba(147,51,234,0.6) 0%, transparent 70%)", right: "-10%", bottom: "-15%" }}
+          animate={{ x: [0, -80, 0], y: [0, -60, 0], scale: [1.2, 0.9, 1.2] }}
+          transition={{ duration: 10, repeat: Infinity }}
+        />
+      </div>
+
+      {/* Particle burst effect */}
+      {Array.from({ length: 20 }).map((_, i) => (
+        <motion.div
+          key={i}
+          className="absolute left-1/2 top-1/2"
+          initial={{ x: 0, y: 0, scale: 0, opacity: 0 }}
+          animate={{
+            x: Math.cos((i / 20) * Math.PI * 2) * (150 + Math.random() * 100),
+            y: Math.sin((i / 20) * Math.PI * 2) * (150 + Math.random() * 100),
+            scale: [0, 1.5, 0],
+            opacity: [0, 1, 0],
+          }}
+          transition={{ duration: 2, delay: 0.3, ease: "easeOut" }}
         >
-          {typeof data.num === "number" ? `Chapter ${data.num}` : data.num}
+          <span className="text-2xl">{["✨", "💫", "⭐", "🌟"][i % 4]}</span>
         </motion.div>
+      ))}
+
+      {/* Floating sparkles */}
+      {Array.from({ length: 30 }).map((_, i) => (
+        <motion.div
+          key={`sparkle-${i}`}
+          className="absolute rounded-full bg-white"
+          style={{
+            left: `${Math.random() * 100}%`,
+            top: `${Math.random() * 100}%`,
+            width: `${2 + Math.random() * 3}px`,
+            height: `${2 + Math.random() * 3}px`,
+            boxShadow: "0 0 6px 2px rgba(255,255,255,0.6)"
+          }}
+          animate={{ opacity: [0, 1, 0], scale: [0, 1.5, 0] }}
+          transition={{ duration: 2 + Math.random() * 2, repeat: Infinity, delay: Math.random() * 2 }}
+        />
+      ))}
+
+      <div className="relative z-10 text-center text-white">
+        {/* Chapter number with premium effects */}
+        <motion.div
+          initial={{ scale: 0, rotate: -180, opacity: 0 }}
+          animate={{ scale: 1, rotate: 0, opacity: 1 }}
+          transition={{ type: "spring", stiffness: 150, delay: 0.2 }}
+          className="relative mb-6"
+        >
+          {/* Glow behind number */}
+          <motion.div
+            className="absolute inset-0 blur-3xl"
+            style={{ background: "radial-gradient(circle, rgba(236,72,153,0.6) 0%, transparent 70%)" }}
+            animate={{ scale: [1, 1.3, 1], opacity: [0.4, 0.8, 0.4] }}
+            transition={{ duration: 2, repeat: Infinity }}
+          />
+          <motion.span
+            className="text-7xl md:text-8xl font-black relative"
+            style={{
+              backgroundImage: "linear-gradient(135deg, #ec4899 0%, #f43f5e 30%, #a855f7 60%, #ec4899 100%)",
+              backgroundSize: "200% auto",
+              backgroundClip: "text",
+              WebkitBackgroundClip: "text",
+              color: "transparent",
+              filter: "drop-shadow(0 0 30px rgba(236,72,153,0.5))"
+            }}
+            animate={{ backgroundPosition: ["0% center", "200% center"] }}
+            transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
+          >
+            {typeof data.num === "number" ? `Chapter ${data.num}` : data.num}
+          </motion.span>
+        </motion.div>
+
+        {/* Title with premium styling */}
         <motion.h1
-          initial={{ y: 50, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          transition={{ delay: 0.5 }}
-          className="text-4xl font-bold mb-2"
+          initial={{ y: 60, opacity: 0, scale: 0.8 }}
+          animate={{ y: 0, opacity: 1, scale: 1 }}
+          transition={{ delay: 0.5, type: "spring", stiffness: 100 }}
+          className="text-4xl md:text-6xl font-black mb-4 relative"
+          style={{ textShadow: "0 0 40px rgba(255,255,255,0.3)" }}
         >
           {data.title}
         </motion.h1>
-        <motion.p
-          initial={{ y: 30, opacity: 0 }}
+
+        {/* Subtitle with glassmorphism */}
+        <motion.div
+          initial={{ y: 40, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           transition={{ delay: 0.8 }}
-          className="text-xl text-slate-400"
+          className="inline-block bg-white/10 backdrop-blur-md rounded-full px-6 py-2 border border-white/20"
         >
-          {data.subtitle}
-        </motion.p>
+          <p className="text-xl md:text-2xl text-white/80 font-medium">
+            {data.subtitle}
+          </p>
+        </motion.div>
+
+        {/* Decorative line */}
+        <motion.div
+          initial={{ scaleX: 0 }}
+          animate={{ scaleX: 1 }}
+          transition={{ delay: 1, duration: 0.8 }}
+          className="w-48 h-1 bg-gradient-to-r from-transparent via-pink-500 to-transparent mx-auto mt-8 rounded-full"
+        />
       </div>
     </motion.div>
   );
@@ -1139,30 +1238,72 @@ const ChapterTitle = memo(function ChapterTitle({ chapter, onComplete }: { chapt
 
 const AchievementPopup = memo(function AchievementPopup({ achievement, onClose }: { achievement: Achievement; onClose: () => void }) {
   useEffect(() => {
-    const timer = setTimeout(onClose, 3000);
+    const timer = setTimeout(onClose, 4000);
     return () => clearTimeout(timer);
   }, [onClose]);
 
   return (
     <motion.div
-      initial={{ x: 300, opacity: 0 }}
-      animate={{ x: 0, opacity: 1 }}
-      exit={{ x: 300, opacity: 0 }}
+      initial={{ x: 350, opacity: 0, scale: 0.8 }}
+      animate={{ x: 0, opacity: 1, scale: 1 }}
+      exit={{ x: 350, opacity: 0, scale: 0.8 }}
+      transition={{ type: "spring", stiffness: 200, damping: 20 }}
       className="fixed top-4 right-4 z-[200]"
     >
-      <div className="bg-gradient-to-r from-amber-400 to-yellow-500 rounded-2xl p-4 shadow-2xl text-white min-w-[280px]">
-        <div className="flex items-center gap-3">
-          <div className="text-4xl">{achievement.emoji}</div>
-          <div>
-            <div className="flex items-center gap-2">
-              <Trophy className="w-4 h-4" />
-              <span className="text-xs font-bold uppercase tracking-wide">Achievement Unlocked!</span>
+      {/* Premium glow effect */}
+      <motion.div
+        className="absolute -inset-2 rounded-3xl bg-gradient-to-r from-amber-400 via-yellow-500 to-amber-400 opacity-60 blur-xl"
+        animate={{ opacity: [0.4, 0.8, 0.4], scale: [0.98, 1.02, 0.98] }}
+        transition={{ duration: 1.5, repeat: Infinity }}
+      />
+      <div className="relative bg-gradient-to-r from-amber-400 via-yellow-500 to-amber-400 rounded-2xl p-1 shadow-2xl min-w-[300px] overflow-hidden">
+        {/* Shimmer effect */}
+        <motion.div
+          className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent -skew-x-12"
+          animate={{ x: ["-200%", "200%"] }}
+          transition={{ duration: 2, repeat: Infinity, repeatDelay: 1 }}
+        />
+        <div className="relative bg-gradient-to-br from-amber-500/90 to-yellow-600/90 backdrop-blur-sm rounded-xl p-4">
+          <div className="flex items-center gap-4">
+            <motion.div
+              className="text-5xl"
+              animate={{ scale: [1, 1.2, 1], rotate: [0, 10, -10, 0] }}
+              transition={{ duration: 1, repeat: Infinity }}
+              style={{ filter: "drop-shadow(0 0 10px rgba(255,215,0,0.8))" }}
+            >
+              {achievement.emoji}
+            </motion.div>
+            <div className="flex-1">
+              <div className="flex items-center gap-2 mb-1">
+                <motion.div animate={{ rotate: [0, 360] }} transition={{ duration: 2, repeat: Infinity, ease: "linear" }}>
+                  <Trophy className="w-5 h-5 text-white" />
+                </motion.div>
+                <span className="text-xs font-black uppercase tracking-wider text-white/90">Achievement Unlocked!</span>
+              </div>
+              <div className="font-black text-xl text-white drop-shadow-md">{achievement.name}</div>
+              <div className="text-sm text-amber-100 font-medium">{achievement.desc}</div>
             </div>
-            <div className="font-bold text-lg">{achievement.name}</div>
-            <div className="text-sm text-amber-100">{achievement.desc}</div>
           </div>
         </div>
       </div>
+      {/* Celebration particles */}
+      {Array.from({ length: 8 }).map((_, i) => (
+        <motion.span
+          key={i}
+          className="absolute text-xl pointer-events-none"
+          style={{ left: "50%", top: "50%" }}
+          initial={{ x: 0, y: 0, opacity: 1, scale: 0 }}
+          animate={{
+            x: Math.cos((i / 8) * Math.PI * 2) * 80,
+            y: Math.sin((i / 8) * Math.PI * 2) * 80,
+            opacity: [1, 1, 0],
+            scale: [0, 1.5, 0],
+          }}
+          transition={{ duration: 1.5, delay: 0.2 }}
+        >
+          {["⭐", "✨", "🌟", "💫"][i % 4]}
+        </motion.span>
+      ))}
     </motion.div>
   );
 });
@@ -12489,267 +12630,445 @@ export default function ValentineCat() {
 
   if (scene === "title") {
     return (
-      <div className="fixed inset-0 bg-gradient-to-b from-pink-100 via-rose-200 to-pink-300 flex flex-col items-center justify-center p-4 overflow-hidden">
+      <div className="fixed inset-0 flex flex-col items-center justify-center p-4 overflow-hidden">
         {SoundToggleButton}
 
-        {/* Premium multi-layer animated background */}
-        <div className="absolute inset-0 pointer-events-none overflow-hidden">
-          {/* Floating hearts with varied sizes and speeds */}
-          {Array.from({ length: 20 }).map((_, i) => (
-            <motion.div
-              key={i}
-              className="absolute"
-              style={{
-                left: `${(i * 5) % 100}%`,
-                fontSize: `${1.5 + (i % 3) * 0.8}rem`,
-              }}
-              initial={{ y: "100vh", rotate: 0, opacity: 0 }}
-              animate={{
-                y: "-20vh",
-                rotate: 360,
-                opacity: [0, 0.25, 0.25, 0],
-                x: [0, (i % 2 === 0 ? 25 : -25), 0],
-              }}
-              transition={{
-                y: { duration: 18 + (i % 6) * 3, repeat: Infinity, ease: "linear" },
-                rotate: { duration: 15 + (i % 4) * 2, repeat: Infinity, ease: "linear" },
-                x: { duration: 4, repeat: Infinity, ease: "easeInOut" },
-                delay: i * 0.5,
-              }}
-            >
-              {["💖", "💕", "💗", "🩷", "✨", "💘"][i % 6]}
-            </motion.div>
-          ))}
+        {/* Super premium animated gradient background */}
+        <motion.div
+          className="absolute inset-0"
+          style={{
+            background: "linear-gradient(135deg, #fdf2f8 0%, #fce7f3 15%, #fbcfe8 30%, #f9a8d4 50%, #f472b6 70%, #ec4899 85%, #db2777 100%)",
+            backgroundSize: "400% 400%"
+          }}
+          animate={{ backgroundPosition: ["0% 0%", "100% 100%", "0% 0%"] }}
+          transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
+        />
 
-          {/* Large animated gradient orbs */}
+        {/* Animated mesh gradient overlay */}
+        <div className="absolute inset-0 pointer-events-none overflow-hidden">
           <motion.div
-            className="absolute w-[600px] h-[600px] rounded-full bg-gradient-to-r from-pink-300/40 to-rose-300/40 blur-3xl"
-            style={{ top: "-20%", left: "-20%" }}
-            animate={{
-              scale: [1, 1.3, 1],
-              x: [0, 80, 0],
-              y: [0, 40, 0],
-            }}
+            className="absolute w-[800px] h-[800px] rounded-full blur-[150px] opacity-60"
+            style={{ background: "radial-gradient(circle, rgba(255,182,193,0.9) 0%, rgba(255,105,180,0.4) 40%, transparent 70%)", left: "-20%", top: "-30%" }}
+            animate={{ x: [0, 150, 0], y: [0, 100, 0], scale: [1, 1.4, 1] }}
+            transition={{ duration: 20, repeat: Infinity, ease: "easeInOut" }}
+          />
+          <motion.div
+            className="absolute w-[700px] h-[700px] rounded-full blur-[120px] opacity-50"
+            style={{ background: "radial-gradient(circle, rgba(236,72,153,0.7) 0%, rgba(219,39,119,0.3) 50%, transparent 70%)", right: "-15%", bottom: "-20%" }}
+            animate={{ x: [0, -100, 0], y: [0, -80, 0], scale: [1.2, 0.9, 1.2] }}
+            transition={{ duration: 18, repeat: Infinity, ease: "easeInOut" }}
+          />
+          <motion.div
+            className="absolute w-[500px] h-[500px] rounded-full blur-[100px] opacity-45"
+            style={{ background: "radial-gradient(circle, rgba(251,113,133,0.8) 0%, transparent 70%)", left: "40%", top: "20%" }}
+            animate={{ scale: [1, 1.5, 1], opacity: [0.3, 0.6, 0.3] }}
             transition={{ duration: 12, repeat: Infinity, ease: "easeInOut" }}
           />
           <motion.div
-            className="absolute w-[500px] h-[500px] rounded-full bg-gradient-to-r from-rose-300/40 to-red-300/40 blur-3xl"
-            style={{ bottom: "-20%", right: "-20%" }}
-            animate={{
-              scale: [1.2, 1, 1.2],
-              x: [0, -60, 0],
-              y: [0, -50, 0],
-            }}
-            transition={{ duration: 10, repeat: Infinity, ease: "easeInOut" }}
+            className="absolute w-[400px] h-[400px] rounded-full blur-[80px] opacity-40"
+            style={{ background: "radial-gradient(circle, rgba(244,114,182,0.7) 0%, transparent 70%)", right: "30%", top: "60%" }}
+            animate={{ scale: [1.2, 1, 1.2], x: [0, 50, 0] }}
+            transition={{ duration: 15, repeat: Infinity, ease: "easeInOut" }}
           />
-          <motion.div
-            className="absolute w-[400px] h-[400px] rounded-full bg-gradient-to-r from-fuchsia-300/30 to-pink-300/30 blur-3xl"
-            style={{ top: "30%", right: "10%" }}
-            animate={{
-              scale: [1, 1.2, 1],
-              opacity: [0.3, 0.5, 0.3],
-            }}
-            transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
-          />
+        </div>
 
-          {/* Sparkle particles */}
-          {Array.from({ length: 25 }).map((_, i) => (
+        {/* Floating hearts - multi-layer parallax effect */}
+        <div className="absolute inset-0 pointer-events-none overflow-hidden">
+          {/* Far layer - small, slow, faint */}
+          {Array.from({ length: 15 }).map((_, i) => (
+            <motion.div
+              key={`far-${i}`}
+              className="absolute"
+              style={{
+                left: `${(i * 7) % 100}%`,
+                fontSize: `${0.8 + (i % 2) * 0.4}rem`,
+                opacity: 0.2,
+                filter: "blur(1px)"
+              }}
+              initial={{ y: "110vh", rotate: 0 }}
+              animate={{ y: "-20vh", rotate: 180, x: [0, (i % 2 === 0 ? 10 : -10), 0] }}
+              transition={{ duration: 25 + (i % 5) * 5, repeat: Infinity, ease: "linear", delay: i * 0.8 }}
+            >
+              {["💕", "💗", "🩷"][i % 3]}
+            </motion.div>
+          ))}
+
+          {/* Mid layer - medium, moderate speed */}
+          {Array.from({ length: 20 }).map((_, i) => (
+            <motion.div
+              key={`mid-${i}`}
+              className="absolute"
+              style={{
+                left: `${(i * 5) % 100}%`,
+                fontSize: `${1.2 + (i % 3) * 0.5}rem`,
+                filter: i % 4 === 0 ? "drop-shadow(0 0 8px rgba(236,72,153,0.6))" : "none"
+              }}
+              initial={{ y: "100vh", rotate: 0, opacity: 0 }}
+              animate={{
+                y: "-15vh",
+                rotate: (i % 2 === 0 ? 360 : -360),
+                opacity: [0, 0.35, 0.35, 0],
+                x: [0, (i % 2 === 0 ? 20 : -20), 0],
+              }}
+              transition={{
+                duration: 18 + (i % 6) * 3,
+                repeat: Infinity,
+                ease: "linear",
+                delay: i * 0.4,
+              }}
+            >
+              {["💖", "💕", "💗", "🩷", "✨", "💘", "💝"][i % 7]}
+            </motion.div>
+          ))}
+
+          {/* Near layer - large, fast, bright */}
+          {Array.from({ length: 8 }).map((_, i) => (
+            <motion.div
+              key={`near-${i}`}
+              className="absolute"
+              style={{
+                left: `${(i * 12 + 5) % 100}%`,
+                fontSize: `${2.5 + (i % 2) * 1}rem`,
+                filter: "drop-shadow(0 0 15px rgba(255,105,180,0.8))"
+              }}
+              initial={{ y: "105vh", rotate: 0, opacity: 0 }}
+              animate={{
+                y: "-10vh",
+                rotate: (i % 2 === 0 ? 180 : -180),
+                opacity: [0, 0.5, 0.5, 0],
+                scale: [1, 1.2, 1],
+              }}
+              transition={{ duration: 12 + (i % 3) * 2, repeat: Infinity, ease: "linear", delay: i * 1.5 }}
+            >
+              {["💖", "💗", "💘", "❤️"][i % 4]}
+            </motion.div>
+          ))}
+        </div>
+
+        {/* Sparkle particles - enhanced */}
+        <div className="absolute inset-0 pointer-events-none">
+          {Array.from({ length: 40 }).map((_, i) => (
             <motion.div
               key={`sparkle-${i}`}
-              className="absolute w-1.5 h-1.5 bg-white rounded-full"
+              className="absolute rounded-full"
               style={{
                 left: `${Math.random() * 100}%`,
                 top: `${Math.random() * 100}%`,
+                width: `${2 + Math.random() * 3}px`,
+                height: `${2 + Math.random() * 3}px`,
+                background: i % 3 === 0 ? "#fff" : i % 3 === 1 ? "#fce7f3" : "#f9a8d4",
+                boxShadow: `0 0 ${6 + Math.random() * 8}px ${2 + Math.random() * 3}px rgba(255,255,255,0.9)`
               }}
               animate={{
                 opacity: [0, 1, 0],
-                scale: [0, 2, 0],
+                scale: [0, 1.5, 0],
               }}
               transition={{
-                duration: 2 + Math.random() * 2,
+                duration: 1.5 + Math.random() * 2,
                 repeat: Infinity,
-                delay: Math.random() * 4,
+                delay: Math.random() * 5,
               }}
             />
           ))}
         </div>
 
-        {/* Premium radial glow behind cat */}
+        {/* Shooting stars */}
+        <div className="absolute inset-0 pointer-events-none overflow-hidden">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <motion.div
+              key={`shooting-${i}`}
+              className="absolute w-1 h-1 bg-white rounded-full"
+              style={{
+                boxShadow: "0 0 6px 2px white, -20px 0 15px 1px rgba(255,255,255,0.5), -40px 0 10px rgba(255,255,255,0.3)",
+                top: `${10 + i * 25}%`,
+                left: "-5%"
+              }}
+              animate={{
+                x: ["0vw", "110vw"],
+                y: ["0vh", `${20 + i * 10}vh`],
+                opacity: [0, 1, 1, 0]
+              }}
+              transition={{
+                duration: 2,
+                repeat: Infinity,
+                repeatDelay: 8 + i * 4,
+                delay: i * 3,
+                ease: "easeOut"
+              }}
+            />
+          ))}
+        </div>
+
+        {/* Premium radial glow behind cat - enhanced */}
         <motion.div
-          className="absolute w-[350px] h-[350px] rounded-full pointer-events-none z-0"
-          style={{ background: "radial-gradient(circle, rgba(255,105,180,0.5) 0%, rgba(255,182,193,0.3) 40%, transparent 70%)" }}
-          animate={{ scale: [1, 1.25, 1], opacity: [0.6, 0.9, 0.6] }}
+          className="absolute w-[400px] h-[400px] rounded-full pointer-events-none z-0"
+          style={{ background: "radial-gradient(circle, rgba(255,105,180,0.7) 0%, rgba(255,182,193,0.4) 30%, rgba(236,72,153,0.2) 50%, transparent 70%)" }}
+          animate={{ scale: [1, 1.3, 1], opacity: [0.5, 0.9, 0.5] }}
           transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
+        />
+        <motion.div
+          className="absolute w-[300px] h-[300px] rounded-full pointer-events-none z-0"
+          style={{ background: "radial-gradient(circle, rgba(255,255,255,0.4) 0%, transparent 60%)" }}
+          animate={{ scale: [1.2, 1, 1.2], opacity: [0.3, 0.6, 0.3] }}
+          transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
         />
 
         {/* Main content */}
         <div className="relative z-10 flex flex-col items-center">
-          {/* Premium Cat with crown and enhanced effects */}
+          {/* Super Premium Cat with crown and enhanced effects */}
           <motion.div
             initial={{ scale: 0, rotate: -180 }}
             animate={{ scale: 1, rotate: 0 }}
             transition={{ type: "spring", stiffness: 150, delay: 0.2 }}
             className="relative mb-6"
           >
-            {/* Crown with glow */}
+            {/* Multiple glow layers behind cat */}
             <motion.div
-              className="absolute -top-10 left-1/2 -translate-x-1/2 text-5xl z-10"
-              initial={{ y: -50, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              transition={{ delay: 0.8, type: "spring" }}
+              className="absolute inset-0 rounded-full blur-3xl"
+              style={{ margin: "-40px", background: "radial-gradient(circle, rgba(236,72,153,0.5) 0%, transparent 70%)" }}
+              animate={{ scale: [1, 1.4, 1], opacity: [0.4, 0.8, 0.4] }}
+              transition={{ duration: 2.5, repeat: Infinity }}
+            />
+
+            {/* Crown with premium glow */}
+            <motion.div
+              className="absolute -top-12 left-1/2 -translate-x-1/2 text-6xl z-20"
+              initial={{ y: -50, opacity: 0, scale: 0 }}
+              animate={{ y: 0, opacity: 1, scale: 1 }}
+              transition={{ delay: 0.8, type: "spring", stiffness: 200 }}
             >
               <motion.span
-                animate={{ y: [0, -8, 0], rotate: [-8, 8, -8] }}
+                animate={{ y: [0, -10, 0], rotate: [-10, 10, -10], scale: [1, 1.1, 1] }}
                 transition={{ duration: 2, repeat: Infinity }}
-                className="drop-shadow-[0_0_15px_rgba(255,215,0,0.6)]"
+                style={{ filter: "drop-shadow(0 0 20px rgba(255,215,0,0.9)) drop-shadow(0 0 40px rgba(255,215,0,0.5))" }}
               >
                 👑
               </motion.span>
             </motion.div>
 
-            {/* Glowing ring around cat */}
-            <motion.div
-              className="absolute inset-0 rounded-full"
-              style={{ margin: "-20px" }}
-              animate={{
-                boxShadow: [
-                  "0 0 0 0 rgba(236,72,153,0.4)",
-                  "0 0 0 20px rgba(236,72,153,0)",
-                ],
-              }}
-              transition={{ duration: 1.5, repeat: Infinity }}
-            />
+            {/* Animated pulse rings */}
+            {[0, 1, 2].map((i) => (
+              <motion.div
+                key={`ring-${i}`}
+                className="absolute inset-0 rounded-full border-2 border-pink-400/30"
+                style={{ margin: `-${20 + i * 15}px` }}
+                animate={{
+                  scale: [1, 1.5],
+                  opacity: [0.6, 0],
+                }}
+                transition={{ duration: 2, repeat: Infinity, delay: i * 0.6 }}
+              />
+            ))}
 
-            {/* Cat with bounce */}
+            {/* Cat with premium bounce and glow */}
             <motion.div
-              animate={{ y: [0, -12, 0], scale: [1, 1.02, 1] }}
+              animate={{ y: [0, -15, 0], scale: [1, 1.05, 1] }}
               transition={{ duration: 2.5, repeat: Infinity, ease: "easeInOut" }}
+              className="relative"
             >
-              <span className="text-[110px] md:text-[130px] block drop-shadow-lg">😻</span>
+              <span
+                className="text-[120px] md:text-[150px] block"
+                style={{ filter: "drop-shadow(0 0 30px rgba(236,72,153,0.5)) drop-shadow(0 8px 15px rgba(0,0,0,0.2))" }}
+              >
+                😻
+              </span>
             </motion.div>
 
-            {/* Orbiting heart decorations */}
-            {[0, 1, 2, 3].map((i) => (
+            {/* Orbiting heart decorations - enhanced */}
+            {[0, 1, 2, 3, 4, 5].map((i) => (
               <motion.div
                 key={i}
-                className="absolute text-2xl"
+                className="absolute"
+                style={{
+                  top: "50%",
+                  left: "50%",
+                  filter: "drop-shadow(0 0 8px rgba(236,72,153,0.6))"
+                }}
+                animate={{
+                  x: [Math.cos((i * Math.PI) / 3) * 80, Math.cos((i * Math.PI) / 3 + Math.PI) * 80, Math.cos((i * Math.PI) / 3) * 80],
+                  y: [Math.sin((i * Math.PI) / 3) * 80, Math.sin((i * Math.PI) / 3 + Math.PI) * 80, Math.sin((i * Math.PI) / 3) * 80],
+                  scale: [1, 1.4, 1],
+                  opacity: [0.5, 1, 0.5],
+                }}
+                transition={{
+                  duration: 4,
+                  repeat: Infinity,
+                  delay: i * 0.4,
+                  ease: "easeInOut",
+                }}
+              >
+                <span className="text-2xl">{["💕", "💗", "💖", "💘", "✨", "💝"][i]}</span>
+              </motion.div>
+            ))}
+
+            {/* Sparkle burst around cat */}
+            {Array.from({ length: 8 }).map((_, i) => (
+              <motion.span
+                key={`cat-sparkle-${i}`}
+                className="absolute text-lg"
                 style={{
                   top: "50%",
                   left: "50%",
                 }}
                 animate={{
-                  x: [0, Math.cos((i * Math.PI) / 2) * 70, 0],
-                  y: [0, Math.sin((i * Math.PI) / 2) * 70, 0],
-                  scale: [1, 1.3, 1],
-                  opacity: [0.6, 1, 0.6],
+                  x: [0, Math.cos((i * Math.PI) / 4) * 100],
+                  y: [0, Math.sin((i * Math.PI) / 4) * 100],
+                  opacity: [0, 1, 0],
+                  scale: [0, 1.5, 0],
                 }}
                 transition={{
-                  duration: 3,
+                  duration: 2,
                   repeat: Infinity,
-                  delay: i * 0.5,
-                  ease: "easeInOut",
+                  delay: i * 0.3,
+                  repeatDelay: 1,
                 }}
               >
-                {["💕", "💗", "💖", "💘"][i]}
-              </motion.div>
+                ✨
+              </motion.span>
             ))}
           </motion.div>
 
-          {/* Premium Title with animated gradient */}
+          {/* Super Premium Title with animated gradient and glow */}
           <motion.div
             initial={{ y: 50, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             transition={{ delay: 0.5, type: "spring" }}
-            className="text-center mb-2 relative"
+            className="text-center mb-3 relative"
           >
+            {/* Title glow backdrop */}
+            <motion.div
+              className="absolute inset-0 blur-2xl opacity-60"
+              style={{ background: "linear-gradient(90deg, rgba(236,72,153,0.5), rgba(244,63,94,0.5), rgba(239,68,68,0.5))" }}
+              animate={{ opacity: [0.4, 0.7, 0.4] }}
+              transition={{ duration: 2, repeat: Infinity }}
+            />
             <motion.h1
-              className="text-5xl md:text-7xl font-black bg-gradient-to-r from-pink-600 via-rose-500 to-red-500 bg-clip-text text-transparent bg-[length:200%_auto]"
-              animate={{ backgroundPosition: ["0% center", "100% center", "0% center"] }}
-              transition={{ duration: 5, repeat: Infinity, ease: "linear" }}
+              className="text-5xl md:text-8xl font-black relative"
+              style={{
+                backgroundImage: "linear-gradient(135deg, #ec4899 0%, #f43f5e 20%, #ef4444 40%, #f43f5e 60%, #ec4899 80%, #db2777 100%)",
+                backgroundSize: "300% auto",
+                backgroundClip: "text",
+                WebkitBackgroundClip: "text",
+                color: "transparent",
+                textShadow: "0 0 80px rgba(236,72,153,0.5)"
+              }}
+              animate={{ backgroundPosition: ["0% center", "300% center"] }}
+              transition={{ duration: 6, repeat: Infinity, ease: "linear" }}
             >
               Valentine's Quest
             </motion.h1>
-            {/* Sparkles on title */}
-            <motion.span
-              className="absolute -top-2 -right-4 text-2xl"
-              animate={{ rotate: [0, 20, 0], scale: [1, 1.3, 1] }}
-              transition={{ duration: 2, repeat: Infinity }}
-            >
-              ✨
-            </motion.span>
-            <motion.span
-              className="absolute -bottom-1 -left-4 text-xl"
-              animate={{ rotate: [0, -20, 0], scale: [1, 1.2, 1] }}
-              transition={{ duration: 2, repeat: Infinity, delay: 0.5 }}
-            >
-              💫
-            </motion.span>
+            {/* Sparkles on title - enhanced */}
+            {[
+              { pos: "-top-3 -right-6", size: "text-3xl", delay: 0 },
+              { pos: "-top-1 right-16", size: "text-xl", delay: 0.3 },
+              { pos: "-bottom-2 -left-6", size: "text-2xl", delay: 0.5 },
+              { pos: "top-2 -left-4", size: "text-lg", delay: 0.8 },
+            ].map((spark, i) => (
+              <motion.span
+                key={i}
+                className={`absolute ${spark.pos} ${spark.size}`}
+                animate={{ rotate: [0, 360], scale: [1, 1.5, 1], opacity: [0.6, 1, 0.6] }}
+                transition={{ duration: 3, repeat: Infinity, delay: spark.delay }}
+                style={{ filter: "drop-shadow(0 0 8px rgba(255,255,255,0.8))" }}
+              >
+                {i % 2 === 0 ? "✨" : "💫"}
+              </motion.span>
+            ))}
           </motion.div>
 
-          {/* Premium Subtitle */}
+          {/* Premium Subtitle with glassmorphism */}
           <motion.div
             initial={{ y: 30, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             transition={{ delay: 0.7 }}
-            className="flex items-center gap-3 mb-8"
+            className="flex items-center gap-3 mb-8 bg-white/20 backdrop-blur-md rounded-full px-6 py-2 border border-white/30 shadow-lg"
           >
             <motion.span
-              animate={{ scale: [1, 1.3, 1], rotate: [0, 10, 0] }}
+              animate={{ scale: [1, 1.4, 1], rotate: [0, 15, 0] }}
               transition={{ duration: 1.5, repeat: Infinity }}
+              style={{ filter: "drop-shadow(0 0 6px rgba(236,72,153,0.6))" }}
             >
               💖
             </motion.span>
-            <p className="text-lg md:text-xl text-pink-700 font-semibold">
+            <p className="text-lg md:text-xl text-white font-semibold drop-shadow-md">
               A dramatic cat's journey to find love
             </p>
             <motion.span
-              animate={{ scale: [1, 1.3, 1], rotate: [0, -10, 0] }}
+              animate={{ scale: [1, 1.4, 1], rotate: [0, -15, 0] }}
               transition={{ duration: 1.5, repeat: Infinity, delay: 0.5 }}
+              style={{ filter: "drop-shadow(0 0 6px rgba(236,72,153,0.6))" }}
             >
               💖
             </motion.span>
           </motion.div>
 
-          {/* Premium Buttons with glow effects */}
+          {/* Super Premium Buttons */}
           <motion.div
             initial={{ y: 30, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
             transition={{ delay: 0.9 }}
-            className="flex flex-col gap-4 w-full max-w-xs"
+            className="flex flex-col gap-4 w-full max-w-sm"
           >
-            {/* Start Game button - premium */}
-            <motion.button
-              onClick={startGame}
-              className="w-full py-5 px-8 bg-gradient-to-r from-pink-500 via-rose-500 to-red-500 text-white font-bold text-xl rounded-2xl shadow-[0_10px_40px_-10px_rgba(236,72,153,0.5)] relative overflow-hidden"
-              whileHover={{ scale: 1.03, boxShadow: "0 15px 50px -10px rgba(236,72,153,0.6)" }}
-              whileTap={{ scale: 0.97 }}
-            >
-              {/* Shimmer */}
+            {/* Start Game button - super premium */}
+            <motion.div className="relative">
+              {/* Button glow */}
               <motion.div
-                className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/40 to-white/0"
-                animate={{ x: ["-100%", "100%"] }}
-                transition={{ duration: 1.5, repeat: Infinity, repeatDelay: 1 }}
+                className="absolute -inset-2 rounded-3xl bg-gradient-to-r from-pink-500 via-rose-500 to-red-500 opacity-60 blur-xl"
+                animate={{ opacity: [0.4, 0.8, 0.4], scale: [0.95, 1.05, 0.95] }}
+                transition={{ duration: 2, repeat: Infinity }}
               />
-              {/* Pulse ring */}
-              <motion.div
-                className="absolute inset-0 rounded-2xl"
-                animate={{
-                  boxShadow: [
-                    "0 0 0 0 rgba(236,72,153,0.4)",
-                    "0 0 0 12px rgba(236,72,153,0)",
-                  ],
-                }}
-                transition={{ duration: 1.5, repeat: Infinity }}
-              />
-              <span className="relative z-10 flex items-center justify-center gap-2">
-                <motion.span animate={{ scale: [1, 1.2, 1] }} transition={{ duration: 1, repeat: Infinity }}>
-                  <Heart className="w-6 h-6" />
-                </motion.span>
-                Start Game
-              </span>
-            </motion.button>
+              <motion.button
+                onClick={startGame}
+                className="relative w-full py-6 px-10 bg-gradient-to-r from-pink-500 via-rose-500 to-red-500 text-white font-bold text-2xl rounded-2xl shadow-2xl overflow-hidden border-2 border-white/20"
+                whileHover={{ scale: 1.03 }}
+                whileTap={{ scale: 0.97 }}
+              >
+                {/* Animated gradient overlay */}
+                <motion.div
+                  className="absolute inset-0 bg-gradient-to-r from-pink-400 via-rose-400 to-red-400"
+                  animate={{ x: ["-100%", "100%"] }}
+                  transition={{ duration: 2, repeat: Infinity, repeatDelay: 0.5 }}
+                  style={{ opacity: 0.5 }}
+                />
+                {/* Shimmer */}
+                <motion.div
+                  className="absolute inset-0 bg-gradient-to-r from-transparent via-white/50 to-transparent -skew-x-12"
+                  animate={{ x: ["-200%", "200%"] }}
+                  transition={{ duration: 2, repeat: Infinity, repeatDelay: 1 }}
+                />
+                {/* Multiple pulse rings */}
+                {[0, 1].map((i) => (
+                  <motion.div
+                    key={i}
+                    className="absolute inset-0 rounded-2xl"
+                    animate={{
+                      boxShadow: [
+                        "0 0 0 0 rgba(255,255,255,0.4)",
+                        "0 0 0 15px rgba(255,255,255,0)",
+                      ],
+                    }}
+                    transition={{ duration: 1.5, repeat: Infinity, delay: i * 0.7 }}
+                  />
+                ))}
+                <span className="relative z-10 flex items-center justify-center gap-3">
+                  <motion.span
+                    animate={{ scale: [1, 1.3, 1], rotate: [0, 10, 0] }}
+                    transition={{ duration: 1, repeat: Infinity }}
+                  >
+                    <Heart className="w-7 h-7" fill="currentColor" />
+                  </motion.span>
+                  Start Game
+                  <motion.span
+                    animate={{ scale: [1, 1.3, 1], rotate: [0, -10, 0] }}
+                    transition={{ duration: 1, repeat: Infinity, delay: 0.5 }}
+                  >
+                    <Heart className="w-7 h-7" fill="currentColor" />
+                  </motion.span>
+                </span>
+              </motion.button>
+            </motion.div>
 
-            {/* Skip Intro button - premium */}
+            {/* Skip Intro button - super premium glassmorphism */}
             <motion.button
               onClick={() => {
                 soundManager.init();
@@ -12758,66 +13077,93 @@ export default function ValentineCat() {
                 gameStartRef.current = now();
                 setScene("chapter1_chase");
               }}
-              className="w-full py-3 px-6 bg-white/60 backdrop-blur-sm border-2 border-pink-300 text-pink-600 font-semibold rounded-xl hover:bg-white/80 hover:border-pink-400 transition-all shadow-lg"
-              whileHover={{ scale: 1.02 }}
+              className="w-full py-4 px-6 bg-white/30 backdrop-blur-md border-2 border-white/50 text-white font-bold rounded-xl shadow-lg relative overflow-hidden"
+              whileHover={{ scale: 1.02, backgroundColor: "rgba(255,255,255,0.4)" }}
               whileTap={{ scale: 0.98 }}
             >
-              Skip Intro →
+              <motion.div
+                className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent -skew-x-12"
+                animate={{ x: ["-200%", "200%"] }}
+                transition={{ duration: 3, repeat: Infinity, repeatDelay: 2 }}
+              />
+              <span className="relative z-10 flex items-center justify-center gap-2">
+                Skip Intro
+                <motion.span
+                  animate={{ x: [0, 5, 0] }}
+                  transition={{ duration: 1, repeat: Infinity }}
+                >
+                  →
+                </motion.span>
+              </span>
             </motion.button>
           </motion.div>
 
-          {/* Premium Features preview */}
+          {/* Super Premium Features preview with glassmorphism */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 1.3 }}
-            className="flex gap-5 mt-10"
+            className="flex gap-4 mt-10"
           >
             {[
-              { emoji: "🎮", label: "Mini-games", color: "from-indigo-100 to-purple-100", border: "border-indigo-200" },
-              { emoji: "👑", label: "Boss Battle", color: "from-amber-100 to-orange-100", border: "border-amber-200" },
-              { emoji: "💕", label: "Romance", color: "from-pink-100 to-rose-100", border: "border-pink-200" },
+              { emoji: "🎮", label: "7 Mini-games", gradient: "from-indigo-500/20 to-purple-500/20", glow: "rgba(99,102,241,0.4)" },
+              { emoji: "👑", label: "Boss Battle", gradient: "from-amber-500/20 to-orange-500/20", glow: "rgba(245,158,11,0.4)" },
+              { emoji: "💕", label: "Romance", gradient: "from-pink-500/20 to-rose-500/20", glow: "rgba(236,72,153,0.4)" },
             ].map((item, i) => (
               <motion.div
                 key={i}
-                className={cn(
-                  "flex flex-col items-center bg-gradient-to-br rounded-2xl px-4 py-3 border shadow-sm",
-                  item.color,
-                  item.border
-                )}
-                initial={{ y: 20, opacity: 0 }}
+                className="relative group"
+                initial={{ y: 30, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
-                transition={{ delay: 1.4 + i * 0.15 }}
-                whileHover={{ y: -3, scale: 1.05 }}
+                transition={{ delay: 1.4 + i * 0.15, type: "spring" }}
               >
-                <motion.span
-                  className="text-3xl mb-1"
-                  animate={{ y: [0, -3, 0] }}
-                  transition={{ duration: 2, repeat: Infinity, delay: i * 0.3 }}
+                {/* Card glow on hover */}
+                <motion.div
+                  className="absolute -inset-1 rounded-2xl opacity-0 group-hover:opacity-100 blur-lg transition-opacity duration-300"
+                  style={{ background: item.glow }}
+                />
+                <motion.div
+                  className={`relative flex flex-col items-center bg-gradient-to-br ${item.gradient} backdrop-blur-md rounded-2xl px-5 py-4 border border-white/30 shadow-lg`}
+                  whileHover={{ y: -5, scale: 1.08 }}
+                  whileTap={{ scale: 0.95 }}
                 >
-                  {item.emoji}
-                </motion.span>
-                <span className="text-xs text-slate-600 font-semibold">{item.label}</span>
+                  <motion.span
+                    className="text-4xl mb-2"
+                    animate={{ y: [0, -5, 0], scale: [1, 1.1, 1] }}
+                    transition={{ duration: 2, repeat: Infinity, delay: i * 0.3 }}
+                    style={{ filter: "drop-shadow(0 0 8px rgba(255,255,255,0.5))" }}
+                  >
+                    {item.emoji}
+                  </motion.span>
+                  <span className="text-xs text-white font-bold drop-shadow-md">{item.label}</span>
+                </motion.div>
               </motion.div>
             ))}
           </motion.div>
         </div>
 
-        {/* Premium Footer */}
+        {/* Super Premium Footer with glassmorphism */}
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 1.8 }}
-          className="absolute bottom-6 flex items-center gap-2"
+          className="absolute bottom-6 flex items-center gap-2 bg-white/20 backdrop-blur-md rounded-full px-5 py-2 border border-white/30"
         >
-          <span className="text-pink-600 text-sm font-medium">Made with</span>
+          <span className="text-white text-sm font-medium drop-shadow-sm">Made with</span>
           <motion.span
-            animate={{ scale: [1, 1.3, 1] }}
+            animate={{ scale: [1, 1.4, 1] }}
             transition={{ duration: 1, repeat: Infinity }}
+            style={{ filter: "drop-shadow(0 0 8px rgba(236,72,153,0.8))" }}
           >
             💖
           </motion.span>
-          <span className="text-pink-600 text-sm font-medium">and dramatic cat energy</span>
+          <span className="text-white text-sm font-medium drop-shadow-sm">and dramatic cat energy</span>
+          <motion.span
+            animate={{ scale: [1, 1.2, 1], rotate: [0, 360] }}
+            transition={{ duration: 3, repeat: Infinity }}
+          >
+            ✨
+          </motion.span>
         </motion.div>
       </div>
     );
@@ -12825,52 +13171,151 @@ export default function ValentineCat() {
 
   if (scene === "intro_cutscene") {
     return (
-      <div className="fixed inset-0 bg-gradient-to-b from-indigo-950 via-purple-900 to-pink-900 flex items-center justify-center p-4 overflow-hidden">
+      <div className="fixed inset-0 flex items-center justify-center p-4 overflow-hidden">
         {SoundToggleButton}
-        {/* Starfield background - optimized with CSS */}
+
+        {/* Super premium animated cosmic background */}
+        <motion.div
+          className="absolute inset-0"
+          style={{
+            background: "linear-gradient(180deg, #1e1b4b 0%, #4c1d95 30%, #7e22ce 60%, #be185d 85%, #9d174d 100%)",
+            backgroundSize: "100% 400%"
+          }}
+          animate={{ backgroundPosition: ["0% 0%", "0% 100%", "0% 0%"] }}
+          transition={{ duration: 30, repeat: Infinity, ease: "linear" }}
+        />
+
+        {/* Animated nebula orbs */}
+        <div className="absolute inset-0 pointer-events-none overflow-hidden">
+          <motion.div
+            className="absolute w-[700px] h-[700px] rounded-full blur-[150px] opacity-40"
+            style={{ background: "radial-gradient(circle, rgba(147,51,234,0.8) 0%, rgba(126,34,206,0.4) 50%, transparent 70%)", left: "-20%", top: "-20%" }}
+            animate={{ x: [0, 100, 0], y: [0, 80, 0], scale: [1, 1.3, 1] }}
+            transition={{ duration: 25, repeat: Infinity, ease: "easeInOut" }}
+          />
+          <motion.div
+            className="absolute w-[600px] h-[600px] rounded-full blur-[120px] opacity-35"
+            style={{ background: "radial-gradient(circle, rgba(219,39,119,0.7) 0%, rgba(190,24,93,0.3) 50%, transparent 70%)", right: "-15%", bottom: "-10%" }}
+            animate={{ x: [0, -80, 0], y: [0, -60, 0], scale: [1.2, 0.9, 1.2] }}
+            transition={{ duration: 20, repeat: Infinity, ease: "easeInOut" }}
+          />
+          <motion.div
+            className="absolute w-[400px] h-[400px] rounded-full blur-[80px] opacity-30"
+            style={{ background: "radial-gradient(circle, rgba(236,72,153,0.6) 0%, transparent 70%)", left: "50%", top: "40%", transform: "translate(-50%, -50%)" }}
+            animate={{ scale: [1, 1.5, 1], opacity: [0.2, 0.4, 0.2] }}
+            transition={{ duration: 10, repeat: Infinity, ease: "easeInOut" }}
+          />
+        </div>
+
+        {/* Premium starfield - multi-layer */}
         <div className="absolute inset-0 pointer-events-none">
-          {Array.from({ length: 15 }).map((_, i) => (
-            <div
-              key={i}
+          {/* Far stars - small, dim */}
+          {Array.from({ length: 40 }).map((_, i) => (
+            <motion.div
+              key={`star-far-${i}`}
+              className="absolute rounded-full bg-white"
+              style={{
+                left: `${(i * 2.5) % 100}%`,
+                top: `${(i * 7.3 + 3) % 100}%`,
+                width: `${1 + (i % 2)}px`,
+                height: `${1 + (i % 2)}px`,
+              }}
+              animate={{ opacity: [0.2, 0.6, 0.2], scale: [1, 1.2, 1] }}
+              transition={{ duration: 2 + (i % 3), repeat: Infinity, delay: i * 0.1 }}
+            />
+          ))}
+          {/* Medium stars */}
+          {Array.from({ length: 20 }).map((_, i) => (
+            <motion.div
+              key={`star-mid-${i}`}
+              className="absolute rounded-full"
+              style={{
+                left: `${(i * 5 + 2) % 100}%`,
+                top: `${(i * 9.7 + 5) % 100}%`,
+                width: `${2 + (i % 2)}px`,
+                height: `${2 + (i % 2)}px`,
+                background: i % 3 === 0 ? "#fff" : i % 3 === 1 ? "#f9a8d4" : "#c4b5fd",
+                boxShadow: `0 0 ${4 + (i % 3) * 2}px ${1 + (i % 2)}px currentColor`
+              }}
+              animate={{ opacity: [0.4, 1, 0.4], scale: [1, 1.5, 1] }}
+              transition={{ duration: 3 + (i % 4), repeat: Infinity, delay: i * 0.15 }}
+            />
+          ))}
+          {/* Bright stars with glow */}
+          {Array.from({ length: 8 }).map((_, i) => (
+            <motion.div
+              key={`star-bright-${i}`}
+              className="absolute rounded-full bg-white"
+              style={{
+                left: `${(i * 12 + 5) % 100}%`,
+                top: `${(i * 15 + 10) % 100}%`,
+                width: "4px",
+                height: "4px",
+                boxShadow: "0 0 10px 3px rgba(255,255,255,0.8), 0 0 20px 6px rgba(255,255,255,0.4)"
+              }}
+              animate={{ opacity: [0.6, 1, 0.6], scale: [1, 1.8, 1] }}
+              transition={{ duration: 2 + (i % 3), repeat: Infinity, delay: i * 0.3 }}
+            />
+          ))}
+        </div>
+
+        {/* Shooting stars */}
+        <div className="absolute inset-0 pointer-events-none overflow-hidden">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <motion.div
+              key={`shooting-${i}`}
               className="absolute w-1 h-1 bg-white rounded-full"
               style={{
-                left: `${(i * 7) % 100}%`,
-                top: `${(i * 13 + 5) % 100}%`,
-                opacity: 0.4 + (i % 3) * 0.2,
-                animation: `float ${3 + (i % 3)}s ease-in-out infinite`,
-                animationDelay: `${(i % 4) * 0.5}s`,
+                boxShadow: "0 0 4px 2px white, -30px 0 20px 2px rgba(255,255,255,0.5), -60px 0 15px rgba(255,255,255,0.3), -90px 0 10px rgba(255,255,255,0.1)",
+                top: `${5 + i * 20}%`,
+                left: "-5%"
+              }}
+              animate={{
+                x: ["0vw", "120vw"],
+                y: ["0vh", `${15 + i * 8}vh`],
+                opacity: [0, 1, 1, 0]
+              }}
+              transition={{
+                duration: 1.5,
+                repeat: Infinity,
+                repeatDelay: 6 + i * 3,
+                delay: i * 2,
+                ease: "easeOut"
               }}
             />
           ))}
         </div>
 
-        {/* Floating sparkles - reduced */}
+        {/* Floating sparkles and cosmic dust */}
         <div className="absolute inset-0 pointer-events-none overflow-hidden">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <div
+          {Array.from({ length: 15 }).map((_, i) => (
+            <motion.div
               key={`sparkle-${i}`}
-              className="absolute text-lg opacity-30"
+              className="absolute"
               style={{
-                left: `${(i * 16) % 100}%`,
-                animation: `floatUp ${18 + (i % 3) * 4}s linear infinite`,
-                animationDelay: `${i * 1.5}s`,
+                left: `${(i * 7) % 100}%`,
+                fontSize: `${1 + (i % 3) * 0.5}rem`,
+                filter: "drop-shadow(0 0 6px rgba(255,255,255,0.6))"
               }}
+              initial={{ y: "110vh", opacity: 0 }}
+              animate={{ y: "-10vh", opacity: [0, 0.5, 0.5, 0], rotate: [0, 360] }}
+              transition={{ duration: 20 + (i % 5) * 3, repeat: Infinity, ease: "linear", delay: i * 1.2 }}
             >
-              {["✨", "⭐", "💫"][i % 3]}
-            </div>
+              {["✨", "⭐", "💫", "🌟", "💜"][i % 5]}
+            </motion.div>
           ))}
         </div>
 
-        {/* Progress indicator */}
-        <div className="absolute top-6 left-1/2 -translate-x-1/2 flex gap-2">
+        {/* Premium progress indicator with glow */}
+        <div className="absolute top-6 left-1/2 -translate-x-1/2 flex gap-3 bg-white/10 backdrop-blur-md rounded-full px-4 py-2 border border-white/20">
           {INTRO_DIALOG.map((_, i) => (
             <motion.div
               key={i}
               className={cn(
-                "w-2 h-2 rounded-full transition-colors duration-300",
-                i === dialogIndex ? "bg-pink-400" : i < dialogIndex ? "bg-pink-600" : "bg-white/30"
+                "w-2.5 h-2.5 rounded-full transition-all duration-300",
+                i === dialogIndex ? "bg-pink-400 shadow-[0_0_10px_rgba(244,114,182,0.8)]" : i < dialogIndex ? "bg-pink-500" : "bg-white/30"
               )}
-              animate={i === dialogIndex ? { scale: [1, 1.3, 1] } : {}}
+              animate={i === dialogIndex ? { scale: [1, 1.4, 1], boxShadow: ["0 0 5px rgba(244,114,182,0.5)", "0 0 15px rgba(244,114,182,1)", "0 0 5px rgba(244,114,182,0.5)"] } : {}}
               transition={{ duration: 1, repeat: Infinity }}
             />
           ))}
@@ -12881,18 +13326,23 @@ export default function ValentineCat() {
           <DialogBox key={dialogIndex} line={INTRO_DIALOG[dialogIndex]} onNext={advanceDialog} />
         </AnimatePresence>
 
-        {/* Skip button */}
+        {/* Super premium skip button */}
         <motion.button
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 1 }}
           onClick={() => {
             soundManager.whoosh();
             nextScene("chapter1_chase");
           }}
-          className="absolute bottom-6 right-6 text-white/50 hover:text-white/80 text-sm transition-colors"
+          className="absolute bottom-6 right-6 bg-white/10 backdrop-blur-md border border-white/30 rounded-full px-4 py-2 text-white/70 hover:text-white hover:bg-white/20 text-sm font-medium transition-all"
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
         >
-          Skip →
+          <span className="flex items-center gap-2">
+            Skip
+            <motion.span animate={{ x: [0, 4, 0] }} transition={{ duration: 1, repeat: Infinity }}>→</motion.span>
+          </span>
         </motion.button>
       </div>
     );
