@@ -6138,16 +6138,41 @@ const RejectLettersGame = memo(function RejectLettersGame({ onComplete }: { onCo
 
 type BossPhase = "phase1" | "phase2" | "phase3";
 type SwipeDirection = "left" | "right" | "up" | "down";
+type AttackType = "swipe" | "rapidfire" | "fakeout" | "lovebomb" | "ragemode";
+type PowerUpType = "heart" | "star" | "shield" | "rage";
 
-// Incoming attack that requires a swipe to dodge
+// Incoming attack that requires different mechanics to dodge
 interface IncomingAttack {
   id: number;
+  type: AttackType;
   direction: SwipeDirection;
-  timeLeft: number; // seconds until it hits
-  duration: number; // total time
+  directions?: SwipeDirection[]; // for rapidfire (sequence) or ragemode (two at once)
+  currentIndex?: number; // for rapidfire progress
+  timeLeft: number;
+  duration: number;
   emoji: string;
   damage: number;
+  isFake?: boolean; // for fakeout - the shown direction is a trick
+  realDirection?: SwipeDirection; // for fakeout - the actual direction
+  deflectCount?: number; // for lovebomb - taps needed to deflect
+  deflected?: number; // for lovebomb - taps done
 }
+
+// Power-up that spawns during battle
+interface PowerUp {
+  id: number;
+  type: PowerUpType;
+  x: number;
+  y: number;
+  timeLeft: number;
+  emoji: string;
+}
+
+// Charge attack levels (for reference)
+// Level 0: <1s = 2 damage (tap)
+// Level 1: 1s = 5 damage (light charge)
+// Level 2: 2s = 10 damage (heavy charge)
+// Level 3: 3s = 15 damage (mega charge)
 
 
 const DramaKingBattle = memo(function DramaKingBattle({ onComplete }: { onComplete: (won: boolean) => void }) {
@@ -6179,11 +6204,32 @@ const DramaKingBattle = memo(function DramaKingBattle({ onComplete }: { onComple
   const [qteIndex, setQteIndex] = useState(0);
   const [qteTimeLeft, setQteTimeLeft] = useState(0);
 
+  // Charge attack state
+  const [isCharging, setIsCharging] = useState(false);
+  const [chargeTime, setChargeTime] = useState(0);
+  const [chargeLevel, setChargeLevel] = useState(0);
+
+  // Counter window state (after perfect dodge)
+  const [counterWindowActive, setCounterWindowActive] = useState(false);
+  const [counterWindowTimer, setCounterWindowTimer] = useState(0);
+
+  // Power-ups
+  const [powerUps, setPowerUps] = useState<PowerUp[]>([]);
+  const [hasShield, setHasShield] = useState(false);
+  const [rageMode, setRageMode] = useState(false);
+  const [rageModeTimer, setRageModeTimer] = useState(0);
+
+
+  // Phase transformation state
+  const [showingPhaseTransition, setShowingPhaseTransition] = useState(false);
+  const [phaseTransitionText, setPhaseTransitionText] = useState("");
+
   // Visual effects
   const [particles, setParticles] = useState<Array<{ id: number; x: number; y: number; emoji: string; vx: number; vy: number; life: number }>>([]);
   const [floatingTexts, setFloatingTexts] = useState<Array<{ id: number; x: number; y: number; text: string; color: string }>>([]);
   const [screenShake, setScreenShake] = useState(0);
   const [flashColor, setFlashColor] = useState<string | null>(null);
+  const [bossScale, setBossScale] = useState(1);
 
   // Refs
   const onCompleteRef = useRef(onComplete);
@@ -6193,6 +6239,10 @@ const DramaKingBattle = memo(function DramaKingBattle({ onComplete }: { onComple
   const comboRef = useRef(0);
   const touchStartRef = useRef<{ x: number; y: number; time: number } | null>(null);
   const lastAttackTimeRef = useRef(0);
+  const chargeStartRef = useRef<number | null>(null);
+  const lastPowerUpSpawnRef = useRef(0);
+  const phase2TriggeredRef = useRef(false);
+  const phase3TriggeredRef = useRef(false);
 
   // Sync refs
   useEffect(() => { onCompleteRef.current = onComplete; }, [onComplete]);
@@ -6232,6 +6282,58 @@ const DramaKingBattle = memo(function DramaKingBattle({ onComplete }: { onComple
     setTimeout(() => setScreenShake(0), 200);
   }, []);
 
+  // Get combo damage multiplier
+  const getComboMultiplier = useCallback((comboCount: number) => {
+    if (comboCount >= 30) return 2.5;
+    if (comboCount >= 20) return 2.0;
+    if (comboCount >= 10) return 1.5;
+    return 1.0;
+  }, []);
+
+  // Spawn a power-up
+  const spawnPowerUp = useCallback(() => {
+    const types: PowerUpType[] = ["heart", "star", "shield", "rage"];
+    const emojis: Record<PowerUpType, string> = { heart: "💗", star: "⭐", shield: "🛡️", rage: "🔥" };
+    const type = types[Math.floor(Math.random() * types.length)];
+    const newPowerUp: PowerUp = {
+      id: Date.now(),
+      type,
+      x: 10 + Math.random() * 80,
+      y: 40 + Math.random() * 30,
+      timeLeft: 5,
+      emoji: emojis[type],
+    };
+    setPowerUps(prev => [...prev.slice(-3), newPowerUp]);
+  }, []);
+
+  // Collect a power-up
+  const collectPowerUp = useCallback((powerUp: PowerUp) => {
+    soundManager.collect();
+    setPowerUps(prev => prev.filter(p => p.id !== powerUp.id));
+    spawnParticles(powerUp.x, powerUp.y, powerUp.emoji, 5);
+
+    switch (powerUp.type) {
+      case "heart":
+        setPlayerHP(hp => Math.min(100, hp + 15));
+        playerHPRef.current = Math.min(100, playerHPRef.current + 15);
+        spawnText(powerUp.x, powerUp.y, "+15 HP!", "#ff69b4");
+        break;
+      case "star":
+        setSuperMeter(m => Math.min(100, m + 50));
+        spawnText(powerUp.x, powerUp.y, "+50% SUPER!", "#FFD700");
+        break;
+      case "shield":
+        setHasShield(true);
+        spawnText(powerUp.x, powerUp.y, "SHIELD!", "#00bfff");
+        break;
+      case "rage":
+        setRageMode(true);
+        setRageModeTimer(5);
+        spawnText(powerUp.x, powerUp.y, "2x DAMAGE!", "#ff4500");
+        break;
+    }
+  }, [spawnParticles, spawnText]);
+
   // Start countdown
   const startCountdown = useCallback(() => {
     soundManager.buttonPress();
@@ -6259,6 +6361,20 @@ const DramaKingBattle = memo(function DramaKingBattle({ onComplete }: { onComple
       setBossEmotion("smug");
       setBossMessage("You DARE challenge ME?! 😾");
       setTimeout(() => setBossMessage(""), 2000);
+      // Reset new states
+      setIsCharging(false);
+      setChargeTime(0);
+      setChargeLevel(0);
+      setCounterWindowActive(false);
+      setCounterWindowTimer(0);
+      setPowerUps([]);
+      setHasShield(false);
+      setRageMode(false);
+      setRageModeTimer(0);
+      setBossScale(1);
+      phase2TriggeredRef.current = false;
+      phase3TriggeredRef.current = false;
+      lastPowerUpSpawnRef.current = Date.now();
       setPhase("battle");
       return;
     }
@@ -6267,25 +6383,39 @@ const DramaKingBattle = memo(function DramaKingBattle({ onComplete }: { onComple
     return () => clearTimeout(timer);
   }, [phase, countdownNum]);
 
-  // Handle player tap attack
-  const handleTapAttack = useCallback(() => {
-    if (phase !== "battle" || gameEndedRef.current || !canTap || currentAttack) return;
+  // Deal damage to boss helper
+  const dealDamageToBoss = useCallback((baseDamage: number, isCharged = false) => {
+    // Calculate multipliers
+    const comboMult = getComboMultiplier(comboRef.current);
+    const rageMult = rageMode ? 2 : 1;
+    const counterMult = counterWindowActive ? 3 : 1;
+    const totalDamage = Math.round(baseDamage * comboMult * rageMult * counterMult);
 
-    // Cooldown between taps
-    setCanTap(false);
-    setTimeout(() => setCanTap(true), 150);
-
-    // Deal damage
-    const baseDamage = 2;
-    const comboBonus = Math.floor(comboRef.current / 5);
-    const damage = baseDamage + comboBonus;
+    // Visual effects based on damage
+    const particleEmoji = totalDamage >= 20 ? "💥" : totalDamage >= 10 ? "⭐" : "💖";
+    const particleCount = Math.min(15, Math.max(3, Math.floor(totalDamage / 2)));
 
     soundManager.bossHit();
-    spawnParticles(50, 30, "💖", 3);
-    spawnText(50 + (Math.random() - 0.5) * 20, 35, `${damage}`, "#ff69b4");
+    if (totalDamage >= 15) soundManager.criticalHit();
+
+    spawnParticles(50, 30, particleEmoji, particleCount);
+    if (isCharged) spawnParticles(50, 30, "✨", 5);
+
+    // Damage text with multiplier info
+    const dmgText = counterWindowActive ? `${totalDamage} COUNTER!` :
+                    rageMult > 1 ? `${totalDamage} RAGE!` :
+                    comboMult > 1 ? `${totalDamage} x${comboMult}` : `${totalDamage}`;
+    const dmgColor = counterWindowActive ? "#00ffff" : rageMult > 1 ? "#ff4500" : comboMult >= 2 ? "#FFD700" : "#ff69b4";
+    spawnText(50 + (Math.random() - 0.5) * 20, 35, dmgText, dmgColor);
+
+    if (totalDamage >= 10) {
+      triggerShake(totalDamage >= 20 ? 15 : 8);
+      setBossShaking(true);
+      setTimeout(() => setBossShaking(false), 300);
+    }
 
     setBossHP(hp => {
-      const newHP = Math.max(0, hp - damage);
+      const newHP = Math.max(0, hp - totalDamage);
       bossHPRef.current = newHP;
 
       // Check for victory
@@ -6301,11 +6431,37 @@ const DramaKingBattle = memo(function DramaKingBattle({ onComplete }: { onComple
         setTimeout(() => onCompleteRef.current(true), 2500);
       }
 
-      // Update boss phase
-      if (newHP <= 30 && newHP > 0) {
+      // Phase transitions with effects
+      if (newHP <= 30 && newHP > 0 && !phase3TriggeredRef.current) {
+        phase3TriggeredRef.current = true;
         setBossPhase("phase3");
-      } else if (newHP <= 60) {
+        setShowingPhaseTransition(true);
+        setPhaseTransitionText("FINAL PHASE!");
+        setBossScale(1.3);
+        soundManager.specialAttack();
+        triggerShake(20);
+        setFlashColor("rgba(255,0,0,0.5)");
+        setTimeout(() => setFlashColor(null), 300);
+        setBossMessage("NOW I'M SERIOUS! 😈🔥");
+        setTimeout(() => {
+          setShowingPhaseTransition(false);
+          setBossMessage("");
+        }, 2000);
+      } else if (newHP <= 60 && newHP > 30 && !phase2TriggeredRef.current) {
+        phase2TriggeredRef.current = true;
         setBossPhase("phase2");
+        setShowingPhaseTransition(true);
+        setPhaseTransitionText("PHASE 2!");
+        setBossScale(1.15);
+        soundManager.bossAttack();
+        triggerShake(12);
+        setFlashColor("rgba(128,0,128,0.4)");
+        setTimeout(() => setFlashColor(null), 200);
+        setBossMessage("You'll regret that! 😾");
+        setTimeout(() => {
+          setShowingPhaseTransition(false);
+          setBossMessage("");
+        }, 1500);
       }
 
       return newHP;
@@ -6315,43 +6471,235 @@ const DramaKingBattle = memo(function DramaKingBattle({ onComplete }: { onComple
     setCombo(c => {
       const newCombo = c + 1;
       if (newCombo > maxCombo) setMaxCombo(newCombo);
+
+      // Combo milestone celebrations
+      if (newCombo === 10 || newCombo === 20 || newCombo === 30) {
+        soundManager.victory();
+        spawnParticles(50, 50, "🔥", 10);
+        spawnText(50, 55, newCombo === 30 ? "ON FIRE! 🔥🔥🔥" : newCombo === 20 ? "AMAZING! 🔥🔥" : "NICE! 🔥", "#FFD700");
+        triggerShake(10);
+      }
+
       return newCombo;
     });
-    setScore(s => s + damage * 10);
+    setScore(s => s + totalDamage * 10);
     setSuperMeter(m => Math.min(100, m + 2));
 
-    // Boss reaction
-    if (Math.random() < 0.1) {
-      setBossShaking(true);
-      setTimeout(() => setBossShaking(false), 200);
+    // Boss reaction for bigger hits
+    if (totalDamage >= 5 || Math.random() < 0.15) {
       setBossEmotion("hurt");
       setTimeout(() => setBossEmotion(bossHPRef.current > 30 ? "smug" : "angry"), 300);
     }
-  }, [phase, canTap, currentAttack, maxCombo, spawnParticles, spawnText]);
+  }, [getComboMultiplier, rageMode, counterWindowActive, maxCombo, spawnParticles, spawnText, triggerShake]);
+
+  // Handle player tap attack (quick tap)
+  const handleTapAttack = useCallback(() => {
+    if (phase !== "battle" || gameEndedRef.current || !canTap) return;
+
+    // Can't attack during certain attack types - handle love bomb deflection
+    if (currentAttack) {
+      if (currentAttack.type === "lovebomb") {
+        // Tapping deflects the love bomb!
+        setCurrentAttack(prev => {
+          if (!prev || prev.type !== "lovebomb") return prev;
+          const newDeflected = (prev.deflected || 0) + 1;
+          soundManager.parry();
+          spawnParticles(50, 50, "💥", 2);
+          if (newDeflected >= (prev.deflectCount || 5)) {
+            // Fully deflected!
+            soundManager.criticalHit();
+            spawnText(50, 50, "DEFLECTED!", "#00ff00");
+            setCombo(c => c + 3);
+            setSuperMeter(m => Math.min(100, m + 10));
+            return null;
+          }
+          return { ...prev, deflected: newDeflected };
+        });
+      }
+      // Any attack blocks normal attacking (need to dodge or deflect)
+      return;
+    }
+
+    // Cooldown between taps
+    setCanTap(false);
+    setTimeout(() => setCanTap(true), 120);
+
+    dealDamageToBoss(2, false);
+  }, [phase, canTap, currentAttack, dealDamageToBoss, spawnParticles, spawnText]);
+
+  // Start charging attack
+  const startCharging = useCallback(() => {
+    if (phase !== "battle" || gameEndedRef.current || currentAttack) return;
+    chargeStartRef.current = Date.now();
+    setIsCharging(true);
+    setChargeTime(0);
+    setChargeLevel(0);
+  }, [phase, currentAttack]);
+
+  // Release charged attack
+  const releaseCharge = useCallback(() => {
+    if (!isCharging || !chargeStartRef.current) {
+      setIsCharging(false);
+      return;
+    }
+
+    const holdDuration = (Date.now() - chargeStartRef.current) / 1000;
+    chargeStartRef.current = null;
+    setIsCharging(false);
+    setChargeTime(0);
+    setChargeLevel(0);
+
+    if (phase !== "battle" || gameEndedRef.current) return;
+
+    // Can't attack while dodging needed
+    if (currentAttack && currentAttack.type !== "lovebomb") return;
+
+    // Determine charge level and damage
+    let damage = 2;
+    let isCharged = false;
+    if (holdDuration >= 3) {
+      damage = 15;
+      isCharged = true;
+      soundManager.specialAttack();
+      triggerShake(15);
+      spawnParticles(50, 30, "💥", 10);
+      spawnParticles(50, 30, "⭐", 8);
+    } else if (holdDuration >= 2) {
+      damage = 10;
+      isCharged = true;
+      soundManager.criticalHit();
+      triggerShake(10);
+      spawnParticles(50, 30, "⭐", 6);
+    } else if (holdDuration >= 1) {
+      damage = 5;
+      isCharged = true;
+      soundManager.bossHit();
+      triggerShake(5);
+    }
+
+    dealDamageToBoss(damage, isCharged);
+  }, [isCharging, phase, currentAttack, dealDamageToBoss, triggerShake, spawnParticles]);
+
+  // Update charge time while holding
+  useEffect(() => {
+    if (!isCharging) return;
+    const timer = setInterval(() => {
+      if (chargeStartRef.current) {
+        const elapsed = (Date.now() - chargeStartRef.current) / 1000;
+        setChargeTime(Math.min(3, elapsed));
+        setChargeLevel(elapsed >= 3 ? 3 : elapsed >= 2 ? 2 : elapsed >= 1 ? 1 : 0);
+      }
+    }, 50);
+    return () => clearInterval(timer);
+  }, [isCharging]);
 
   // Launch boss attack (player must swipe to dodge)
   const launchBossAttack = useCallback(() => {
-    if (phase !== "battle" || gameEndedRef.current || currentAttack) return;
+    if (phase !== "battle" || gameEndedRef.current || currentAttack || showingPhaseTransition) return;
 
     const directions: SwipeDirection[] = ["left", "right", "up", "down"];
     const direction = directions[Math.floor(Math.random() * directions.length)];
 
     const phaseSpeed = bossPhase === "phase3" ? 1.2 : bossPhase === "phase2" ? 1.5 : 2.0;
-    const damage = bossPhase === "phase3" ? 20 : bossPhase === "phase2" ? 15 : 10;
+    const baseDamage = bossPhase === "phase3" ? 20 : bossPhase === "phase2" ? 15 : 10;
+
+    // Determine attack type based on phase
+    let attackType: AttackType = "swipe";
+    const roll = Math.random();
+
+    if (bossPhase === "phase3") {
+      // Phase 3: All attacks possible
+      if (roll < 0.2) attackType = "rapidfire";
+      else if (roll < 0.35) attackType = "fakeout";
+      else if (roll < 0.5) attackType = "lovebomb";
+      else if (roll < 0.65) attackType = "ragemode";
+      // else normal swipe
+    } else if (bossPhase === "phase2") {
+      // Phase 2: Rapidfire and fakeout
+      if (roll < 0.25) attackType = "rapidfire";
+      else if (roll < 0.4) attackType = "fakeout";
+      // else normal swipe
+    }
+    // Phase 1: Only normal swipes
 
     soundManager.bossAttack();
     setBossEmotion("charging");
-    setBossMessage(["Feel my DRAMA! 😾", "TAKE THIS! 💢", "Can't dodge THIS! 😈"][Math.floor(Math.random() * 3)]);
 
-    setCurrentAttack({
-      id: Date.now(),
-      direction,
-      timeLeft: phaseSpeed,
-      duration: phaseSpeed,
-      emoji: DIRECTION_ARROWS[direction],
-      damage,
-    });
-  }, [phase, currentAttack, bossPhase, DIRECTION_ARROWS]);
+    // Create attack based on type
+    if (attackType === "rapidfire") {
+      // 3 quick arrows in sequence
+      const seq = Array.from({ length: 3 }, () => directions[Math.floor(Math.random() * 4)]);
+      setBossMessage("RAPID FIRE! 💨💨💨");
+      setCurrentAttack({
+        id: Date.now(),
+        type: "rapidfire",
+        direction: seq[0],
+        directions: seq,
+        currentIndex: 0,
+        timeLeft: phaseSpeed * 1.5,
+        duration: phaseSpeed * 1.5,
+        emoji: "⚡",
+        damage: Math.floor(baseDamage / 2),
+      });
+    } else if (attackType === "fakeout") {
+      // Shows one direction, then switches
+      const fakeDir = direction;
+      const realDir = directions.filter(d => d !== fakeDir)[Math.floor(Math.random() * 3)];
+      setBossMessage("Can't fool me? 😏");
+      setCurrentAttack({
+        id: Date.now(),
+        type: "fakeout",
+        direction: fakeDir,
+        realDirection: realDir,
+        isFake: true,
+        timeLeft: phaseSpeed * 1.2,
+        duration: phaseSpeed * 1.2,
+        emoji: DIRECTION_ARROWS[fakeDir],
+        damage: Math.floor(baseDamage * 1.2),
+      });
+    } else if (attackType === "lovebomb") {
+      // Circle that shrinks - tap rapidly to deflect
+      setBossMessage("LOVE BOMB! 💣💕");
+      setCurrentAttack({
+        id: Date.now(),
+        type: "lovebomb",
+        direction: "up", // Not used for lovebomb
+        timeLeft: phaseSpeed * 1.5,
+        duration: phaseSpeed * 1.5,
+        emoji: "💣",
+        damage: Math.floor(baseDamage * 1.5),
+        deflectCount: 5 + Math.floor(Math.random() * 3),
+        deflected: 0,
+      });
+    } else if (attackType === "ragemode") {
+      // Two directions at once - swipe diagonally
+      const dir1 = directions[Math.floor(Math.random() * 2)]; // left or right
+      const dir2 = directions[2 + Math.floor(Math.random() * 2)]; // up or down
+      setBossMessage("DOUBLE TROUBLE! 😈😈");
+      setCurrentAttack({
+        id: Date.now(),
+        type: "ragemode",
+        direction: dir1,
+        directions: [dir1, dir2],
+        timeLeft: phaseSpeed,
+        duration: phaseSpeed,
+        emoji: "💢",
+        damage: Math.floor(baseDamage * 1.3),
+      });
+    } else {
+      // Normal swipe
+      setBossMessage(["Feel my DRAMA! 😾", "TAKE THIS! 💢", "Can't dodge THIS! 😈"][Math.floor(Math.random() * 3)]);
+      setCurrentAttack({
+        id: Date.now(),
+        type: "swipe",
+        direction,
+        timeLeft: phaseSpeed,
+        duration: phaseSpeed,
+        emoji: DIRECTION_ARROWS[direction],
+        damage: baseDamage,
+      });
+    }
+  }, [phase, currentAttack, bossPhase, showingPhaseTransition, DIRECTION_ARROWS]);
 
   // Boss attack timer
   useEffect(() => {
@@ -6378,8 +6726,31 @@ const DramaKingBattle = memo(function DramaKingBattle({ onComplete }: { onComple
         if (!prev) return null;
         const newTimeLeft = prev.timeLeft - 0.05;
 
+        // Fakeout switch - at 40% time remaining, switch to real direction
+        if (prev.type === "fakeout" && prev.isFake && newTimeLeft < prev.duration * 0.4) {
+          soundManager.buttonPress();
+          return {
+            ...prev,
+            timeLeft: newTimeLeft,
+            isFake: false,
+            direction: prev.realDirection!,
+            emoji: DIRECTION_ARROWS[prev.realDirection!],
+          };
+        }
+
         if (newTimeLeft <= 0) {
           // Player failed to dodge - take damage!
+          // Check for shield
+          if (hasShield) {
+            setHasShield(false);
+            soundManager.parry();
+            spawnParticles(50, 50, "🛡️", 5);
+            spawnText(50, 50, "SHIELD BLOCKED!", "#00bfff");
+            setBossMessage("What?! 😲");
+            setTimeout(() => setBossMessage(""), 1000);
+            return null;
+          }
+
           soundManager.damage();
           setPlayerHP(hp => {
             const newHP = Math.max(0, hp - prev.damage);
@@ -6403,6 +6774,9 @@ const DramaKingBattle = memo(function DramaKingBattle({ onComplete }: { onComple
           setBossMessage("Got you! 😼");
           setBossEmotion("smug");
           setTimeout(() => setBossMessage(""), 1000);
+          // Cancel charging if hit
+          setIsCharging(false);
+          chargeStartRef.current = null;
           return null;
         }
 
@@ -6411,7 +6785,7 @@ const DramaKingBattle = memo(function DramaKingBattle({ onComplete }: { onComple
     }, 50);
 
     return () => clearInterval(timer);
-  }, [currentAttack, triggerShake, spawnText]);
+  }, [currentAttack, hasShield, triggerShake, spawnText, spawnParticles, DIRECTION_ARROWS]);
 
   // Update particles
   useEffect(() => {
@@ -6428,60 +6802,187 @@ const DramaKingBattle = memo(function DramaKingBattle({ onComplete }: { onComple
     return () => clearInterval(timer);
   }, [particles.length]);
 
+  // Handle successful dodge
+  const handleDodgeSuccess = useCallback((isPerfect: boolean, isSpecialAttack: boolean) => {
+    soundManager.parry();
+    setBossEmotion("hurt");
+    setTimeout(() => setBossEmotion(bossHPRef.current > 30 ? "smug" : "angry"), 500);
+
+    if (isPerfect) {
+      // Perfect dodge - activate counter window!
+      soundManager.criticalHit();
+      spawnParticles(50, 30, "⭐", 10);
+      spawnText(50, 40, "PERFECT! COUNTER!", "#FFD700");
+      setFlashColor("rgba(255,215,0,0.3)");
+      setTimeout(() => setFlashColor(null), 150);
+      setLastDodgeResult("perfect");
+      setCombo(c => c + 5);
+      setSuperMeter(m => Math.min(100, m + 15));
+      setScore(s => s + (isSpecialAttack ? 750 : 500));
+      setBossMessage("WHAT?! 😱");
+
+      // Activate counter window for 1.5 seconds
+      setCounterWindowActive(true);
+      setCounterWindowTimer(1.5);
+    } else {
+      // Good dodge
+      spawnParticles(50, 50, "✨", 5);
+      spawnText(50, 50, isSpecialAttack ? "NICE DODGE!" : "DODGED!", "#00ff00");
+      setLastDodgeResult("good");
+      setCombo(c => c + (isSpecialAttack ? 3 : 1));
+      setSuperMeter(m => Math.min(100, m + (isSpecialAttack ? 10 : 5)));
+      setScore(s => s + (isSpecialAttack ? 200 : 100));
+      setBossMessage("Tch! 😾");
+    }
+    setTimeout(() => {
+      setBossMessage("");
+      setLastDodgeResult("none");
+    }, 1000);
+  }, [spawnParticles, spawnText]);
+
   // Handle swipe to dodge
   const handleSwipe = useCallback((direction: SwipeDirection) => {
     if (!currentAttack || phase !== "battle") return;
 
-    if (direction === currentAttack.direction) {
-      // Successful dodge!
-      const timeRatio = currentAttack.timeLeft / currentAttack.duration;
-      const isPerfect = timeRatio < 0.3; // Dodged at last moment
+    // Love bomb can't be swiped - must be tapped
+    if (currentAttack.type === "lovebomb") {
+      spawnText(50, 50, "TAP TO DEFLECT!", "#ffaa00");
+      return;
+    }
 
-      soundManager.parry();
-      setCurrentAttack(null);
-      setBossEmotion("hurt");
-      setTimeout(() => setBossEmotion(bossHPRef.current > 30 ? "smug" : "angry"), 500);
+    // Ragemode needs diagonal swipe (both directions)
+    if (currentAttack.type === "ragemode" && currentAttack.directions) {
+      const [dir1, dir2] = currentAttack.directions;
+      if (direction === dir1 || direction === dir2) {
+        // Partial success - need both
+        soundManager.parry();
+        spawnParticles(50, 50, "✨", 3);
 
-      if (isPerfect) {
-        // Perfect dodge - counter attack!
-        soundManager.criticalHit();
-        const counterDamage = 10;
-        setBossHP(hp => Math.max(0, hp - counterDamage));
-        spawnParticles(50, 30, "⭐", 8);
-        spawnText(50, 40, "PERFECT! +" + counterDamage, "#FFD700");
-        setFlashColor("rgba(255,215,0,0.3)");
-        setTimeout(() => setFlashColor(null), 150);
-        setLastDodgeResult("perfect");
-        setCombo(c => c + 5);
-        setSuperMeter(m => Math.min(100, m + 15));
-        setScore(s => s + 500);
-        setBossMessage("WHAT?! 😱");
+        // Mark this direction as done
+        const newDirections = currentAttack.directions.filter(d => d !== direction);
+        if (newDirections.length === 0) {
+          // Both directions swiped!
+          const timeRatio = currentAttack.timeLeft / currentAttack.duration;
+          const isPerfect = timeRatio < 0.3;
+          setCurrentAttack(null);
+          handleDodgeSuccess(isPerfect, true);
+        } else {
+          setCurrentAttack({ ...currentAttack, directions: newDirections });
+          spawnText(50, 50, "KEEP GOING!", "#00ff00");
+        }
+        return;
       } else {
-        // Good dodge
-        spawnParticles(50, 50, "✨", 5);
-        spawnText(50, 50, "DODGED!", "#00ff00");
-        setLastDodgeResult("good");
-        setCombo(c => c + 1);
-        setSuperMeter(m => Math.min(100, m + 5));
-        setScore(s => s + 100);
-        setBossMessage("Tch! 😾");
+        soundManager.hit();
+        spawnText(50, 50, "WRONG WAY!", "#ff6666");
+        return;
       }
-      setTimeout(() => {
-        setBossMessage("");
-        setLastDodgeResult("none");
-      }, 1000);
+    }
+
+    // Rapidfire - need to match current direction in sequence
+    if (currentAttack.type === "rapidfire" && currentAttack.directions) {
+      const currentDir = currentAttack.directions[currentAttack.currentIndex || 0];
+      if (direction === currentDir) {
+        soundManager.parry();
+        spawnParticles(50, 50, "⚡", 2);
+        const nextIndex = (currentAttack.currentIndex || 0) + 1;
+
+        if (nextIndex >= currentAttack.directions.length) {
+          // All done!
+          const timeRatio = currentAttack.timeLeft / currentAttack.duration;
+          const isPerfect = timeRatio < 0.3;
+          setCurrentAttack(null);
+          handleDodgeSuccess(isPerfect, true);
+        } else {
+          // Next in sequence
+          setCurrentAttack({
+            ...currentAttack,
+            currentIndex: nextIndex,
+            direction: currentAttack.directions[nextIndex],
+          });
+          spawnText(50, 50, `${nextIndex}/${currentAttack.directions.length}`, "#00ffff");
+        }
+        return;
+      } else {
+        soundManager.hit();
+        spawnText(50, 50, "WRONG WAY!", "#ff6666");
+        return;
+      }
+    }
+
+    // Normal swipe or fakeout (after switch)
+    if (direction === currentAttack.direction) {
+      const timeRatio = currentAttack.timeLeft / currentAttack.duration;
+      const isPerfect = timeRatio < 0.3;
+      setCurrentAttack(null);
+      handleDodgeSuccess(isPerfect, false);
     } else {
-      // Wrong direction!
       soundManager.hit();
       spawnText(50, 50, "WRONG WAY!", "#ff6666");
     }
-  }, [currentAttack, phase, spawnParticles, spawnText]);
+  }, [currentAttack, phase, spawnParticles, spawnText, handleDodgeSuccess]);
+
+  // Counter window timer
+  useEffect(() => {
+    if (!counterWindowActive) return;
+    const timer = setInterval(() => {
+      setCounterWindowTimer(t => {
+        if (t <= 0.05) {
+          setCounterWindowActive(false);
+          return 0;
+        }
+        return t - 0.05;
+      });
+    }, 50);
+    return () => clearInterval(timer);
+  }, [counterWindowActive]);
+
+  // Power-up spawning
+  useEffect(() => {
+    if (phase !== "battle" || gameEndedRef.current) return;
+
+    const timer = setInterval(() => {
+      if (Date.now() - lastPowerUpSpawnRef.current > 15000 + Math.random() * 10000) {
+        lastPowerUpSpawnRef.current = Date.now();
+        spawnPowerUp();
+      }
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [phase, spawnPowerUp]);
+
+  // Power-up timer countdown
+  useEffect(() => {
+    if (powerUps.length === 0) return;
+    const timer = setInterval(() => {
+      setPowerUps(prev => prev.map(p => ({ ...p, timeLeft: p.timeLeft - 0.1 })).filter(p => p.timeLeft > 0));
+    }, 100);
+    return () => clearInterval(timer);
+  }, [powerUps.length]);
+
+  // Rage mode timer
+  useEffect(() => {
+    if (!rageMode) return;
+    const timer = setInterval(() => {
+      setRageModeTimer(t => {
+        if (t <= 0.1) {
+          setRageMode(false);
+          return 0;
+        }
+        return t - 0.1;
+      });
+    }, 100);
+    return () => clearInterval(timer);
+  }, [rageMode]);
 
   // Touch handlers (mobile)
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
     const touch = e.touches[0];
     touchStartRef.current = { x: touch.clientX, y: touch.clientY, time: Date.now() };
-  }, []);
+    // Start charging if no attack incoming
+    if (!currentAttack || currentAttack.type === "lovebomb") {
+      startCharging();
+    }
+  }, [currentAttack, startCharging]);
 
   const handleTouchEnd = useCallback((e: React.TouchEvent) => {
     if (!touchStartRef.current) return;
@@ -6497,6 +6998,8 @@ const DramaKingBattle = memo(function DramaKingBattle({ onComplete }: { onComple
 
     // Check if it's a swipe
     if (Math.abs(dx) > minSwipeDistance || Math.abs(dy) > minSwipeDistance) {
+      setIsCharging(false);
+      chargeStartRef.current = null;
       let direction: SwipeDirection;
       if (Math.abs(dx) > Math.abs(dy)) {
         direction = dx > 0 ? "right" : "left";
@@ -6505,18 +7008,33 @@ const DramaKingBattle = memo(function DramaKingBattle({ onComplete }: { onComple
       }
       handleSwipe(direction);
     }
-    // Check if it's a tap
-    else if (Math.abs(dx) < maxTapDistance && Math.abs(dy) < maxTapDistance && dt < 300) {
-      handleTapAttack();
+    // Check if it's a tap/charge release
+    else if (Math.abs(dx) < maxTapDistance && Math.abs(dy) < maxTapDistance) {
+      if (dt >= 500 && isCharging) {
+        // It was a hold - release charge attack
+        releaseCharge();
+      } else {
+        // Quick tap
+        setIsCharging(false);
+        chargeStartRef.current = null;
+        handleTapAttack();
+      }
+    } else {
+      setIsCharging(false);
+      chargeStartRef.current = null;
     }
-  }, [handleSwipe, handleTapAttack]);
+  }, [handleSwipe, handleTapAttack, isCharging, releaseCharge]);
 
   // Mouse handlers (desktop/laptop)
   const mouseStartRef = useRef<{ x: number; y: number; time: number } | null>(null);
 
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
     mouseStartRef.current = { x: e.clientX, y: e.clientY, time: Date.now() };
-  }, []);
+    // Start charging if no attack incoming
+    if (!currentAttack || currentAttack.type === "lovebomb") {
+      startCharging();
+    }
+  }, [currentAttack, startCharging]);
 
   const handleMouseUp = useCallback((e: React.MouseEvent) => {
     if (!mouseStartRef.current) return;
@@ -6531,6 +7049,8 @@ const DramaKingBattle = memo(function DramaKingBattle({ onComplete }: { onComple
 
     // Check if it's a drag (swipe)
     if (Math.abs(dx) > minSwipeDistance || Math.abs(dy) > minSwipeDistance) {
+      setIsCharging(false);
+      chargeStartRef.current = null;
       let direction: SwipeDirection;
       if (Math.abs(dx) > Math.abs(dy)) {
         direction = dx > 0 ? "right" : "left";
@@ -6539,11 +7059,22 @@ const DramaKingBattle = memo(function DramaKingBattle({ onComplete }: { onComple
       }
       handleSwipe(direction);
     }
-    // Check if it's a click (tap)
-    else if (Math.abs(dx) < maxTapDistance && Math.abs(dy) < maxTapDistance && dt < 300) {
-      handleTapAttack();
+    // Check if it's a click/charge release
+    else if (Math.abs(dx) < maxTapDistance && Math.abs(dy) < maxTapDistance) {
+      if (dt >= 500 && isCharging) {
+        // It was a hold - release charge attack
+        releaseCharge();
+      } else {
+        // Quick click
+        setIsCharging(false);
+        chargeStartRef.current = null;
+        handleTapAttack();
+      }
+    } else {
+      setIsCharging(false);
+      chargeStartRef.current = null;
     }
-  }, [handleSwipe, handleTapAttack]);
+  }, [handleSwipe, handleTapAttack, isCharging, releaseCharge, currentAttack, startCharging]);
 
   // Handle QTE button press
   const handleQTEPress = useCallback((button: string) => {
@@ -6706,30 +7237,40 @@ const DramaKingBattle = memo(function DramaKingBattle({ onComplete }: { onComple
             <span className="font-bold text-pink-400">PROVE YOUR LOVE!</span>"
           </p>
 
-          <div className="bg-slate-700/60 rounded-2xl p-4 mb-4 space-y-4">
+          <div className="bg-slate-700/60 rounded-2xl p-4 mb-4 space-y-3">
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 bg-pink-500/30 rounded-xl flex items-center justify-center">
-                <span className="text-2xl">👆</span>
+              <div className="w-10 h-10 bg-pink-500/30 rounded-xl flex items-center justify-center">
+                <span className="text-xl">👆</span>
               </div>
-              <div className="text-left">
-                <div className="text-white text-sm font-bold">TAP to Attack!</div>
-                <div className="text-slate-400 text-xs">Tap anywhere to send love!</div>
+              <div className="text-left flex-1">
+                <div className="text-white text-sm font-bold">TAP or HOLD!</div>
+                <div className="text-slate-400 text-xs">Tap to attack, hold to charge!</div>
               </div>
             </div>
 
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 bg-cyan-500/30 rounded-xl flex items-center justify-center">
-                <span className="text-2xl">👋</span>
+              <div className="w-10 h-10 bg-cyan-500/30 rounded-xl flex items-center justify-center">
+                <span className="text-xl">👋</span>
               </div>
-              <div className="text-left">
+              <div className="text-left flex-1">
                 <div className="text-white text-sm font-bold">SWIPE to Dodge!</div>
-                <div className="text-slate-400 text-xs">Swipe the direction shown!</div>
+                <div className="text-slate-400 text-xs">Perfect timing = counter!</div>
               </div>
             </div>
 
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 bg-yellow-500/30 rounded-xl flex items-center justify-center">
-                <span className="text-2xl">⚡</span>
+              <div className="w-10 h-10 bg-orange-500/30 rounded-xl flex items-center justify-center">
+                <span className="text-xl">🔥</span>
+              </div>
+              <div className="text-left flex-1">
+                <div className="text-white text-sm font-bold">Build Combos!</div>
+                <div className="text-slate-400 text-xs">10+ combo = damage boost!</div>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-yellow-500/30 rounded-xl flex items-center justify-center">
+                <span className="text-xl">⚡</span>
               </div>
               <div className="text-left">
                 <div className="text-white text-sm font-bold">SUPER Attack!</div>
@@ -6938,11 +7479,14 @@ const DramaKingBattle = memo(function DramaKingBattle({ onComplete }: { onComple
       <div className="absolute top-1/4 left-1/2 -translate-x-1/2 flex flex-col items-center z-20">
         <motion.div
           className="text-7xl text-center"
-          animate={bossShaking ? { x: [-10, 10, -10, 10, 0] } : { y: [0, -8, 0] }}
+          animate={bossShaking ? { x: [-10, 10, -10, 10, 0], scale: bossScale } : { y: [0, -8, 0], scale: bossScale }}
           transition={{ duration: bossShaking ? 0.3 : 2, repeat: bossShaking ? 0 : Infinity }}
         >
           <div className="text-4xl">👑</div>
-          <div>
+          <div className={cn(
+            bossPhase === "phase3" && "drop-shadow-[0_0_10px_rgba(255,0,0,0.8)]",
+            bossPhase === "phase2" && "drop-shadow-[0_0_8px_rgba(128,0,255,0.6)]"
+          )}>
             {bossEmotion === "defeated" ? "😵" :
              bossEmotion === "hurt" ? "😿" :
              bossEmotion === "charging" ? "😈" :
@@ -6983,14 +7527,75 @@ const DramaKingBattle = memo(function DramaKingBattle({ onComplete }: { onComple
         >
           <motion.div
             className="text-center"
-            animate={{ scale: [1, 1.2, 1] }}
+            animate={{ scale: [1, 1.1, 1] }}
             transition={{ duration: 0.3, repeat: Infinity }}
           >
-            <div className="text-8xl mb-2">{currentAttack.emoji}</div>
-            <div className="text-white font-bold text-lg">SWIPE {currentAttack.direction.toUpperCase()}!</div>
+            {/* Love Bomb - tap to deflect */}
+            {currentAttack.type === "lovebomb" ? (
+              <>
+                <motion.div
+                  className="text-8xl mb-2"
+                  animate={{ scale: [1, 1 - (1 - currentAttack.timeLeft / currentAttack.duration) * 0.5] }}
+                >
+                  💣💕
+                </motion.div>
+                <div className="text-yellow-400 font-bold text-lg">TAP TO DEFLECT!</div>
+                <div className="text-white text-sm mt-1">
+                  {currentAttack.deflected || 0}/{currentAttack.deflectCount}
+                </div>
+              </>
+            ) : currentAttack.type === "rapidfire" && currentAttack.directions ? (
+              /* Rapidfire - sequence of arrows */
+              <>
+                <div className="flex gap-2 justify-center text-5xl mb-2">
+                  {currentAttack.directions.map((dir, i) => (
+                    <span key={i} className={cn(
+                      "transition-all",
+                      i < (currentAttack.currentIndex || 0) ? "opacity-30 scale-75" :
+                      i === (currentAttack.currentIndex || 0) ? "text-yellow-400 scale-110" : "opacity-60"
+                    )}>
+                      {DIRECTION_ARROWS[dir]}
+                    </span>
+                  ))}
+                </div>
+                <div className="text-cyan-400 font-bold text-lg">RAPID FIRE!</div>
+              </>
+            ) : currentAttack.type === "ragemode" && currentAttack.directions ? (
+              /* Ragemode - two directions at once */
+              <>
+                <div className="flex gap-4 justify-center text-6xl mb-2">
+                  {currentAttack.directions.map((dir, i) => (
+                    <motion.span key={i} animate={{ scale: [1, 1.2, 1] }} transition={{ duration: 0.4, delay: i * 0.1 }}>
+                      {DIRECTION_ARROWS[dir]}
+                    </motion.span>
+                  ))}
+                </div>
+                <div className="text-red-400 font-bold text-lg">SWIPE BOTH!</div>
+              </>
+            ) : currentAttack.type === "fakeout" && currentAttack.isFake ? (
+              /* Fakeout - shows warning */
+              <>
+                <div className="text-8xl mb-2 opacity-80">{currentAttack.emoji}</div>
+                <div className="text-orange-400 font-bold text-lg">WAIT FOR IT...</div>
+                <div className="text-orange-300 text-xs">⚠️ FAKEOUT!</div>
+              </>
+            ) : (
+              /* Normal swipe */
+              <>
+                <div className="text-8xl mb-2">{currentAttack.emoji}</div>
+                <div className="text-white font-bold text-lg">SWIPE {currentAttack.direction.toUpperCase()}!</div>
+              </>
+            )}
+            {/* Timer bar */}
             <div className="w-32 h-2 bg-slate-700 rounded-full mt-2 mx-auto overflow-hidden">
               <motion.div
-                className="h-full bg-gradient-to-r from-red-500 to-yellow-500"
+                className={cn(
+                  "h-full",
+                  currentAttack.type === "lovebomb" ? "bg-gradient-to-r from-pink-500 to-yellow-500" :
+                  currentAttack.type === "rapidfire" ? "bg-gradient-to-r from-cyan-500 to-blue-500" :
+                  currentAttack.type === "ragemode" ? "bg-gradient-to-r from-red-600 to-orange-500" :
+                  "bg-gradient-to-r from-red-500 to-yellow-500"
+                )}
                 style={{ width: `${(currentAttack.timeLeft / currentAttack.duration) * 100}%` }}
               />
             </div>
@@ -7044,6 +7649,128 @@ const DramaKingBattle = memo(function DramaKingBattle({ onComplete }: { onComple
         </div>
       ))}
 
+      {/* Power-ups */}
+      {powerUps.map(powerUp => (
+        <motion.button
+          key={powerUp.id}
+          initial={{ scale: 0, rotate: -180 }}
+          animate={{ scale: 1, rotate: 0, y: [0, -5, 0] }}
+          transition={{ y: { duration: 1, repeat: Infinity } }}
+          onClick={() => collectPowerUp(powerUp)}
+          className="absolute text-4xl z-35 cursor-pointer"
+          style={{
+            left: `${powerUp.x}%`,
+            top: `${powerUp.y}%`,
+            transform: "translate(-50%, -50%)",
+            opacity: powerUp.timeLeft > 1 ? 1 : powerUp.timeLeft,
+          }}
+        >
+          {powerUp.emoji}
+        </motion.button>
+      ))}
+
+      {/* Counter Window Indicator */}
+      {counterWindowActive && (
+        <motion.div
+          initial={{ scale: 0 }}
+          animate={{ scale: 1 }}
+          className="absolute inset-0 pointer-events-none z-25"
+        >
+          <div className="absolute inset-4 border-4 border-yellow-400 rounded-3xl animate-pulse" />
+          <div className="absolute top-1/3 left-1/2 -translate-x-1/2 text-yellow-400 font-bold text-lg">
+            ⚡ COUNTER! ⚡
+          </div>
+          <div className="absolute top-1/3 left-1/2 -translate-x-1/2 mt-8">
+            <div className="w-24 h-2 bg-slate-700 rounded-full overflow-hidden">
+              <div
+                className="h-full bg-yellow-400 transition-all"
+                style={{ width: `${(counterWindowTimer / 1.5) * 100}%` }}
+              />
+            </div>
+          </div>
+        </motion.div>
+      )}
+
+      {/* Charge Indicator */}
+      {isCharging && chargeTime > 0.3 && (
+        <motion.div
+          initial={{ scale: 0 }}
+          animate={{ scale: 1 }}
+          className="absolute bottom-32 left-1/2 -translate-x-1/2 z-40 pointer-events-none"
+        >
+          <div className="relative w-20 h-20">
+            <svg className="w-full h-full -rotate-90">
+              <circle
+                cx="40" cy="40" r="36"
+                fill="none"
+                stroke="rgba(255,255,255,0.2)"
+                strokeWidth="6"
+              />
+              <circle
+                cx="40" cy="40" r="36"
+                fill="none"
+                stroke={chargeLevel >= 3 ? "#ff00ff" : chargeLevel >= 2 ? "#FFD700" : chargeLevel >= 1 ? "#ff69b4" : "#fff"}
+                strokeWidth="6"
+                strokeDasharray={`${(chargeTime / 3) * 226} 226`}
+                strokeLinecap="round"
+              />
+            </svg>
+            <div className="absolute inset-0 flex items-center justify-center">
+              <span className="text-2xl">
+                {chargeLevel >= 3 ? "💥" : chargeLevel >= 2 ? "⭐" : chargeLevel >= 1 ? "✨" : "💖"}
+              </span>
+            </div>
+          </div>
+          <div className="text-center text-white text-xs mt-1 font-bold">
+            {chargeLevel >= 3 ? "MEGA!" : chargeLevel >= 2 ? "HEAVY!" : chargeLevel >= 1 ? "CHARGED!" : ""}
+          </div>
+        </motion.div>
+      )}
+
+      {/* Status Indicators */}
+      <div className="absolute top-24 right-4 z-30 flex flex-col gap-2">
+        {hasShield && (
+          <motion.div
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            className="bg-cyan-500/30 px-3 py-1 rounded-full text-cyan-300 text-sm font-bold flex items-center gap-1"
+          >
+            🛡️ SHIELD
+          </motion.div>
+        )}
+        {rageMode && (
+          <motion.div
+            initial={{ scale: 0 }}
+            animate={{ scale: [1, 1.1, 1] }}
+            transition={{ duration: 0.3, repeat: Infinity }}
+            className="bg-red-500/30 px-3 py-1 rounded-full text-red-300 text-sm font-bold flex items-center gap-1"
+          >
+            🔥 RAGE {Math.ceil(rageModeTimer)}s
+          </motion.div>
+        )}
+      </div>
+
+      {/* Phase Transition Overlay */}
+      {showingPhaseTransition && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="absolute inset-0 z-50 flex items-center justify-center bg-black/50 pointer-events-none"
+        >
+          <motion.div
+            initial={{ scale: 0, rotate: -10 }}
+            animate={{ scale: [1, 1.2, 1], rotate: [0, 5, -5, 0] }}
+            transition={{ duration: 0.5 }}
+            className={cn(
+              "text-5xl font-black px-8 py-4 rounded-2xl",
+              bossPhase === "phase3" ? "bg-red-600 text-white" : "bg-purple-600 text-white"
+            )}
+          >
+            {phaseTransitionText}
+          </motion.div>
+        </motion.div>
+      )}
+
       {/* Bottom Area - Tap hint and Super meter */}
       <div className="absolute bottom-0 left-0 right-0 p-4 z-30">
         {/* Super meter */}
@@ -7070,14 +7797,28 @@ const DramaKingBattle = memo(function DramaKingBattle({ onComplete }: { onComple
         </div>
 
         {/* Tap hint */}
-        {!currentAttack && (
+        {!currentAttack && !isCharging && (
           <motion.div
             className="text-center text-slate-400 text-sm"
             animate={{ opacity: [0.5, 1, 0.5] }}
             transition={{ duration: 1.5, repeat: Infinity }}
           >
-            👆 TAP to attack! 👆
+            👆 TAP to attack! HOLD to charge! 👆
           </motion.div>
+        )}
+
+        {/* Combo multiplier display */}
+        {combo >= 10 && !currentAttack && (
+          <div className="text-center mt-2">
+            <span className={cn(
+              "text-xs font-bold px-2 py-1 rounded-full",
+              combo >= 30 ? "bg-yellow-500/30 text-yellow-300" :
+              combo >= 20 ? "bg-pink-500/30 text-pink-300" :
+              "bg-purple-500/30 text-purple-300"
+            )}>
+              {combo >= 30 ? "2.5x DMG" : combo >= 20 ? "2x DMG" : "1.5x DMG"}
+            </span>
+          </div>
         )}
       </div>
     </div>
