@@ -541,84 +541,291 @@ class SoundManager {
 
   // === RHYTHM GAME SOUNDS ===
   rhythmHit() {
-    this.playTone(880, 0.08, "sine", 0.25);
-    this.playTone(1100, 0.06, "sine", 0.15, 0.02);
+    // Punchy hit with harmonics
+    this.playTone(880, 0.08, "sine", 0.3);
+    this.playTone(1100, 0.06, "sine", 0.2, 0.015);
+    this.playTone(1760, 0.04, "sine", 0.1, 0.02);
+    this.playNoise(0.02, 0.1);
   }
 
   rhythmPerfect() {
-    this.playTone(1047, 0.1, "sine", 0.3); // C6
-    this.playTone(1319, 0.08, "sine", 0.2, 0.03); // E6
-    this.playTone(1568, 0.1, "sine", 0.25, 0.06); // G6
+    // Sparkly perfect hit with arpeggiated chord
+    this.playTone(1047, 0.12, "sine", 0.35); // C6
+    this.playTone(1319, 0.1, "sine", 0.28, 0.025); // E6
+    this.playTone(1568, 0.12, "sine", 0.32, 0.05); // G6
+    this.playTone(2093, 0.08, "sine", 0.2, 0.08); // C7
+    // Shimmer effect
+    this.playTone(3000, 0.03, "sine", 0.08, 0.1);
+    this.playTone(4000, 0.02, "sine", 0.05, 0.12);
   }
 
   rhythmMiss() {
-    this.playTone(200, 0.15, "sawtooth", 0.2);
-    this.playNoise(0.1, 0.1);
+    // Dissonant buzz with descending tone
+    this.playTone(200, 0.18, "sawtooth", 0.2);
+    this.playTone(150, 0.15, "sawtooth", 0.15, 0.05);
+    this.playNoise(0.12, 0.15);
   }
 
   rhythmBeat() {
-    this.playTone(80, 0.1, "sine", 0.15);
+    // Deep bass pulse with subtle kick
+    this.playTone(60, 0.12, "sine", 0.2);
+    this.playTone(120, 0.08, "sine", 0.1, 0.02);
   }
 
   rhythmCombo() {
-    this.playTone(600, 0.1, "sine", 0.2);
-    this.playTone(800, 0.08, "sine", 0.15, 0.05);
-    this.playTone(1000, 0.1, "sine", 0.2, 0.1);
+    // Triumphant ascending fanfare
+    this.playTone(523, 0.08, "sine", 0.25);
+    this.playTone(659, 0.08, "sine", 0.22, 0.04);
+    this.playTone(784, 0.08, "sine", 0.25, 0.08);
+    this.playTone(1047, 0.12, "sine", 0.3, 0.12);
+    // Shimmer
+    this.playTone(2000, 0.04, "sine", 0.1, 0.15);
+  }
+
+  rhythmGolden() {
+    // Special golden note sparkle
+    this.playTone(1200, 0.1, "sine", 0.3);
+    this.playTone(1500, 0.08, "sine", 0.25, 0.02);
+    this.playTone(1800, 0.1, "sine", 0.28, 0.04);
+    this.playTone(2400, 0.06, "sine", 0.15, 0.07);
+    this.playTone(3200, 0.04, "sine", 0.1, 0.1);
+  }
+
+  startRhythmMusic() {
+    this.stopMusic();
+    if (!this.audioContext || !this.musicGain || !this.musicEnabled) return;
+
+    const playNote = (freq: number, duration: number, delay: number, type: OscillatorType = "sine") => {
+      if (!this.audioContext || !this.musicGain) return;
+      const osc = this.audioContext.createOscillator();
+      const gain = this.audioContext.createGain();
+      osc.type = type;
+      osc.frequency.value = freq;
+      gain.gain.setValueAtTime(0, this.audioContext.currentTime + delay);
+      gain.gain.linearRampToValueAtTime(0.1, this.audioContext.currentTime + delay + 0.02);
+      gain.gain.linearRampToValueAtTime(0, this.audioContext.currentTime + delay + duration);
+      osc.connect(gain);
+      gain.connect(this.musicGain);
+      osc.start(this.audioContext.currentTime + delay);
+      osc.stop(this.audioContext.currentTime + delay + duration + 0.1);
+    };
+
+    // Pumping synth-pop beat
+    const playBeat = () => {
+      // Bass line
+      [130, 130, 165, 147].forEach((f, i) => {
+        playNote(f, 0.4, i * 0.5, "sine");
+      });
+      // Kick drums
+      for (let i = 0; i < 4; i++) {
+        playNote(60, 0.1, i * 0.5, "sine");
+        if (i % 2 === 1) playNote(200, 0.05, i * 0.5 + 0.25, "square");
+      }
+      // Melody
+      [392, 440, 523, 494, 440, 392, 349, 392].forEach((f, i) => {
+        if (f > 0) playNote(f, 0.2, i * 0.25, "sine");
+      });
+    };
+
+    playBeat();
+    this.musicInterval = window.setInterval(playBeat, 2000);
   }
 
   // === PUZZLE GAME SOUNDS ===
   tileSlide() {
-    this.playTone(400, 0.05, "sine", 0.2);
-    this.playTone(500, 0.05, "sine", 0.15, 0.02);
+    // Smooth slide with satisfying click
+    this.playTone(350, 0.04, "sine", 0.2);
+    this.playTone(450, 0.05, "sine", 0.18, 0.02);
+    this.playTone(550, 0.03, "sine", 0.12, 0.04);
   }
 
   tileClick() {
-    this.playTone(600, 0.03, "sine", 0.15);
+    this.playTone(600, 0.04, "sine", 0.18);
+    this.playTone(750, 0.02, "sine", 0.1, 0.02);
+  }
+
+  tileCorrect() {
+    // Satisfying ding when tile is in correct position
+    this.playTone(880, 0.12, "sine", 0.25);
+    this.playTone(1100, 0.08, "sine", 0.18, 0.03);
   }
 
   puzzleSolved() {
-    const notes = [523, 659, 784, 1047, 1319, 1568];
+    // Epic victory fanfare with shimmer
+    const notes = [523, 659, 784, 1047, 1319, 1568, 2093];
     notes.forEach((freq, i) => {
-      this.playTone(freq, 0.2, "sine", 0.2, i * 0.1);
+      this.playTone(freq, 0.25, "sine", 0.25, i * 0.08);
+    });
+    // Add shimmer overtones
+    [2500, 3000, 3500, 4000].forEach((f, i) => {
+      this.playTone(f, 0.15, "sine", 0.08, 0.3 + i * 0.05);
     });
   }
 
   invalidMove() {
-    this.playTone(200, 0.1, "square", 0.15);
+    // Softer rejection with wobble
+    this.playTone(200, 0.08, "square", 0.12);
+    this.playTone(180, 0.08, "square", 0.1, 0.04);
+    this.playTone(160, 0.06, "square", 0.08, 0.08);
+  }
+
+  puzzleTimeLow() {
+    // Tension tick
+    this.playTone(800, 0.05, "sine", 0.2);
+    this.playTone(600, 0.05, "sine", 0.15, 0.1);
+  }
+
+  startPuzzleMusic() {
+    this.stopMusic();
+    if (!this.audioContext || !this.musicGain || !this.musicEnabled) return;
+
+    const playNote = (freq: number, duration: number, delay: number) => {
+      if (!this.audioContext || !this.musicGain) return;
+      const osc = this.audioContext.createOscillator();
+      const gain = this.audioContext.createGain();
+      osc.type = "sine";
+      osc.frequency.value = freq;
+      gain.gain.setValueAtTime(0, this.audioContext.currentTime + delay);
+      gain.gain.linearRampToValueAtTime(0.08, this.audioContext.currentTime + delay + 0.05);
+      gain.gain.linearRampToValueAtTime(0, this.audioContext.currentTime + delay + duration);
+      osc.connect(gain);
+      gain.connect(this.musicGain);
+      osc.start(this.audioContext.currentTime + delay);
+      osc.stop(this.audioContext.currentTime + delay + duration + 0.1);
+    };
+
+    // Gentle ambient puzzle music
+    const playAmbient = () => {
+      // Soft pad chords
+      [262, 330, 392].forEach(f => playNote(f, 2.5, 0));
+      [294, 370, 440].forEach(f => playNote(f, 2.5, 2.5));
+      // Gentle melody
+      [523, 494, 440, 392, 440, 494, 523, 587].forEach((f, i) => {
+        playNote(f, 0.5, i * 0.6);
+      });
+    };
+
+    playAmbient();
+    this.musicInterval = window.setInterval(playAmbient, 5000);
   }
 
   // === ARROW GALLERY SOUNDS ===
   bowDraw() {
-    this.playTone(200, 0.1, "sine", 0.1);
-    this.playTone(250, 0.15, "sine", 0.1, 0.05);
+    // Tension string pull
+    this.playTone(150, 0.15, "sine", 0.12);
+    this.playTone(180, 0.2, "sine", 0.1, 0.05);
+    this.playTone(220, 0.15, "sine", 0.08, 0.12);
   }
 
   arrowFire() {
-    this.playNoise(0.1, 0.2);
-    this.playTone(400, 0.1, "sine", 0.15);
-    this.playTone(600, 0.08, "sine", 0.1, 0.03);
+    // Whooshing arrow release
+    this.playNoise(0.12, 0.25);
+    this.playTone(350, 0.08, "sine", 0.18);
+    this.playTone(500, 0.06, "sine", 0.12, 0.02);
+    this.playTone(650, 0.04, "sine", 0.08, 0.04);
   }
 
   arrowHit() {
-    this.playTone(800, 0.1, "sine", 0.25);
-    this.playTone(1000, 0.08, "sine", 0.2, 0.03);
-    this.playNoise(0.05, 0.15);
+    // Satisfying thunk with sparkle
+    this.playTone(700, 0.1, "sine", 0.28);
+    this.playTone(900, 0.08, "sine", 0.22, 0.02);
+    this.playTone(1100, 0.06, "sine", 0.15, 0.04);
+    this.playNoise(0.06, 0.2);
   }
 
   arrowMiss() {
-    this.playNoise(0.08, 0.1);
-    this.playTone(300, 0.1, "sine", 0.1);
+    // Soft miss whoosh
+    this.playNoise(0.1, 0.12);
+    this.playTone(250, 0.12, "sine", 0.1);
+    this.playTone(200, 0.1, "sine", 0.08, 0.05);
   }
 
   bullseye() {
-    this.playTone(1047, 0.15, "sine", 0.3);
-    this.playTone(1319, 0.12, "sine", 0.25, 0.05);
-    this.playTone(1568, 0.15, "sine", 0.3, 0.1);
+    // Epic bullseye with fanfare
+    this.playTone(880, 0.15, "sine", 0.35);
+    this.playTone(1100, 0.12, "sine", 0.3, 0.03);
+    this.playTone(1320, 0.15, "sine", 0.32, 0.06);
+    this.playTone(1760, 0.1, "sine", 0.25, 0.1);
+    // Sparkle
+    this.playTone(2500, 0.05, "sine", 0.12, 0.12);
+    this.playTone(3000, 0.04, "sine", 0.1, 0.15);
+    this.playTone(3500, 0.03, "sine", 0.08, 0.18);
   }
 
   targetSpawn() {
-    this.playTone(500, 0.08, "sine", 0.15);
-    this.playTone(700, 0.06, "sine", 0.1, 0.04);
+    // Pop-in sound
+    this.playTone(400, 0.06, "sine", 0.15);
+    this.playTone(600, 0.05, "sine", 0.12, 0.02);
+    this.playTone(800, 0.04, "sine", 0.08, 0.04);
+  }
+
+  targetHitGolden() {
+    // Special golden target hit
+    this.playTone(1000, 0.12, "sine", 0.32);
+    this.playTone(1250, 0.1, "sine", 0.28, 0.02);
+    this.playTone(1500, 0.12, "sine", 0.3, 0.04);
+    this.playTone(2000, 0.08, "sine", 0.2, 0.08);
+    // Golden shimmer
+    [2500, 3000, 3500].forEach((f, i) => {
+      this.playTone(f, 0.06, "sine", 0.1, 0.1 + i * 0.03);
+    });
+  }
+
+  startGalleryMusic() {
+    this.stopMusic();
+    if (!this.audioContext || !this.musicGain || !this.musicEnabled) return;
+
+    const playNote = (freq: number, duration: number, delay: number, type: OscillatorType = "sine") => {
+      if (!this.audioContext || !this.musicGain) return;
+      const osc = this.audioContext.createOscillator();
+      const gain = this.audioContext.createGain();
+      osc.type = type;
+      osc.frequency.value = freq;
+      gain.gain.setValueAtTime(0, this.audioContext.currentTime + delay);
+      gain.gain.linearRampToValueAtTime(0.1, this.audioContext.currentTime + delay + 0.02);
+      gain.gain.linearRampToValueAtTime(0, this.audioContext.currentTime + delay + duration);
+      osc.connect(gain);
+      gain.connect(this.musicGain);
+      osc.start(this.audioContext.currentTime + delay);
+      osc.stop(this.audioContext.currentTime + delay + duration + 0.1);
+    };
+
+    // Carnival fair theme
+    const playFair = () => {
+      // Organ-style bass
+      [196, 220, 247, 262].forEach((f, i) => {
+        playNote(f, 0.4, i * 0.5, "sine");
+        playNote(f * 2, 0.3, i * 0.5, "sine");
+      });
+      // Festive melody
+      [523, 587, 659, 698, 659, 587, 523, 494].forEach((f, i) => {
+        playNote(f, 0.22, i * 0.25, "sine");
+      });
+      // Cymbals
+      this.playNoise(0.05, 0.08);
+      setTimeout(() => this.playNoise(0.05, 0.08), 500);
+    };
+
+    playFair();
+    this.musicInterval = window.setInterval(playFair, 2000);
+  }
+
+  // === UI SOUNDS ===
+  uiWhoosh() {
+    this.playNoise(0.08, 0.15);
+    this.playTone(300, 0.1, "sine", 0.1);
+    this.playTone(500, 0.08, "sine", 0.08, 0.03);
+  }
+
+  uiPop() {
+    this.playTone(800, 0.05, "sine", 0.2);
+    this.playTone(1200, 0.03, "sine", 0.12, 0.02);
+  }
+
+  scoreUp() {
+    this.playTone(600, 0.06, "sine", 0.2);
+    this.playTone(800, 0.05, "sine", 0.15, 0.03);
+    this.playTone(1000, 0.06, "sine", 0.18, 0.06);
   }
 }
 
@@ -637,11 +844,10 @@ type GameScene =
   | "chapter2_smash_hearts"
   | "chapter2_escape"
   | "chapter2_reject_letters"
+  | "chapter3_rhythm"
+  | "chapter3_puzzle"
+  | "chapter3_gallery"
   | "chapter3_boss_battle"
-  | "bonus_select"
-  | "bonus_rhythm"
-  | "bonus_puzzle"
-  | "bonus_gallery"
   | "chapter3_final"
   | "ending_good"
   | "ending_perfect";
@@ -691,6 +897,9 @@ const CHAPTER_TITLES = {
   chapter2_smash_hearts: { num: 2, title: "Smash the Hearts!", subtitle: "Destroy the decorations!" },
   chapter2_escape: { num: 2, title: "Dodge the Love!", subtitle: "Avoid the cat's attacks!" },
   chapter2_reject_letters: { num: 2, title: "Reject the Letters!", subtitle: "Tear them all up!" },
+  chapter3_rhythm: { num: 3, title: "Rhythm Heart Beat", subtitle: "Feel the love rhythm!" },
+  chapter3_puzzle: { num: 3, title: "Love Letter Puzzle", subtitle: "Piece together the message!" },
+  chapter3_gallery: { num: 3, title: "Cupid's Arrow Gallery", subtitle: "Shoot down the hearts!" },
   chapter3_boss_battle: { num: "👑", title: "FINAL BOSS", subtitle: "The cat won't give up!" },
   chapter3_final: { num: 3, title: "Final Decision", subtitle: "The moment of truth" },
 } as const;
@@ -8090,14 +8299,14 @@ const DramaKingBattle = memo(function DramaKingBattle({ onComplete }: { onComple
 });
 
 // ============================================================================
-// RHYTHM HEART BEAT - Rhythm game with falling hearts
+// RHYTHM HEART BEAT - ULTIMATE rhythm game with fever mode & power-ups!
 // ============================================================================
 
 type RhythmNote = {
   id: number;
   lane: 0 | 1 | 2;
   y: number;
-  type: "heart" | "golden" | "broken";
+  type: "heart" | "golden" | "broken" | "diamond" | "freeze" | "shield" | "bomb";
   speed: number;
   hit?: "perfect" | "good" | "miss";
 };
@@ -8105,9 +8314,32 @@ type RhythmNote = {
 type RhythmHitEffect = {
   id: number;
   lane: number;
-  type: "perfect" | "good" | "miss";
+  type: "perfect" | "good" | "miss" | "fever" | "powerup";
   y: number;
+  points?: number;
+  text?: string;
 };
+
+type RhythmParticle = {
+  id: number;
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  color: string;
+  size: number;
+  life: number;
+};
+
+const RHYTHM_CAT_MESSAGES = [
+  { combo: 5, text: "Nice! 💕", emotion: "happy" as const },
+  { combo: 10, text: "Amazing! 🌟", emotion: "happy" as const },
+  { combo: 15, text: "You're on fire! 🔥", emotion: "impressed" as const },
+  { combo: 20, text: "INCREDIBLE! ✨", emotion: "impressed" as const },
+  { combo: 25, text: "FEVER TIME! 💜", emotion: "impressed" as const },
+  { combo: 30, text: "UNSTOPPABLE!! 🚀", emotion: "impressed" as const },
+  { combo: 40, text: "LEGENDARY!!! 👑", emotion: "impressed" as const },
+];
 
 const RhythmHeartBeatGame = memo(function RhythmHeartBeatGame({
   onComplete
@@ -8120,11 +8352,22 @@ const RhythmHeartBeatGame = memo(function RhythmHeartBeatGame({
   const [score, setScore] = useState(0);
   const [combo, setCombo] = useState(0);
   const [maxCombo, setMaxCombo] = useState(0);
-  const [timeLeft, setTimeLeft] = useState(30);
+  const [timeLeft, setTimeLeft] = useState(35);
   const [hitEffects, setHitEffects] = useState<RhythmHitEffect[]>([]);
   const [laneFlash, setLaneFlash] = useState<[boolean, boolean, boolean]>([false, false, false]);
   const [beatPulse, setBeatPulse] = useState(false);
   const [catEmotion, setCatEmotion] = useState<"happy" | "impressed" | "worried">("happy");
+  const [particles, setParticles] = useState<RhythmParticle[]>([]);
+  // NEW: Fever mode and power-ups!
+  const [feverMode, setFeverMode] = useState(false);
+  const [feverTimer, setFeverTimer] = useState(0);
+  const [hasShield, setHasShield] = useState(false);
+  const [slowMo, setSlowMo] = useState(false);
+  const [catMessage, setCatMessage] = useState<string | null>(null);
+  const [eventMessage, setEventMessage] = useState<string | null>(null);
+  const [screenShake, setScreenShake] = useState(false);
+  const [perfectStreak, setPerfectStreak] = useState(0);
+  const [displayedScore, setDisplayedScore] = useState(0);
 
   const onCompleteRef = useRef(onComplete);
   const gameEndedRef = useRef(false);
@@ -8132,10 +8375,45 @@ const RhythmHeartBeatGame = memo(function RhythmHeartBeatGame({
   const noteIdRef = useRef(0);
   const scoreRef = useRef(0);
   const comboRef = useRef(0);
+  const particleIdRef = useRef(0);
 
   useEffect(() => { onCompleteRef.current = onComplete; }, [onComplete]);
   useEffect(() => { scoreRef.current = score; }, [score]);
   useEffect(() => { comboRef.current = combo; }, [combo]);
+
+  // Animated score display
+  useEffect(() => {
+    if (displayedScore < score) {
+      const diff = score - displayedScore;
+      const step = Math.max(1, Math.floor(diff / 10));
+      const timer = setTimeout(() => {
+        setDisplayedScore(prev => Math.min(prev + step, score));
+      }, 20);
+      return () => clearTimeout(timer);
+    }
+  }, [displayedScore, score]);
+
+  // Spawn particles
+  const spawnParticles = useCallback((x: number, y: number, type: "perfect" | "good" | "miss" | "golden") => {
+    const colors = type === "perfect" ? ["#fbbf24", "#fcd34d", "#fef08a"] :
+                   type === "golden" ? ["#ffd700", "#ffec8b", "#fff8dc"] :
+                   type === "good" ? ["#4ade80", "#86efac", "#bbf7d0"] :
+                   ["#f87171", "#fca5a5", "#fecaca"];
+    const count = type === "perfect" || type === "golden" ? 15 : 8;
+    const newParticles: RhythmParticle[] = [];
+    for (let i = 0; i < count; i++) {
+      newParticles.push({
+        id: particleIdRef.current++,
+        x, y,
+        vx: (Math.random() - 0.5) * 8,
+        vy: (Math.random() - 0.5) * 8 - 3,
+        color: colors[Math.floor(Math.random() * colors.length)],
+        size: type === "perfect" || type === "golden" ? 4 + Math.random() * 4 : 3 + Math.random() * 3,
+        life: 1
+      });
+    }
+    setParticles(prev => [...prev, ...newParticles]);
+  }, []);
 
   // Countdown
   useEffect(() => {
@@ -8146,6 +8424,7 @@ const RhythmHeartBeatGame = memo(function RhythmHeartBeatGame({
       return () => clearTimeout(timer);
     } else {
       soundManager.countdownGo();
+      soundManager.startRhythmMusic();
       setPhase("playing");
     }
   }, [phase, countdownNum]);
@@ -8158,8 +8437,9 @@ const RhythmHeartBeatGame = memo(function RhythmHeartBeatGame({
         if (t <= 1) {
           gameEndedRef.current = true;
           setPhase("done");
+          soundManager.stopMusic();
           soundManager.victory();
-          setTimeout(() => onCompleteRef.current(scoreRef.current), 2000);
+          setTimeout(() => onCompleteRef.current(scoreRef.current), 2500);
           return 0;
         }
         return t - 1;
@@ -8174,31 +8454,103 @@ const RhythmHeartBeatGame = memo(function RhythmHeartBeatGame({
     const beatInterval = setInterval(() => {
       setBeatPulse(true);
       soundManager.rhythmBeat();
-      setTimeout(() => setBeatPulse(false), 100);
+      setTimeout(() => setBeatPulse(false), 150);
     }, 500);
     return () => clearInterval(beatInterval);
   }, [phase]);
 
-  // Spawn notes
+  // Fever mode timer
+  useEffect(() => {
+    if (!feverMode || phase !== "playing") return;
+    const timer = setInterval(() => {
+      setFeverTimer(t => {
+        if (t <= 1) {
+          setFeverMode(false);
+          setEventMessage("Fever ended!");
+          setTimeout(() => setEventMessage(null), 1500);
+          return 0;
+        }
+        return t - 1;
+      });
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [feverMode, phase]);
+
+  // Slow motion timer
+  useEffect(() => {
+    if (!slowMo) return;
+    const timer = setTimeout(() => setSlowMo(false), 3000);
+    return () => clearTimeout(timer);
+  }, [slowMo]);
+
+  // Cat message based on combo
+  useEffect(() => {
+    const message = RHYTHM_CAT_MESSAGES.slice().reverse().find(m => combo >= m.combo);
+    if (message) {
+      setCatMessage(message.text);
+      setCatEmotion(message.emotion);
+    } else if (combo === 0) {
+      setCatMessage(null);
+      setCatEmotion("worried");
+    }
+  }, [combo]);
+
+  // Trigger fever mode at 25 combo
+  useEffect(() => {
+    if (combo >= 25 && !feverMode && phase === "playing") {
+      setFeverMode(true);
+      setFeverTimer(8);
+      setEventMessage("🔥 FEVER MODE! 🔥");
+      soundManager.rhythmCombo();
+      setTimeout(() => setEventMessage(null), 2000);
+    }
+  }, [combo, feverMode, phase]);
+
+  // Spawn notes with power-ups and events!
   useEffect(() => {
     if (phase !== "playing" || gameEndedRef.current) return;
+
+    const baseInterval = slowMo ? 1000 : 650;
+    const difficultyMod = Math.min(350, (35 - timeLeft) * 10);
+    const interval = feverMode ? baseInterval - difficultyMod - 100 : baseInterval - difficultyMod;
+
     const spawnInterval = setInterval(() => {
       const lane = Math.floor(Math.random() * 3) as 0 | 1 | 2;
       const rand = Math.random();
-      const type: RhythmNote["type"] = rand < 0.1 ? "broken" : rand < 0.2 ? "golden" : "heart";
+
+      // Power-up and note type distribution
+      let type: RhythmNote["type"];
+      if (feverMode) {
+        // Fever mode: more golden, no broken, chance for diamond
+        type = rand < 0.15 ? "diamond" : rand < 0.35 ? "golden" : "heart";
+      } else {
+        // Normal: include power-ups occasionally
+        if (rand < 0.03) type = "diamond";
+        else if (rand < 0.05) type = "freeze";
+        else if (rand < 0.07) type = "shield";
+        else if (rand < 0.09) type = "bomb";
+        else if (rand < 0.14) type = "broken";
+        else if (rand < 0.24) type = "golden";
+        else type = "heart";
+      }
+
+      const baseSpeed = slowMo ? 0.6 : 1.1;
+      const speedIncrease = (35 - timeLeft) * (slowMo ? 0.01 : 0.025);
+
       const newNote: RhythmNote = {
         id: noteIdRef.current++,
         lane,
-        y: -5,
+        y: -8,
         type,
-        speed: 1.2 + (30 - timeLeft) * 0.02,
+        speed: baseSpeed + speedIncrease,
       };
       setNotes(prev => [...prev, newNote]);
-    }, 800 - Math.min(400, (30 - timeLeft) * 10));
-    return () => clearInterval(spawnInterval);
-  }, [phase, timeLeft]);
+    }, Math.max(250, interval));
 
-  // Game loop - update note positions
+    return () => clearInterval(spawnInterval);
+  }, [phase, timeLeft, feverMode, slowMo]);
+
+  // Game loop - update note positions and particles
   useEffect(() => {
     if (phase !== "playing") return;
 
@@ -8212,19 +8564,41 @@ const RhythmHeartBeatGame = memo(function RhythmHeartBeatGame({
         }));
 
         // Check for missed notes
-        const missed = updated.filter(n => n.y > 95 && !n.hit);
+        const missed = updated.filter(n => n.y > 92 && !n.hit);
         missed.forEach(n => {
-          if (n.type !== "broken") {
+          // Power-ups don't cause misses, only regular notes
+          if (n.type === "heart" || n.type === "golden" || n.type === "diamond") {
+            // Shield protection!
+            if (hasShield) {
+              setHasShield(false);
+              setEventMessage("🛡️ Shield used!");
+              setTimeout(() => setEventMessage(null), 1000);
+              soundManager.buttonPress();
+              return;
+            }
             setCombo(0);
             comboRef.current = 0;
+            setPerfectStreak(0);
+            setFeverMode(false);
             soundManager.rhythmMiss();
-            setHitEffects(prev => [...prev, { id: n.id, lane: n.lane, type: "miss", y: 85 }]);
-            setTimeout(() => setHitEffects(prev => prev.filter(e => e.id !== n.id)), 500);
+            setScreenShake(true);
+            setTimeout(() => setScreenShake(false), 200);
+            setHitEffects(prev => [...prev, { id: n.id, lane: n.lane, type: "miss", y: 82 }]);
+            setTimeout(() => setHitEffects(prev => prev.filter(e => e.id !== n.id)), 600);
           }
         });
 
         return updated.filter(n => n.y <= 100 && !n.hit);
       });
+
+      // Update particles
+      setParticles(prev => prev.map(p => ({
+        ...p,
+        x: p.x + p.vx,
+        y: p.y + p.vy,
+        vy: p.vy + 0.3,
+        life: p.life - 0.03
+      })).filter(p => p.life > 0));
 
       rafRef.current = requestAnimationFrame(gameLoop);
     };
@@ -8233,7 +8607,7 @@ const RhythmHeartBeatGame = memo(function RhythmHeartBeatGame({
     return () => cancelAnimationFrame(rafRef.current);
   }, [phase]);
 
-  // Handle lane tap
+  // Handle lane tap - now with power-ups!
   const handleLaneTap = useCallback((lane: 0 | 1 | 2) => {
     if (phase !== "playing" || gameEndedRef.current) return;
 
@@ -8247,28 +8621,74 @@ const RhythmHeartBeatGame = memo(function RhythmHeartBeatGame({
       const newFlash = [...prev] as [boolean, boolean, boolean];
       newFlash[lane] = false;
       return newFlash;
-    }), 100);
+    }), 120);
 
-    const hitZone = 85;
+    const hitZone = 82;
     const activeNotes = notes.filter(n => n.lane === lane && !n.hit);
 
     for (const note of activeNotes) {
       const distance = Math.abs(note.y - hitZone);
 
-      if (distance <= 12) {
-        // Hit!
+      if (distance <= 14) {
+        const hitX = (lane * 33.33) + 16.66 + 6;
+        const hitY = hitZone;
+
+        // Handle different note types
         if (note.type === "broken") {
-          // Hit a trap
-          setScore(s => Math.max(0, s - 50));
-          setCombo(0);
-          comboRef.current = 0;
-          soundManager.rhythmMiss();
-          setHitEffects(prev => [...prev, { id: note.id, lane, type: "miss", y: hitZone }]);
+          // Shield protects from broken hearts too!
+          if (hasShield) {
+            setHasShield(false);
+            setEventMessage("🛡️ Shield blocked damage!");
+            setTimeout(() => setEventMessage(null), 1000);
+            soundManager.buttonPress();
+          } else {
+            setScore(s => Math.max(0, s - 50));
+            setCombo(0);
+            comboRef.current = 0;
+            setPerfectStreak(0);
+            setFeverMode(false);
+            soundManager.rhythmMiss();
+            setScreenShake(true);
+            setTimeout(() => setScreenShake(false), 200);
+            spawnParticles(hitX, hitY, "miss");
+            setHitEffects(prev => [...prev, { id: note.id, lane, type: "miss", y: hitZone, points: -50 }]);
+          }
+        } else if (note.type === "freeze") {
+          // FREEZE POWER-UP: Slow motion for 3 seconds!
+                    setSlowMo(true);
+          soundManager.rhythmGolden();
+          setEventMessage("⏰ SLOW MOTION!");
+          setTimeout(() => setEventMessage(null), 1500);
+          spawnParticles(hitX, hitY, "golden");
+          setHitEffects(prev => [...prev, { id: note.id, lane, type: "powerup", y: hitZone, text: "FREEZE!" }]);
+        } else if (note.type === "shield") {
+          // SHIELD POWER-UP: Protect from one miss!
+                    setHasShield(true);
+          soundManager.rhythmGolden();
+          setEventMessage("🛡️ SHIELD ACTIVE!");
+          setTimeout(() => setEventMessage(null), 1500);
+          spawnParticles(hitX, hitY, "golden");
+          setHitEffects(prev => [...prev, { id: note.id, lane, type: "powerup", y: hitZone, text: "SHIELD!" }]);
+        } else if (note.type === "bomb") {
+          // BOMB POWER-UP: Clear all broken hearts!
+                    setNotes(prev => prev.filter(n => n.type !== "broken"));
+          soundManager.rhythmGolden();
+          setEventMessage("💥 BROKEN HEARTS CLEARED!");
+          setTimeout(() => setEventMessage(null), 1500);
+          spawnParticles(hitX, hitY, "golden");
+          setHitEffects(prev => [...prev, { id: note.id, lane, type: "powerup", y: hitZone, text: "BOOM!" }]);
         } else {
+          // Regular notes (heart, golden, diamond)
           const isPerfect = distance <= 5;
-          const basePoints = note.type === "golden" ? 200 : 100;
-          const comboMultiplier = comboRef.current >= 10 ? 3 : comboRef.current >= 5 ? 2 : 1;
-          const points = (isPerfect ? basePoints : Math.floor(basePoints / 2)) * comboMultiplier;
+          const isDiamond = note.type === "diamond";
+          const isGolden = note.type === "golden";
+
+          // Calculate points with fever mode bonus!
+          const basePoints = isDiamond ? 500 : isGolden ? 250 : 100;
+          const comboMultiplier = comboRef.current >= 15 ? 4 : comboRef.current >= 10 ? 3 : comboRef.current >= 5 ? 2 : 1;
+          const perfectBonus = isPerfect ? 1.5 : 1;
+          const feverBonus = feverMode ? 2 : 1;
+          const points = Math.round(basePoints * perfectBonus * comboMultiplier * feverBonus);
 
           setScore(s => s + points);
           setCombo(c => {
@@ -8279,15 +8699,35 @@ const RhythmHeartBeatGame = memo(function RhythmHeartBeatGame({
           });
 
           if (isPerfect) {
-            soundManager.rhythmPerfect();
+                        setPerfectStreak(p => p + 1);
+            if (isDiamond) {
+              soundManager.rhythmGolden();
+              soundManager.rhythmGolden(); // Double sound for diamond!
+              spawnParticles(hitX, hitY, "golden");
+              spawnParticles(hitX, hitY, "perfect");
+            } else if (isGolden) {
+              soundManager.rhythmGolden();
+              spawnParticles(hitX, hitY, "golden");
+            } else {
+              soundManager.rhythmPerfect();
+              spawnParticles(hitX, hitY, "perfect");
+            }
           } else {
+            setPerfectStreak(0);
             soundManager.rhythmHit();
+            spawnParticles(hitX, hitY, "good");
           }
 
-          setHitEffects(prev => [...prev, { id: note.id, lane, type: isPerfect ? "perfect" : "good", y: hitZone }]);
+          const effectType = feverMode ? "fever" : isPerfect ? "perfect" : "good";
+          setHitEffects(prev => [...prev, {
+            id: note.id, lane,
+            type: effectType,
+            y: hitZone,
+            points
+          }]);
         }
 
-        setTimeout(() => setHitEffects(prev => prev.filter(e => e.id !== note.id)), 500);
+        setTimeout(() => setHitEffects(prev => prev.filter(e => e.id !== note.id)), 700);
 
         setNotes(prev => prev.map(n =>
           n.id === note.id ? { ...n, hit: distance <= 5 ? "perfect" : "good" } : n
@@ -8296,68 +8736,123 @@ const RhythmHeartBeatGame = memo(function RhythmHeartBeatGame({
         break;
       }
     }
-  }, [phase, notes]);
+  }, [phase, notes, spawnParticles, hasShield, feverMode]);
 
-  // Update cat emotion based on combo
+  // Cleanup music on unmount
   useEffect(() => {
-    if (combo >= 15) setCatEmotion("impressed");
-    else if (combo >= 5) setCatEmotion("happy");
-    else setCatEmotion("worried");
-  }, [combo]);
+    return () => soundManager.stopMusic();
+  }, []);
 
-  // Tutorial
+  // Tutorial - Now shows power-ups!
   if (phase === "tutorial") {
     return (
-      <div className="fixed inset-0 bg-gradient-to-b from-purple-900 via-fuchsia-800 to-pink-700 flex items-center justify-center p-4">
+      <div className="fixed inset-0 bg-gradient-to-b from-purple-950 via-fuchsia-900 to-pink-800 flex items-center justify-center p-4 overflow-hidden">
+        {/* Animated background stars */}
+        {[...Array(25)].map((_, i) => (
+          <div
+            key={i}
+            className="absolute w-1 h-1 bg-white rounded-full animate-[starTwinkle_2s_ease-in-out_infinite]"
+            style={{
+              left: `${Math.random() * 100}%`,
+              top: `${Math.random() * 100}%`,
+              animationDelay: `${Math.random() * 2}s`
+            }}
+          />
+        ))}
+
         <motion.div
-          initial={{ scale: 0.8, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          className="bg-white/95 backdrop-blur-xl rounded-3xl p-6 max-w-sm w-full shadow-2xl border border-white/30"
+          initial={{ scale: 0.8, opacity: 0, y: 20 }}
+          animate={{ scale: 1, opacity: 1, y: 0 }}
+          transition={{ type: "spring", damping: 20 }}
+          className="bg-gradient-to-br from-white/95 to-white/85 backdrop-blur-xl rounded-3xl p-5 max-w-sm w-full shadow-[0_20px_60px_rgba(168,85,247,0.4)] border border-white/50 max-h-[90vh] overflow-y-auto"
         >
           <div className="text-center">
             <motion.div
-              className="text-7xl mb-4"
-              animate={{ scale: [1, 1.1, 1], rotate: [0, 5, -5, 0] }}
-              transition={{ duration: 2, repeat: Infinity }}
+              className="text-6xl mb-3 relative"
+              animate={{
+                scale: [1, 1.15, 1],
+                rotate: [0, 5, -5, 0],
+                filter: ["drop-shadow(0 0 20px rgba(236,72,153,0.5))", "drop-shadow(0 0 40px rgba(236,72,153,0.8))", "drop-shadow(0 0 20px rgba(236,72,153,0.5))"]
+              }}
+              transition={{ duration: 1.5, repeat: Infinity }}
             >
               🎵
             </motion.div>
-            <h2 className="text-2xl font-black text-purple-800 mb-2">Rhythm Heart Beat</h2>
-            <p className="text-slate-600 mb-4">
-              Tap the lanes when hearts reach the glowing zone!
+            <h2 className="text-2xl font-black bg-gradient-to-r from-purple-600 via-pink-500 to-fuchsia-600 bg-clip-text text-transparent mb-1">
+              Rhythm Heart Beat
+            </h2>
+            <p className="text-slate-600 mb-3 text-xs">
+              Tap lanes when hearts reach the glowing zone!
             </p>
 
-            <div className="flex justify-center gap-4 mb-4">
-              <div className="text-center">
-                <div className="text-3xl">💕</div>
-                <div className="text-xs text-slate-500">+100</div>
-              </div>
-              <div className="text-center">
-                <div className="text-3xl">💛</div>
-                <div className="text-xs text-yellow-600">+200</div>
-              </div>
-              <div className="text-center">
-                <div className="text-3xl">💔</div>
-                <div className="text-xs text-red-500">Avoid!</div>
+            {/* Notes */}
+            <div className="flex justify-center gap-3 mb-3">
+              <motion.div className="text-center" whileHover={{ scale: 1.1 }}>
+                <div className="text-3xl mb-1 drop-shadow-lg">💕</div>
+                <div className="text-[10px] font-bold text-pink-600 bg-pink-100 rounded-full px-2 py-0.5">+100</div>
+              </motion.div>
+              <motion.div className="text-center" whileHover={{ scale: 1.1 }}>
+                <div className="text-3xl mb-1 animate-[goldShimmer_1.5s_ease-in-out_infinite]">💛</div>
+                <div className="text-[10px] font-bold text-yellow-700 bg-yellow-100 rounded-full px-2 py-0.5">+250</div>
+              </motion.div>
+              <motion.div className="text-center" whileHover={{ scale: 1.1 }}>
+                <div className="text-3xl mb-1 animate-[goldShimmer_1s_ease-in-out_infinite]">💎</div>
+                <div className="text-[10px] font-bold text-cyan-700 bg-cyan-100 rounded-full px-2 py-0.5">+500!</div>
+              </motion.div>
+              <motion.div className="text-center" whileHover={{ scale: 1.1 }}>
+                <div className="text-3xl mb-1">💔</div>
+                <div className="text-[10px] font-bold text-red-600 bg-red-100 rounded-full px-2 py-0.5">AVOID</div>
+              </motion.div>
+            </div>
+
+            {/* Power-ups section */}
+            <div className="bg-gradient-to-r from-indigo-100 via-purple-100 to-pink-100 rounded-xl p-3 mb-3">
+              <div className="text-xs font-bold text-purple-700 mb-2">⚡ POWER-UPS ⚡</div>
+              <div className="grid grid-cols-3 gap-2 text-center">
+                <div>
+                  <div className="text-2xl">⏰</div>
+                  <div className="text-[9px] text-slate-600">Slow Mo</div>
+                </div>
+                <div>
+                  <div className="text-2xl">🛡️</div>
+                  <div className="text-[9px] text-slate-600">Shield</div>
+                </div>
+                <div>
+                  <div className="text-2xl">💥</div>
+                  <div className="text-[9px] text-slate-600">Clear Bad</div>
+                </div>
               </div>
             </div>
 
-            <div className="bg-purple-100 rounded-xl p-3 mb-4">
-              <div className="flex justify-around text-sm">
-                <span>🎯 Perfect = Full Points</span>
+            {/* Tips */}
+            <div className="bg-gradient-to-r from-purple-100 via-pink-100 to-fuchsia-100 rounded-xl p-3 mb-4 space-y-1.5">
+              <div className="flex items-center gap-2 text-xs text-slate-700">
+                <span className="text-yellow-500">⭐</span>
+                <span><strong>Perfect</strong> hits = 1.5x points!</span>
               </div>
-              <div className="flex justify-around text-sm mt-1">
-                <span>🔥 Combos = Multiplier!</span>
+              <div className="flex items-center gap-2 text-xs text-slate-700">
+                <span className="text-orange-500">🔥</span>
+                <span><strong>25 Combo</strong> = FEVER MODE (2x!)
+                </span>
+              </div>
+              <div className="flex items-center gap-2 text-xs text-slate-700">
+                <span className="text-purple-500">✨</span>
+                <span><strong>Combos</strong> multiply up to 4x!</span>
               </div>
             </div>
 
             <motion.button
-              onClick={() => { soundManager.buttonPress(); setPhase("countdown"); }}
-              className="w-full py-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white font-bold rounded-xl shadow-lg"
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
+              onClick={() => { soundManager.buttonPress(); soundManager.uiWhoosh(); setPhase("countdown"); }}
+              className="w-full py-3 bg-gradient-to-r from-purple-500 via-pink-500 to-fuchsia-500 text-white font-black text-lg rounded-2xl shadow-[0_8px_30px_rgba(168,85,247,0.4)] relative overflow-hidden"
+              whileHover={{ scale: 1.03, boxShadow: "0 12px 40px rgba(168,85,247,0.5)" }}
+              whileTap={{ scale: 0.97 }}
             >
-              Start!
+              <span className="relative z-10">Let's Go! 🎶</span>
+              <motion.div
+                className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/30 to-white/0"
+                animate={{ x: ["-100%", "200%"] }}
+                transition={{ duration: 2, repeat: Infinity, repeatDelay: 1 }}
+              />
             </motion.button>
           </div>
         </motion.div>
@@ -8368,13 +8863,31 @@ const RhythmHeartBeatGame = memo(function RhythmHeartBeatGame({
   // Countdown
   if (phase === "countdown") {
     return (
-      <div className="fixed inset-0 bg-gradient-to-b from-purple-900 via-fuchsia-800 to-pink-700 flex items-center justify-center">
+      <div className="fixed inset-0 bg-gradient-to-b from-purple-950 via-fuchsia-900 to-pink-800 flex items-center justify-center overflow-hidden">
+        {/* Radial pulse rings */}
+        {[1, 2, 3].map(i => (
+          <motion.div
+            key={i}
+            className="absolute border-4 border-pink-400/30 rounded-full"
+            initial={{ width: 100, height: 100, opacity: 0.8 }}
+            animate={{ width: 600, height: 600, opacity: 0 }}
+            transition={{ duration: 1.5, repeat: Infinity, delay: i * 0.3 }}
+          />
+        ))}
+
         <motion.div
           key={countdownNum}
-          initial={{ scale: 2, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
+          initial={{ scale: 3, opacity: 0, rotateY: 90 }}
+          animate={{ scale: 1, opacity: 1, rotateY: 0 }}
           exit={{ scale: 0, opacity: 0 }}
-          className="text-9xl font-black text-white drop-shadow-[0_0_30px_rgba(255,255,255,0.8)]"
+          transition={{ type: "spring", damping: 15 }}
+          className={cn(
+            "text-9xl font-black text-white relative",
+            countdownNum === 0 && "text-yellow-300"
+          )}
+          style={{
+            textShadow: "0 0 60px rgba(255,255,255,0.8), 0 0 120px rgba(236,72,153,0.6)"
+          }}
         >
           {countdownNum || "GO!"}
         </motion.div>
@@ -8385,128 +8898,467 @@ const RhythmHeartBeatGame = memo(function RhythmHeartBeatGame({
   // Done
   if (phase === "done") {
     return (
-      <div className="fixed inset-0 bg-gradient-to-b from-purple-900 via-fuchsia-800 to-pink-700 flex items-center justify-center p-4">
+      <div className="fixed inset-0 bg-gradient-to-b from-purple-950 via-fuchsia-900 to-pink-800 flex items-center justify-center p-4 overflow-hidden">
+        {/* Celebration confetti */}
+        {[...Array(30)].map((_, i) => (
+          <motion.div
+            key={i}
+            className="absolute w-3 h-3 rounded-sm"
+            style={{
+              backgroundColor: ["#fbbf24", "#f472b6", "#a78bfa", "#34d399", "#60a5fa"][i % 5],
+              left: `${Math.random() * 100}%`,
+            }}
+            initial={{ y: -20, rotate: 0, opacity: 1 }}
+            animate={{
+              y: "100vh",
+              rotate: Math.random() * 720,
+              opacity: [1, 1, 0]
+            }}
+            transition={{
+              duration: 3 + Math.random() * 2,
+              delay: Math.random() * 0.5,
+              ease: "easeIn"
+            }}
+          />
+        ))}
+
         <motion.div
-          initial={{ scale: 0.8, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          className="bg-white/95 backdrop-blur-xl rounded-3xl p-6 text-center"
+          initial={{ scale: 0.5, opacity: 0, y: 50 }}
+          animate={{ scale: 1, opacity: 1, y: 0 }}
+          transition={{ type: "spring", damping: 15 }}
+          className="bg-gradient-to-br from-white/95 to-white/85 backdrop-blur-xl rounded-3xl p-8 text-center shadow-[0_30px_80px_rgba(168,85,247,0.5)] border border-white/50"
         >
-          <div className="text-6xl mb-4">🎵✨</div>
-          <h2 className="text-3xl font-black text-purple-800 mb-2">Great Rhythm!</h2>
-          <div className="text-5xl font-black text-pink-500 mb-2">{score.toLocaleString()}</div>
-          <div className="text-slate-600">Max Combo: {maxCombo}x</div>
+          <motion.div
+            className="text-7xl mb-4"
+            animate={{ rotate: [0, 10, -10, 0], scale: [1, 1.1, 1] }}
+            transition={{ duration: 1, repeat: Infinity }}
+          >
+            🎵✨
+          </motion.div>
+          <h2 className="text-4xl font-black bg-gradient-to-r from-purple-600 via-pink-500 to-fuchsia-600 bg-clip-text text-transparent mb-3">
+            Amazing Rhythm!
+          </h2>
+          <motion.div
+            className="text-6xl font-black text-pink-500 mb-3"
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            transition={{ delay: 0.3, type: "spring" }}
+          >
+            {score.toLocaleString()}
+          </motion.div>
+          <div className="flex justify-center gap-6 text-slate-600">
+            <div className="text-center">
+              <div className="text-2xl font-bold text-orange-500">{maxCombo}x</div>
+              <div className="text-xs">Best Combo</div>
+            </div>
+            <div className="text-center">
+              <div className="text-2xl font-bold text-yellow-500">{perfectStreak}</div>
+              <div className="text-xs">Perfect Streak</div>
+            </div>
+          </div>
         </motion.div>
       </div>
     );
   }
 
-  // Playing
+  // Playing - NOW WITH FEVER MODE!
   return (
-    <div className="fixed inset-0 bg-gradient-to-b from-purple-900 via-fuchsia-800 to-pink-700 overflow-hidden select-none">
-      {/* HUD */}
-      <div className="absolute top-0 left-0 right-0 z-30 p-3 bg-gradient-to-b from-black/40 to-transparent">
-        <div className="flex justify-between items-center">
-          <div className="bg-slate-800/80 rounded-lg px-3 py-1">
-            <span className="text-white text-sm font-bold">{score.toLocaleString()}</span>
-          </div>
-          <div className={cn(
-            "rounded-lg px-3 py-1 font-bold text-sm transition-all",
-            combo >= 10 ? "bg-yellow-500/80 text-yellow-950" :
-            combo >= 5 ? "bg-pink-500/80 text-white" :
-            "bg-slate-700/80 text-white"
-          )}>
-            {combo}x {combo >= 10 ? "🔥" : ""}
-          </div>
-          <div className="bg-slate-800/80 rounded-lg px-3 py-1">
-            <span className="text-white text-sm font-bold">{timeLeft}s</span>
-          </div>
-        </div>
-      </div>
+    <div className={cn(
+      "fixed inset-0 overflow-hidden select-none transition-all",
+      screenShake && "animate-[screenShake_0.2s_ease-out]",
+      feverMode
+        ? "bg-gradient-to-b from-orange-900 via-red-800 to-pink-900"
+        : slowMo
+        ? "bg-gradient-to-b from-cyan-900 via-blue-900 to-purple-900"
+        : "bg-gradient-to-b from-purple-950 via-fuchsia-900 to-pink-800"
+    )}>
+      {/* Fever mode rainbow border */}
+      {feverMode && (
+        <div className="absolute inset-0 pointer-events-none z-40 border-8 animate-[rainbowGlow_2s_linear_infinite]" />
+      )}
 
-      {/* Lanes */}
-      <div className="absolute inset-x-4 top-16 bottom-32 flex gap-2">
-        {[0, 1, 2].map(lane => (
-          <button
-            key={lane}
-            onClick={() => handleLaneTap(lane as 0 | 1 | 2)}
+      {/* Slow-mo visual indicator */}
+      {slowMo && (
+        <div className="absolute inset-0 pointer-events-none z-30 border-4 border-cyan-400/50" />
+      )}
+
+      {/* Animated background visualizer bars */}
+      <div className="absolute inset-0 flex items-end justify-center gap-1 opacity-30 pointer-events-none">
+        {[...Array(20)].map((_, i) => (
+          <motion.div
+            key={i}
             className={cn(
-              "flex-1 rounded-2xl border-2 border-white/20 transition-all relative overflow-hidden",
-              laneFlash[lane] ? "bg-white/30" : "bg-white/5"
+              "w-4 rounded-t-sm",
+              feverMode
+                ? "bg-gradient-to-t from-yellow-500 to-red-500"
+                : "bg-gradient-to-t from-pink-500 to-purple-500"
             )}
-          >
-            {/* Lane glow animation */}
-            <div className="absolute inset-0 animate-[laneGlow_2s_ease-in-out_infinite]" />
-          </button>
+            animate={{
+              height: beatPulse ? [20, 50 + Math.random() * 80, 20] : [20, 30, 20]
+            }}
+            transition={{ duration: 0.2 }}
+          />
         ))}
       </div>
 
-      {/* Hit Zone */}
-      <div
-        className={cn(
-          "absolute left-4 right-4 h-4 rounded-full transition-all",
-          "bg-gradient-to-r from-pink-500 via-rose-400 to-pink-500"
+      {/* Particles */}
+      {particles.map(p => (
+        <div
+          key={p.id}
+          className="absolute rounded-full pointer-events-none"
+          style={{
+            left: `${p.x}%`,
+            top: `${p.y}%`,
+            width: p.size,
+            height: p.size,
+            backgroundColor: p.color,
+            opacity: p.life,
+            boxShadow: `0 0 ${p.size * 2}px ${p.color}`
+          }}
+        />
+      ))}
+
+      {/* Event message overlay */}
+      {eventMessage && (
+        <motion.div
+          className="absolute inset-0 flex items-center justify-center pointer-events-none z-50"
+          initial={{ scale: 0.5, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          exit={{ scale: 1.5, opacity: 0 }}
+        >
+          <div className="text-4xl font-black text-white text-center"
+            style={{ textShadow: "0 0 30px rgba(255,255,255,0.8), 0 0 60px rgba(236,72,153,0.6)" }}>
+            {eventMessage}
+          </div>
+        </motion.div>
+      )}
+
+      {/* Premium HUD */}
+      <div className="absolute top-0 left-0 right-0 z-30 p-3 bg-gradient-to-b from-black/60 to-transparent">
+        <div className="flex justify-between items-center max-w-lg mx-auto">
+          {/* Score */}
+          <motion.div
+            className={cn(
+              "backdrop-blur-sm rounded-xl px-4 py-2 border",
+              feverMode ? "bg-orange-500/50 border-yellow-400/50" : "bg-black/50 border-white/10"
+            )}
+            animate={score !== displayedScore ? { scale: [1, 1.05, 1] } : {}}
+          >
+            <div className="text-white text-xl font-black tabular-nums">
+              {displayedScore.toLocaleString()}
+            </div>
+          </motion.div>
+
+          {/* Combo - enhanced in fever mode */}
+          <motion.div
+            className={cn(
+              "rounded-xl px-4 py-2 font-black text-lg transition-all backdrop-blur-sm border",
+              feverMode ? "bg-gradient-to-r from-yellow-500/90 to-orange-500/90 text-white border-yellow-300 animate-[comboFire_0.3s_ease-in-out_infinite]" :
+              combo >= 15 ? "bg-gradient-to-r from-orange-500/80 to-red-500/80 text-white border-orange-400/50 animate-[comboFire_0.5s_ease-in-out_infinite]" :
+              combo >= 10 ? "bg-gradient-to-r from-yellow-500/80 to-orange-500/80 text-white border-yellow-400/50" :
+              combo >= 5 ? "bg-gradient-to-r from-pink-500/80 to-rose-500/80 text-white border-pink-400/50" :
+              "bg-black/50 text-white/80 border-white/10"
+            )}
+            animate={combo > 0 ? { scale: [1, 1.15, 1] } : {}}
+            transition={{ duration: 0.15 }}
+          >
+            {combo}x {feverMode ? "🔥🔥" : combo >= 10 && "🔥"}
+          </motion.div>
+
+          {/* Timer */}
+          <div className={cn(
+            "bg-black/50 backdrop-blur-sm rounded-xl px-4 py-2 border flex items-center gap-2",
+            timeLeft <= 5 ? "border-red-500/50 text-red-400" : "border-white/10 text-white"
+          )}>
+            <span className="text-xl font-black tabular-nums">{timeLeft}s</span>
+            {hasShield && <span className="text-lg">🛡️</span>}
+          </div>
+        </div>
+
+        {/* Fever mode indicator */}
+        {feverMode && (
+          <motion.div
+            className="max-w-lg mx-auto mt-2"
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+          >
+            <div className="flex items-center justify-center gap-2 text-yellow-300 font-black text-sm">
+              <span>🔥 FEVER MODE 🔥</span>
+              <div className="w-24 h-2 bg-black/30 rounded-full overflow-hidden">
+                <motion.div
+                  className="h-full bg-gradient-to-r from-yellow-400 to-orange-500"
+                  initial={{ width: "100%" }}
+                  animate={{ width: `${(feverTimer / 8) * 100}%` }}
+                />
+              </div>
+              <span>{feverTimer}s</span>
+            </div>
+          </motion.div>
         )}
+
+        {/* Progress bar */}
+        <div className="max-w-lg mx-auto mt-2">
+          <div className="h-1 bg-white/20 rounded-full overflow-hidden">
+            <motion.div
+              className={cn(
+                "h-full",
+                feverMode
+                  ? "bg-gradient-to-r from-yellow-500 to-orange-500"
+                  : "bg-gradient-to-r from-pink-500 to-purple-500"
+              )}
+              initial={{ width: "100%" }}
+              animate={{ width: `${(timeLeft / 35) * 100}%` }}
+              transition={{ duration: 0.3 }}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Lanes with glow effect */}
+      <div className="absolute inset-x-4 top-24 bottom-28 flex gap-3">
+        {[0, 1, 2].map(lane => (
+          <motion.button
+            key={lane}
+            onClick={() => handleLaneTap(lane as 0 | 1 | 2)}
+            className={cn(
+              "flex-1 rounded-3xl transition-all relative overflow-hidden border-2",
+              feverMode
+                ? "bg-gradient-to-b from-orange-500/10 to-yellow-500/10"
+                : "bg-gradient-to-b from-white/5 to-white/10",
+              laneFlash[lane]
+                ? feverMode ? "border-yellow-400 bg-yellow-500/30" : "border-pink-400 bg-pink-500/30"
+                : feverMode ? "border-orange-500/30" : "border-white/20"
+            )}
+            whileTap={{ scale: 0.98 }}
+            style={{
+              boxShadow: laneFlash[lane]
+                ? feverMode ? "inset 0 0 30px rgba(253,224,71,0.5)" : "inset 0 0 30px rgba(236,72,153,0.5)"
+                : undefined
+            }}
+          >
+            {/* Lane ambient glow */}
+            <div className={cn(
+              "absolute inset-0 opacity-30",
+              beatPulse && "animate-[laneGlow_0.5s_ease-out]"
+            )} />
+
+            {/* Lane label */}
+            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 text-white/40 font-bold text-sm">
+              {["◀", "▼", "▶"][lane]}
+            </div>
+          </motion.button>
+        ))}
+      </div>
+
+      {/* Hit Zone - Premium glow effect */}
+      <motion.div
+        className="absolute left-4 right-4 h-5 rounded-full"
         style={{
-          top: "85%",
+          top: "82%",
+          background: "linear-gradient(90deg, rgba(236,72,153,0.8), rgba(168,85,247,0.8), rgba(236,72,153,0.8))",
+          backgroundSize: "200% 100%",
+        }}
+        animate={{
+          backgroundPosition: ["0% 0%", "200% 0%"],
           boxShadow: beatPulse
-            ? "0 0 40px rgba(236,72,153,0.8), 0 0 60px rgba(236,72,153,0.4)"
-            : "0 0 20px rgba(236,72,153,0.6)"
+            ? ["0 0 30px rgba(236,72,153,0.8), 0 0 60px rgba(168,85,247,0.5)",
+               "0 0 50px rgba(236,72,153,1), 0 0 80px rgba(168,85,247,0.7)"]
+            : "0 0 30px rgba(236,72,153,0.6), 0 0 50px rgba(168,85,247,0.3)"
+        }}
+        transition={{
+          backgroundPosition: { duration: 2, repeat: Infinity, ease: "linear" },
+          boxShadow: { duration: 0.2 }
         }}
       />
 
-      {/* Notes */}
-      {notes.filter(n => !n.hit).map(note => (
-        <div
-          key={note.id}
-          className="absolute text-4xl pointer-events-none transition-transform"
-          style={{
-            left: `calc(${(note.lane * 33.33) + 16.66}% - 16px + 1rem)`,
-            top: `${note.y}%`,
-            filter: note.type === "golden" ? "drop-shadow(0 0 15px gold)" : "drop-shadow(0 0 10px rgba(255,182,193,0.8))"
-          }}
-        >
-          {note.type === "heart" ? "💕" : note.type === "golden" ? "💛" : "💔"}
-        </div>
-      ))}
+      {/* Notes with trails - Now with power-ups! */}
+      {notes.filter(n => !n.hit).map(note => {
+        // Get emoji for note type
+        const getNoteEmoji = () => {
+          switch (note.type) {
+            case "heart": return "💕";
+            case "golden": return "💛";
+            case "diamond": return "💎";
+            case "broken": return "💔";
+            case "freeze": return "⏰";
+            case "shield": return "🛡️";
+            case "bomb": return "💥";
+            default: return "💕";
+          }
+        };
 
-      {/* Hit Effects */}
+        const isPowerUp = ["freeze", "shield", "bomb"].includes(note.type);
+
+        return (
+          <motion.div
+            key={note.id}
+            className="absolute pointer-events-none"
+            style={{
+              left: `calc(${(note.lane * 33.33) + 16.66}% - 20px + 1rem)`,
+              top: `${note.y}%`,
+            }}
+            initial={{ scale: 0, opacity: 0 }}
+            animate={{
+              scale: slowMo ? [1, 1.1, 1] : 1,
+              opacity: 1,
+              rotate: isPowerUp ? [0, 10, -10, 0] : 0
+            }}
+            transition={slowMo ? { duration: 1, repeat: Infinity } : undefined}
+          >
+            {/* Trail effect */}
+            <div
+              className="absolute inset-0 -translate-y-4 opacity-50 blur-sm text-4xl"
+              style={{
+                filter: note.type === "golden" || note.type === "diamond"
+                  ? "brightness(1.5)"
+                  : isPowerUp ? "brightness(1.3)" : undefined
+              }}
+            >
+              {getNoteEmoji()}
+            </div>
+            {/* Main note */}
+            <div
+              className={cn(
+                "text-5xl relative",
+                (note.type === "golden" || note.type === "diamond") && "animate-[goldShimmer_1s_ease-in-out_infinite]",
+                isPowerUp && "animate-pulse"
+              )}
+              style={{
+                filter: note.type === "diamond"
+                  ? "drop-shadow(0 0 20px cyan) drop-shadow(0 0 40px cyan)"
+                  : note.type === "golden"
+                  ? "drop-shadow(0 0 20px gold) drop-shadow(0 0 40px gold)"
+                  : note.type === "broken"
+                  ? "drop-shadow(0 0 10px rgba(220,38,38,0.8))"
+                  : isPowerUp
+                  ? "drop-shadow(0 0 15px rgba(99,102,241,0.8)) drop-shadow(0 0 30px rgba(99,102,241,0.5))"
+                  : "drop-shadow(0 0 15px rgba(236,72,153,0.8))"
+              }}
+            >
+              {getNoteEmoji()}
+            </div>
+            {/* Power-up label */}
+            {isPowerUp && (
+              <div className="absolute -bottom-4 left-1/2 -translate-x-1/2 text-[10px] font-bold text-white bg-indigo-500/80 rounded-full px-2">
+                {note.type === "freeze" ? "SLOW" : note.type === "shield" ? "SHIELD" : "CLEAR"}
+              </div>
+            )}
+          </motion.div>
+        );
+      })}
+
+      {/* Hit Effects with score popup - Enhanced for fever mode! */}
       {hitEffects.map(effect => (
         <motion.div
           key={effect.id}
-          initial={{ scale: 0.5, opacity: 1 }}
-          animate={{ scale: 2, opacity: 0 }}
-          transition={{ duration: 0.5 }}
-          className="absolute pointer-events-none text-2xl font-black"
+          initial={{ scale: 0.3, opacity: 1, y: 0 }}
+          animate={{ scale: feverMode ? 2 : 1.5, opacity: 0, y: -35 }}
+          transition={{ duration: 0.6, ease: "easeOut" }}
+          className="absolute pointer-events-none text-center"
           style={{
             left: `calc(${(effect.lane * 33.33) + 16.66}% + 1rem)`,
             top: `${effect.y}%`,
             transform: "translate(-50%, -50%)"
           }}
         >
-          <span className={cn(
-            effect.type === "perfect" ? "text-yellow-400" :
+          <div className={cn(
+            "font-black text-2xl",
+            effect.type === "fever" ? "text-orange-300" :
+            effect.type === "powerup" ? "text-cyan-300" :
+            effect.type === "perfect" ? "text-yellow-300" :
             effect.type === "good" ? "text-green-400" : "text-red-400"
-          )}>
-            {effect.type === "perfect" ? "PERFECT!" : effect.type === "good" ? "GOOD!" : "MISS!"}
-          </span>
+          )}
+          style={{
+            textShadow: effect.type === "fever"
+              ? "0 0 25px rgba(251,146,60,0.9), 0 0 50px rgba(251,146,60,0.5)"
+              : effect.type === "powerup"
+              ? "0 0 20px rgba(34,211,238,0.8)"
+              : effect.type === "perfect"
+              ? "0 0 20px rgba(253,224,71,0.8)"
+              : effect.type === "good"
+              ? "0 0 15px rgba(74,222,128,0.8)"
+              : "0 0 15px rgba(248,113,113,0.8)"
+          }}>
+            {effect.text ? effect.text :
+             effect.type === "fever" ? "🔥 FEVER! 🔥" :
+             effect.type === "perfect" ? "PERFECT!" :
+             effect.type === "good" ? "GOOD!" : "MISS!"}
+          </div>
+          {effect.points && (
+            <motion.div
+              className={cn(
+                "text-lg font-bold",
+                effect.points > 0 ? feverMode ? "text-yellow-200" : "text-white" : "text-red-300"
+              )}
+              initial={{ opacity: 0, y: 5 }}
+              animate={{ opacity: 1, y: 0 }}
+            >
+              {effect.points > 0 ? `+${effect.points}` : effect.points}
+            </motion.div>
+          )}
         </motion.div>
       ))}
 
-      {/* Cat */}
-      <div className="absolute bottom-4 left-1/2 -translate-x-1/2">
-        <div className="text-5xl">
-          {catEmotion === "impressed" ? "😻" : catEmotion === "happy" ? "😸" : "😿"}
+      {/* Cat with reactions and messages */}
+      <motion.div
+        className="absolute bottom-3 left-1/2 -translate-x-1/2 flex flex-col items-center"
+        animate={{
+          y: beatPulse ? -5 : 0,
+          scale: feverMode ? [1, 1.15, 1] : combo >= 15 ? [1, 1.1, 1] : 1
+        }}
+        transition={{ duration: 0.15 }}
+      >
+        <div className={cn(
+          "text-5xl drop-shadow-lg",
+          feverMode && "animate-bounce"
+        )}>
+          {feverMode ? "🤩" : catEmotion === "impressed" ? "😻" : catEmotion === "happy" ? "😸" : "😿"}
         </div>
-      </div>
+        {catMessage && (
+          <motion.div
+            className={cn(
+              "text-xs font-bold rounded-full px-3 py-1 mt-1",
+              feverMode
+                ? "text-yellow-200 bg-orange-500/80"
+                : "text-white/90 bg-black/40"
+            )}
+            initial={{ opacity: 0, scale: 0, y: 5 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            key={catMessage}
+          >
+            {catMessage}
+          </motion.div>
+        )}
+      </motion.div>
     </div>
   );
 });
 
 // ============================================================================
-// LOVE LETTER PUZZLE - Sliding tile puzzle
+// LOVE LETTER PUZZLE - Premium sliding tile puzzle
 // ============================================================================
 
 const PUZZLE_TILES = ["💕", "💗", "💖", "💝", "❤️", "💘", "💓", "💞"];
+
+type PuzzleSparkle = {
+  id: number;
+  x: number;
+  y: number;
+  scale: number;
+  delay: number;
+};
+
+type PuzzleHistoryEntry = {
+  tiles: number[];
+  emptyIndex: number;
+};
+
+const PUZZLE_CAT_MESSAGES = [
+  { progress: 2, text: "Good start! 🐱", emotion: "happy" as const },
+  { progress: 4, text: "You're getting it! 😸", emotion: "happy" as const },
+  { progress: 6, text: "Almost there! 😻", emotion: "excited" as const },
+  { progress: 7, text: "So close!! 🤩", emotion: "excited" as const },
+];
 
 const LoveLetterPuzzleGame = memo(function LoveLetterPuzzleGame({
   onComplete
@@ -8518,15 +9370,44 @@ const LoveLetterPuzzleGame = memo(function LoveLetterPuzzleGame({
   const [tiles, setTiles] = useState<number[]>([]);
   const [emptyIndex, setEmptyIndex] = useState(8);
   const [moves, setMoves] = useState(0);
-  const [timeLeft, setTimeLeft] = useState(60);
+  const [timeLeft, setTimeLeft] = useState(75); // More time!
   const [isSolved, setIsSolved] = useState(false);
   const [shakingTile, setShakingTile] = useState<number | null>(null);
   const [score, setScore] = useState(0);
+  const [correctTiles, setCorrectTiles] = useState<Set<number>>(new Set());
+  const [lastMovedTile, setLastMovedTile] = useState<number | null>(null);
+  const [sparkles, setSparkles] = useState<PuzzleSparkle[]>([]);
+  const [hintPulse, setHintPulse] = useState(false);
+  // NEW FUN FEATURES!
+  const [undoStack, setUndoStack] = useState<PuzzleHistoryEntry[]>([]);
+  const [undosRemaining, setUndosRemaining] = useState(3);
+  const [hintsRemaining, setHintsRemaining] = useState(2);
+  const [hintedTile, setHintedTile] = useState<number | null>(null);
+  const [catMessage, setCatMessage] = useState<string | null>(null);
+  const [catEmotion, setCatEmotion] = useState<"happy" | "excited" | "worried">("happy");
+  const [streak, setStreak] = useState(0);
+  const [bestStreak, setBestStreak] = useState(0);
+  const [bonusTime, setBonusTime] = useState(0);
+  const [showBonusTime, setShowBonusTime] = useState(false);
 
   const onCompleteRef = useRef(onComplete);
   const gameEndedRef = useRef(false);
+  const sparkleIdRef = useRef(0);
 
   useEffect(() => { onCompleteRef.current = onComplete; }, [onComplete]);
+
+  // Cat messages based on progress
+  useEffect(() => {
+    const progress = correctTiles.size;
+    const message = PUZZLE_CAT_MESSAGES.slice().reverse().find(m => progress >= m.progress);
+    if (message) {
+      setCatMessage(message.text);
+      setCatEmotion(message.emotion);
+    } else {
+      setCatMessage(null);
+      setCatEmotion(moves > 40 ? "worried" : "happy");
+    }
+  }, [correctTiles.size, moves]);
 
   // Check if puzzle configuration is solvable
   const isSolvable = useCallback((arr: number[]) => {
@@ -8562,12 +9443,24 @@ const LoveLetterPuzzleGame = memo(function LoveLetterPuzzleGame({
     });
   }, []);
 
+  // Check which tiles are in correct position
+  const updateCorrectTiles = useCallback((arr: number[]) => {
+    const correct = new Set<number>();
+    arr.forEach((tile, index) => {
+      if (tile !== 0 && tile === index + 1) {
+        correct.add(tile);
+      }
+    });
+    return correct;
+  }, []);
+
   // Initialize puzzle
   useEffect(() => {
     const shuffled = shufflePuzzle();
     setTiles(shuffled);
     setEmptyIndex(shuffled.indexOf(0));
-  }, [shufflePuzzle]);
+    setCorrectTiles(updateCorrectTiles(shuffled));
+  }, [shufflePuzzle, updateCorrectTiles]);
 
   // Countdown
   useEffect(() => {
@@ -8578,11 +9471,12 @@ const LoveLetterPuzzleGame = memo(function LoveLetterPuzzleGame({
       return () => clearTimeout(timer);
     } else {
       soundManager.countdownGo();
+      soundManager.startPuzzleMusic();
       setPhase("playing");
     }
   }, [phase, countdownNum]);
 
-  // Timer
+  // Timer with low time warning
   useEffect(() => {
     if (phase !== "playing" || gameEndedRef.current || isSolved) return;
     const timer = setInterval(() => {
@@ -8590,9 +9484,13 @@ const LoveLetterPuzzleGame = memo(function LoveLetterPuzzleGame({
         if (t <= 1) {
           gameEndedRef.current = true;
           setPhase("done");
+          soundManager.stopMusic();
           soundManager.fail();
-          setTimeout(() => onCompleteRef.current(0), 2000);
+          setTimeout(() => onCompleteRef.current(0), 2500);
           return 0;
+        }
+        if (t <= 10) {
+          soundManager.puzzleTimeLow();
         }
         return t - 1;
       });
@@ -8600,7 +9498,90 @@ const LoveLetterPuzzleGame = memo(function LoveLetterPuzzleGame({
     return () => clearInterval(timer);
   }, [phase, isSolved]);
 
-  // Handle tile tap
+  // Hint pulse every 15 seconds
+  useEffect(() => {
+    if (phase !== "playing" || isSolved) return;
+    const hintInterval = setInterval(() => {
+      setHintPulse(true);
+      setTimeout(() => setHintPulse(false), 1000);
+    }, 15000);
+    return () => clearInterval(hintInterval);
+  }, [phase, isSolved]);
+
+  // Add sparkles for correct tile placement
+  const addSparkles = useCallback((tileIndex: number) => {
+    const col = tileIndex % 3;
+    const row = Math.floor(tileIndex / 3);
+    const baseX = col * 33.33 + 16.66;
+    const baseY = row * 33.33 + 16.66;
+
+    const newSparkles: PuzzleSparkle[] = [];
+    for (let i = 0; i < 8; i++) {
+      newSparkles.push({
+        id: sparkleIdRef.current++,
+        x: baseX + (Math.random() - 0.5) * 20,
+        y: baseY + (Math.random() - 0.5) * 20,
+        scale: 0.5 + Math.random() * 0.5,
+        delay: Math.random() * 0.2
+      });
+    }
+    setSparkles(prev => [...prev, ...newSparkles]);
+    setTimeout(() => {
+      setSparkles(prev => prev.filter(s => !newSparkles.includes(s)));
+    }, 1000);
+  }, []);
+
+  // Undo function
+  const handleUndo = useCallback(() => {
+    if (undosRemaining <= 0 || undoStack.length === 0 || phase !== "playing" || isSolved) return;
+    const lastState = undoStack[undoStack.length - 1];
+    setTiles(lastState.tiles);
+    setEmptyIndex(lastState.emptyIndex);
+    setUndoStack(prev => prev.slice(0, -1));
+    setUndosRemaining(u => u - 1);
+    setMoves(m => m - 1);
+    setCorrectTiles(updateCorrectTiles(lastState.tiles));
+    soundManager.buttonPress();
+  }, [undosRemaining, undoStack, phase, isSolved, updateCorrectTiles]);
+
+  // Hint function - find a tile that can move to correct position
+  const handleHint = useCallback(() => {
+    if (hintsRemaining <= 0 || phase !== "playing" || isSolved) return;
+    setHintsRemaining(h => h - 1);
+
+    // Find a tile adjacent to empty that would be correct if moved
+    const gridSize = 3;
+    const emptyRow = Math.floor(emptyIndex / gridSize);
+    const emptyCol = emptyIndex % gridSize;
+
+    const adjacentIndices = [
+      emptyRow > 0 ? emptyIndex - 3 : -1,
+      emptyRow < 2 ? emptyIndex + 3 : -1,
+      emptyCol > 0 ? emptyIndex - 1 : -1,
+      emptyCol < 2 ? emptyIndex + 1 : -1,
+    ].filter(i => i >= 0 && i < 9);
+
+    // Check which adjacent tiles would be correct if moved to empty
+    for (const idx of adjacentIndices) {
+      const tile = tiles[idx];
+      if (tile !== 0 && tile === emptyIndex + 1) {
+        setHintedTile(idx);
+        soundManager.buttonPress();
+        setTimeout(() => setHintedTile(null), 2000);
+        return;
+      }
+    }
+
+    // If no perfect hint, just highlight any adjacent tile
+    const anyAdjacent = adjacentIndices.find(i => tiles[i] !== 0);
+    if (anyAdjacent !== undefined) {
+      setHintedTile(anyAdjacent);
+      soundManager.buttonPress();
+      setTimeout(() => setHintedTile(null), 2000);
+    }
+  }, [hintsRemaining, phase, isSolved, emptyIndex, tiles]);
+
+  // Handle tile tap - Now with undo and streaks!
   const handleTileTap = useCallback((tileIndex: number) => {
     if (phase !== "playing" || gameEndedRef.current || isSolved) return;
     if (tiles[tileIndex] === 0) return;
@@ -8619,82 +9600,187 @@ const LoveLetterPuzzleGame = memo(function LoveLetterPuzzleGame({
       soundManager.invalidMove();
       setShakingTile(tileIndex);
       setTimeout(() => setShakingTile(null), 300);
+      setStreak(0); // Reset streak on invalid move
       return;
     }
 
+    // Save state for undo (keep last 10)
+    setUndoStack(prev => [...prev.slice(-9), { tiles: [...tiles], emptyIndex }]);
+
     soundManager.tileSlide();
     setMoves(m => m + 1);
+    setLastMovedTile(tiles[tileIndex]);
+    setHintedTile(null); // Clear any hint
 
     setTiles(prev => {
       const newTiles = [...prev];
       [newTiles[tileIndex], newTiles[emptyIndex]] = [newTiles[emptyIndex], newTiles[tileIndex]];
 
+      // Check for newly correct tiles
+      const newCorrect = updateCorrectTiles(newTiles);
+      const wasCorrect = correctTiles.has(newTiles[emptyIndex]);
+      const isNowCorrect = newCorrect.has(newTiles[emptyIndex]);
+
+      if (!wasCorrect && isNowCorrect) {
+        soundManager.tileCorrect();
+        addSparkles(emptyIndex);
+
+        // Streak bonus! Every 3 correct placements = +5 seconds
+        const newStreak = streak + 1;
+        setStreak(newStreak);
+        setBestStreak(best => Math.max(best, newStreak));
+
+        if (newStreak % 3 === 0) {
+          setTimeLeft(t => t + 5);
+          setBonusTime(5);
+          setShowBonusTime(true);
+          soundManager.rhythmCombo();
+          setTimeout(() => setShowBonusTime(false), 1500);
+        }
+      } else if (wasCorrect && !isNowCorrect) {
+        // Moved a tile OUT of correct position
+        setStreak(0);
+      }
+
+      setCorrectTiles(newCorrect);
+
       if (checkSolution(newTiles)) {
         gameEndedRef.current = true;
         setIsSolved(true);
+        soundManager.stopMusic();
         soundManager.puzzleSolved();
 
-        // Calculate score
-        const baseScore = 1000;
+        // Calculate score with streak bonus!
+        const baseScore = 1500;
         const timeBonus = timeLeft * 50;
-        const movePenalty = Math.max(0, (moves - 25) * 5);
-        const finalScore = Math.max(100, baseScore + timeBonus - movePenalty);
+        const movePenalty = Math.max(0, (moves - 20) * 5);
+        const streakBonus = bestStreak * 50;
+        const finalScore = Math.max(100, baseScore + timeBonus - movePenalty + streakBonus);
         setScore(finalScore);
 
         setTimeout(() => {
           setPhase("done");
-          setTimeout(() => onCompleteRef.current(finalScore), 2000);
+          setTimeout(() => onCompleteRef.current(finalScore), 2500);
         }, 1500);
       }
 
       return newTiles;
     });
     setEmptyIndex(tileIndex);
-  }, [phase, tiles, emptyIndex, isSolved, checkSolution, moves, timeLeft]);
+  }, [phase, tiles, emptyIndex, isSolved, checkSolution, moves, timeLeft, correctTiles, updateCorrectTiles, addSparkles]);
 
-  // Tutorial
+  // Cleanup music on unmount
+  useEffect(() => {
+    return () => soundManager.stopMusic();
+  }, []);
+
+  // Tutorial - Now with power-ups explanation!
   if (phase === "tutorial") {
     return (
-      <div className="fixed inset-0 bg-gradient-to-b from-rose-600 via-pink-600 to-fuchsia-700 flex items-center justify-center p-4">
+      <div className="fixed inset-0 bg-gradient-to-b from-rose-700 via-pink-700 to-fuchsia-800 flex items-center justify-center p-4 overflow-hidden">
+        {/* Floating hearts background */}
+        {[...Array(12)].map((_, i) => (
+          <motion.div
+            key={i}
+            className="absolute text-2xl opacity-30"
+            initial={{ y: "100vh", x: Math.random() * 100 + "%" }}
+            animate={{ y: "-10vh" }}
+            transition={{
+              duration: 8 + Math.random() * 4,
+              repeat: Infinity,
+              delay: Math.random() * 5,
+              ease: "linear"
+            }}
+          >
+            {["💕", "💗", "💖", "💝"][i % 4]}
+          </motion.div>
+        ))}
+
         <motion.div
-          initial={{ scale: 0.8, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          className="bg-white/95 backdrop-blur-xl rounded-3xl p-6 max-w-sm w-full shadow-2xl border border-white/30"
+          initial={{ scale: 0.8, opacity: 0, y: 20 }}
+          animate={{ scale: 1, opacity: 1, y: 0 }}
+          transition={{ type: "spring", damping: 20 }}
+          className="bg-gradient-to-br from-white/95 to-white/85 backdrop-blur-xl rounded-3xl p-5 max-w-sm w-full shadow-[0_20px_60px_rgba(244,63,94,0.4)] border border-white/50 max-h-[90vh] overflow-y-auto"
         >
           <div className="text-center">
             <motion.div
-              className="text-7xl mb-4"
-              animate={{ rotate: [0, 5, -5, 0] }}
+              className="text-6xl mb-3"
+              animate={{
+                rotate: [0, 5, -5, 0],
+                scale: [1, 1.1, 1]
+              }}
               transition={{ duration: 2, repeat: Infinity }}
             >
               🧩
             </motion.div>
-            <h2 className="text-2xl font-black text-rose-800 mb-2">Love Letter Puzzle</h2>
-            <p className="text-slate-600 mb-4">
+            <h2 className="text-2xl font-black bg-gradient-to-r from-rose-600 via-pink-500 to-fuchsia-600 bg-clip-text text-transparent mb-1">
+              Love Letter Puzzle
+            </h2>
+            <p className="text-slate-600 mb-3 text-xs">
               Slide the tiles to complete the heart pattern!
             </p>
 
-            <div className="grid grid-cols-3 gap-1 w-32 mx-auto mb-4">
-              {PUZZLE_TILES.map((emoji, i) => (
-                <div key={i} className="aspect-square bg-rose-100 rounded-lg flex items-center justify-center text-lg">
-                  {emoji}
-                </div>
-              ))}
-              <div className="aspect-square bg-slate-200 rounded-lg border-2 border-dashed border-slate-300" />
+            {/* Preview grid */}
+            <div className="relative mx-auto mb-3 w-fit">
+              <div className="grid grid-cols-3 gap-1 p-2 bg-gradient-to-br from-rose-100 to-pink-100 rounded-xl">
+                {PUZZLE_TILES.map((emoji, i) => (
+                  <motion.div
+                    key={i}
+                    className="w-8 h-8 bg-white rounded-lg flex items-center justify-center text-base shadow-md"
+                    initial={{ opacity: 0, scale: 0 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ delay: i * 0.03 }}
+                  >
+                    {emoji}
+                  </motion.div>
+                ))}
+                <div className="w-8 h-8 bg-rose-200/50 rounded-lg border-2 border-dashed border-rose-300" />
+              </div>
             </div>
 
-            <div className="bg-rose-100 rounded-xl p-3 mb-4 text-sm text-slate-600">
-              <div>⏱️ 60 seconds to solve</div>
-              <div>🎯 Fewer moves = Higher score!</div>
+            {/* Power-ups section */}
+            <div className="bg-gradient-to-r from-indigo-100 via-purple-100 to-pink-100 rounded-xl p-3 mb-3">
+              <div className="text-xs font-bold text-purple-700 mb-2">⚡ HELPERS ⚡</div>
+              <div className="grid grid-cols-2 gap-2 text-center">
+                <div className="bg-white/60 rounded-lg p-2">
+                  <div className="text-xl">↩️</div>
+                  <div className="text-[9px] text-slate-600 font-semibold">Undo (x3)</div>
+                </div>
+                <div className="bg-white/60 rounded-lg p-2">
+                  <div className="text-xl">💡</div>
+                  <div className="text-[9px] text-slate-600 font-semibold">Hint (x2)</div>
+                </div>
+              </div>
+            </div>
+
+            {/* Tips */}
+            <div className="bg-gradient-to-r from-rose-100 via-pink-100 to-fuchsia-100 rounded-xl p-3 mb-4 space-y-1.5">
+              <div className="flex items-center gap-2 text-xs text-slate-700">
+                <span className="text-blue-500">⏱️</span>
+                <span><strong>75 seconds</strong> to solve!</span>
+              </div>
+              <div className="flex items-center gap-2 text-xs text-slate-700">
+                <span className="text-green-500">🔥</span>
+                <span><strong>3 correct</strong> in a row = +5s!</span>
+              </div>
+              <div className="flex items-center gap-2 text-xs text-slate-700">
+                <span className="text-yellow-500">⭐</span>
+                <span><strong>Streaks</strong> boost your score!</span>
+              </div>
             </div>
 
             <motion.button
-              onClick={() => { soundManager.buttonPress(); setPhase("countdown"); }}
-              className="w-full py-3 bg-gradient-to-r from-rose-500 to-pink-500 text-white font-bold rounded-xl shadow-lg"
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
+              onClick={() => { soundManager.buttonPress(); soundManager.uiWhoosh(); setPhase("countdown"); }}
+              className="w-full py-3 bg-gradient-to-r from-rose-500 via-pink-500 to-fuchsia-500 text-white font-black text-lg rounded-2xl shadow-[0_8px_30px_rgba(244,63,94,0.4)] relative overflow-hidden"
+              whileHover={{ scale: 1.03, boxShadow: "0 12px 40px rgba(244,63,94,0.5)" }}
+              whileTap={{ scale: 0.97 }}
             >
-              Start!
+              <span className="relative z-10">Solve It! 🧩</span>
+              <motion.div
+                className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/30 to-white/0"
+                animate={{ x: ["-100%", "200%"] }}
+                transition={{ duration: 2, repeat: Infinity, repeatDelay: 1 }}
+              />
             </motion.button>
           </div>
         </motion.div>
@@ -8705,13 +9791,43 @@ const LoveLetterPuzzleGame = memo(function LoveLetterPuzzleGame({
   // Countdown
   if (phase === "countdown") {
     return (
-      <div className="fixed inset-0 bg-gradient-to-b from-rose-600 via-pink-600 to-fuchsia-700 flex items-center justify-center">
+      <div className="fixed inset-0 bg-gradient-to-b from-rose-700 via-pink-700 to-fuchsia-800 flex items-center justify-center overflow-hidden">
+        {/* Puzzle pieces flying in */}
+        {[...Array(8)].map((_, i) => (
+          <motion.div
+            key={i}
+            className="absolute text-4xl"
+            initial={{
+              x: (Math.random() - 0.5) * 600,
+              y: (Math.random() - 0.5) * 600,
+              rotate: Math.random() * 360,
+              opacity: 0.5
+            }}
+            animate={{
+              x: 0,
+              y: 0,
+              rotate: 0,
+              opacity: 0
+            }}
+            transition={{ duration: 2, delay: i * 0.1 }}
+          >
+            {PUZZLE_TILES[i]}
+          </motion.div>
+        ))}
+
         <motion.div
           key={countdownNum}
-          initial={{ scale: 2, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
+          initial={{ scale: 3, opacity: 0, rotateX: 90 }}
+          animate={{ scale: 1, opacity: 1, rotateX: 0 }}
           exit={{ scale: 0, opacity: 0 }}
-          className="text-9xl font-black text-white drop-shadow-[0_0_30px_rgba(255,255,255,0.8)]"
+          transition={{ type: "spring", damping: 15 }}
+          className={cn(
+            "text-9xl font-black text-white relative",
+            countdownNum === 0 && "text-yellow-300"
+          )}
+          style={{
+            textShadow: "0 0 60px rgba(255,255,255,0.8), 0 0 120px rgba(244,63,94,0.6)"
+          }}
         >
           {countdownNum || "GO!"}
         </motion.div>
@@ -8722,21 +9838,76 @@ const LoveLetterPuzzleGame = memo(function LoveLetterPuzzleGame({
   // Done
   if (phase === "done") {
     return (
-      <div className="fixed inset-0 bg-gradient-to-b from-rose-600 via-pink-600 to-fuchsia-700 flex items-center justify-center p-4">
+      <div className="fixed inset-0 bg-gradient-to-b from-rose-700 via-pink-700 to-fuchsia-800 flex items-center justify-center p-4 overflow-hidden">
+        {/* Celebration effects */}
+        {isSolved && [...Array(40)].map((_, i) => (
+          <motion.div
+            key={i}
+            className="absolute text-2xl"
+            style={{ left: `${Math.random() * 100}%` }}
+            initial={{ y: -20, rotate: 0, opacity: 1 }}
+            animate={{
+              y: "100vh",
+              rotate: Math.random() * 720,
+              opacity: [1, 1, 0]
+            }}
+            transition={{
+              duration: 3 + Math.random() * 2,
+              delay: Math.random() * 0.5,
+              ease: "easeIn"
+            }}
+          >
+            {["💕", "💗", "💖", "✨", "🎉"][i % 5]}
+          </motion.div>
+        ))}
+
         <motion.div
-          initial={{ scale: 0.8, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          className="bg-white/95 backdrop-blur-xl rounded-3xl p-6 text-center"
+          initial={{ scale: 0.5, opacity: 0, y: 50 }}
+          animate={{ scale: 1, opacity: 1, y: 0 }}
+          transition={{ type: "spring", damping: 15 }}
+          className="bg-gradient-to-br from-white/95 to-white/85 backdrop-blur-xl rounded-3xl p-8 text-center shadow-[0_30px_80px_rgba(244,63,94,0.5)] border border-white/50"
         >
-          <div className="text-6xl mb-4">{isSolved ? "🧩✨" : "😿"}</div>
-          <h2 className="text-3xl font-black text-rose-800 mb-2">
+          <motion.div
+            className="text-7xl mb-4"
+            animate={isSolved ? {
+              rotate: [0, 10, -10, 0],
+              scale: [1, 1.1, 1]
+            } : {}}
+            transition={{ duration: 1, repeat: Infinity }}
+          >
+            {isSolved ? "🧩✨" : "😿"}
+          </motion.div>
+          <h2 className={cn(
+            "text-4xl font-black mb-3",
+            isSolved
+              ? "bg-gradient-to-r from-rose-600 via-pink-500 to-fuchsia-600 bg-clip-text text-transparent"
+              : "text-slate-600"
+          )}>
             {isSolved ? "Puzzle Complete!" : "Time's Up!"}
           </h2>
-          {isSolved && (
+          {isSolved ? (
             <>
-              <div className="text-5xl font-black text-pink-500 mb-2">{score.toLocaleString()}</div>
-              <div className="text-slate-600">Moves: {moves} | Time: {60 - timeLeft}s</div>
+              <motion.div
+                className="text-6xl font-black text-pink-500 mb-3"
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                transition={{ delay: 0.3, type: "spring" }}
+              >
+                {score.toLocaleString()}
+              </motion.div>
+              <div className="flex justify-center gap-6 text-slate-600">
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-rose-500">{moves}</div>
+                  <div className="text-xs">Moves</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-fuchsia-500">{60 - timeLeft}s</div>
+                  <div className="text-xs">Time</div>
+                </div>
+              </div>
             </>
+          ) : (
+            <p className="text-slate-500">Keep practicing! You'll get it next time.</p>
           )}
         </motion.div>
       </div>
@@ -8745,82 +9916,282 @@ const LoveLetterPuzzleGame = memo(function LoveLetterPuzzleGame({
 
   // Playing
   return (
-    <div className="fixed inset-0 bg-gradient-to-b from-rose-600 via-pink-600 to-fuchsia-700 flex flex-col items-center justify-center p-4">
-      {/* HUD */}
-      <div className="absolute top-0 left-0 right-0 z-30 p-3 bg-gradient-to-b from-black/40 to-transparent">
-        <div className="flex justify-between items-center">
-          <div className="bg-slate-800/80 rounded-lg px-3 py-1">
-            <span className="text-white text-sm font-bold">Moves: {moves}</span>
+    <div className="fixed inset-0 bg-gradient-to-b from-rose-700 via-pink-700 to-fuchsia-800 flex flex-col items-center justify-center p-4 overflow-hidden">
+      {/* Ambient floating particles */}
+      <div className="absolute inset-0 pointer-events-none overflow-hidden">
+        {[...Array(6)].map((_, i) => (
+          <motion.div
+            key={i}
+            className="absolute text-xl opacity-20"
+            initial={{ y: "100%", x: `${i * 20}%` }}
+            animate={{ y: "-100%" }}
+            transition={{
+              duration: 10 + i * 2,
+              repeat: Infinity,
+              ease: "linear"
+            }}
+          >
+            {["💕", "💗", "💖"][i % 3]}
+          </motion.div>
+        ))}
+      </div>
+
+      {/* Sparkle effects */}
+      {sparkles.map(sparkle => (
+        <motion.div
+          key={sparkle.id}
+          className="absolute text-xl pointer-events-none z-50"
+          style={{
+            left: `calc(50% - 128px + ${sparkle.x}%)`,
+            top: `calc(50% - 128px + ${sparkle.y}%)`
+          }}
+          initial={{ scale: 0, opacity: 1 }}
+          animate={{ scale: sparkle.scale, opacity: 0, y: -20 }}
+          transition={{ duration: 0.6, delay: sparkle.delay }}
+        >
+          ✨
+        </motion.div>
+      ))}
+
+      {/* Bonus time popup */}
+      {showBonusTime && (
+        <motion.div
+          className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50 pointer-events-none"
+          initial={{ scale: 0.5, opacity: 0 }}
+          animate={{ scale: 1.5, opacity: 1 }}
+          exit={{ scale: 2, opacity: 0 }}
+        >
+          <div className="text-4xl font-black text-green-400"
+            style={{ textShadow: "0 0 30px rgba(74,222,128,0.8)" }}>
+            +{bonusTime}s! 🔥
           </div>
-          <div className={cn(
-            "rounded-lg px-3 py-1 font-bold text-sm",
-            timeLeft <= 10 ? "bg-red-500/80 text-white animate-pulse" : "bg-slate-700/80 text-white"
-          )}>
-            {timeLeft}s
+        </motion.div>
+      )}
+
+      {/* Premium HUD */}
+      <div className="absolute top-0 left-0 right-0 z-30 p-3 bg-gradient-to-b from-black/60 to-transparent">
+        <div className="flex justify-between items-center max-w-md mx-auto">
+          {/* Moves counter */}
+          <motion.div
+            className="bg-black/50 backdrop-blur-sm rounded-xl px-3 py-1.5 border border-white/10"
+            animate={lastMovedTile ? { scale: [1, 1.05, 1] } : {}}
+          >
+            <div className="text-white text-[10px] opacity-60">Moves</div>
+            <div className="text-white text-lg font-black tabular-nums">{moves}</div>
+          </motion.div>
+
+          {/* Progress + Streak */}
+          <div className="bg-black/50 backdrop-blur-sm rounded-xl px-3 py-1.5 border border-white/10 flex gap-3">
+            <div className="text-center">
+              <div className="text-white text-[10px] opacity-60">Correct</div>
+              <div className="text-green-400 text-lg font-black">{correctTiles.size}/8</div>
+            </div>
+            {streak > 0 && (
+              <div className="text-center">
+                <div className="text-orange-300 text-[10px] opacity-80">Streak</div>
+                <div className="text-orange-400 text-lg font-black">🔥{streak}</div>
+              </div>
+            )}
           </div>
+
+          {/* Timer */}
+          <motion.div
+            className={cn(
+              "bg-black/50 backdrop-blur-sm rounded-xl px-3 py-1.5 border",
+              timeLeft <= 10 ? "border-red-500/50" : "border-white/10"
+            )}
+            animate={timeLeft <= 10 ? { scale: [1, 1.05, 1] } : {}}
+            transition={{ duration: 0.5, repeat: timeLeft <= 10 ? Infinity : 0 }}
+          >
+            <div className={cn(
+              "text-[10px] opacity-60",
+              timeLeft <= 10 ? "text-red-400" : "text-white"
+            )}>Time</div>
+            <div className={cn(
+              "text-lg font-black tabular-nums",
+              timeLeft <= 10 ? "text-red-400" : "text-white"
+            )}>{timeLeft}s</div>
+          </motion.div>
+        </div>
+
+        {/* Helper buttons */}
+        <div className="flex justify-center gap-3 mt-2 max-w-md mx-auto">
+          <motion.button
+            onClick={handleUndo}
+            disabled={undosRemaining <= 0 || undoStack.length === 0}
+            className={cn(
+              "px-4 py-1.5 rounded-xl font-bold text-sm flex items-center gap-1.5 transition-all",
+              undosRemaining > 0 && undoStack.length > 0
+                ? "bg-indigo-500/80 text-white border border-indigo-400/50"
+                : "bg-black/30 text-white/40 border border-white/10"
+            )}
+            whileHover={undosRemaining > 0 ? { scale: 1.05 } : {}}
+            whileTap={undosRemaining > 0 ? { scale: 0.95 } : {}}
+          >
+            <span>↩️</span>
+            <span>Undo ({undosRemaining})</span>
+          </motion.button>
+          <motion.button
+            onClick={handleHint}
+            disabled={hintsRemaining <= 0}
+            className={cn(
+              "px-4 py-1.5 rounded-xl font-bold text-sm flex items-center gap-1.5 transition-all",
+              hintsRemaining > 0
+                ? "bg-yellow-500/80 text-white border border-yellow-400/50"
+                : "bg-black/30 text-white/40 border border-white/10"
+            )}
+            whileHover={hintsRemaining > 0 ? { scale: 1.05 } : {}}
+            whileTap={hintsRemaining > 0 ? { scale: 0.95 } : {}}
+          >
+            <span>💡</span>
+            <span>Hint ({hintsRemaining})</span>
+          </motion.button>
         </div>
       </div>
 
-      {/* Puzzle Grid */}
+      {/* Puzzle Grid Container */}
       <motion.div
         className={cn(
-          "bg-white/20 backdrop-blur-xl rounded-3xl p-4 shadow-2xl border border-white/30",
-          isSolved && "animate-[rainbowGlow_2s_linear_infinite]"
+          "relative bg-gradient-to-br from-white/20 to-white/10 backdrop-blur-xl rounded-3xl p-5",
+          "shadow-[0_20px_60px_rgba(0,0,0,0.3)] border-2",
+          isSolved ? "border-yellow-400 animate-[rainbowGlow_2s_linear_infinite]" :
+          timeLeft <= 10 ? "border-red-500/50" : "border-white/30"
         )}
         animate={isSolved ? { scale: [1, 1.05, 1] } : {}}
         transition={{ duration: 0.5 }}
       >
-        <div className="grid grid-cols-3 gap-2 w-64 h-64">
+        {/* Reference preview (small) */}
+        <div className={cn(
+          "absolute -top-14 left-1/2 -translate-x-1/2 flex gap-0.5 p-1.5 rounded-lg transition-all",
+          hintPulse ? "bg-yellow-400/30 scale-110" : "bg-black/30"
+        )}>
+          {PUZZLE_TILES.map((emoji, i) => (
+            <div key={i} className="w-4 h-4 bg-white/80 rounded-sm flex items-center justify-center text-[8px]">
+              {emoji}
+            </div>
+          ))}
+          <div className="w-4 h-4 bg-white/30 rounded-sm" />
+        </div>
+
+        {/* Main puzzle grid */}
+        <div className="grid grid-cols-3 gap-3 w-72 h-72">
           {tiles.map((tile, index) => (
             tile === 0 ? (
-              <div
-                key={index}
-                className="aspect-square rounded-2xl border-2 border-dashed border-white/30 bg-black/10"
+              <motion.div
+                key="empty"
+                className="aspect-square rounded-2xl border-2 border-dashed border-white/30 bg-black/20"
+                layoutId="empty"
               />
             ) : (
               <motion.button
                 key={tile}
                 layout
+                layoutId={`tile-${tile}`}
                 onClick={() => handleTileTap(index)}
                 className={cn(
-                  "aspect-square bg-gradient-to-br from-white via-rose-50 to-pink-100",
-                  "rounded-2xl shadow-lg border-2 border-white/50",
-                  "flex items-center justify-center text-3xl font-bold",
-                  "cursor-pointer active:scale-95 transition-transform",
-                  shakingTile === index && "animate-[tileShake_0.3s_ease-in-out]"
+                  "aspect-square rounded-2xl shadow-lg border-2 relative overflow-hidden",
+                  "flex items-center justify-center text-4xl",
+                  "cursor-pointer transition-colors",
+                  hintedTile === index
+                    ? "bg-gradient-to-br from-yellow-100 via-amber-50 to-yellow-100 border-yellow-400 animate-pulse"
+                    : correctTiles.has(tile)
+                    ? "bg-gradient-to-br from-green-100 via-emerald-50 to-green-100 border-green-400/60"
+                    : "bg-gradient-to-br from-white via-rose-50 to-pink-100 border-white/60",
+                  shakingTile === index && "animate-[tileShake_0.3s_ease-in-out]",
+                  lastMovedTile === tile && "ring-2 ring-pink-400 ring-offset-2 ring-offset-transparent"
                 )}
-                whileHover={{ scale: 1.05, boxShadow: "0 10px 30px rgba(0,0,0,0.2)" }}
+                whileHover={{
+                  scale: 1.05,
+                  boxShadow: "0 15px 40px rgba(0,0,0,0.25)",
+                  rotateX: -5,
+                  rotateY: 5
+                }}
                 whileTap={{ scale: 0.95 }}
-                transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                transition={{ type: "spring", stiffness: 400, damping: 25 }}
+                style={{
+                  transformStyle: "preserve-3d",
+                  perspective: "500px",
+                  boxShadow: hintedTile === index ? "0 0 30px rgba(251, 191, 36, 0.6)" : undefined
+                }}
               >
-                {PUZZLE_TILES[tile - 1]}
+                {/* Tile number indicator */}
+                <div className="absolute top-1 left-1.5 text-[10px] font-bold text-slate-400/60">
+                  {tile}
+                </div>
+
+                {/* Hint arrow */}
+                {hintedTile === index && (
+                  <motion.div
+                    className="absolute -top-6 left-1/2 -translate-x-1/2 text-2xl"
+                    animate={{ y: [0, 5, 0] }}
+                    transition={{ duration: 0.5, repeat: Infinity }}
+                  >
+                    👇
+                  </motion.div>
+                )}
+
+                {/* Emoji */}
+                <span className="drop-shadow-md">{PUZZLE_TILES[tile - 1]}</span>
+
+                {/* Correct indicator */}
+                {correctTiles.has(tile) && (
+                  <motion.div
+                    className="absolute top-1 right-1 text-green-500"
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    transition={{ type: "spring" }}
+                  >
+                    ✓
+                  </motion.div>
+                )}
+
+                {/* Shine effect */}
+                <div className="absolute inset-0 bg-gradient-to-br from-white/40 via-transparent to-transparent rounded-2xl pointer-events-none" />
               </motion.button>
             )
           ))}
         </div>
       </motion.div>
 
-      {/* Cat */}
-      <div className="mt-6 text-5xl">
-        {isSolved ? "😻" : moves > 30 ? "😿" : "😸"}
-      </div>
+      {/* Cat reaction with messages */}
+      <motion.div
+        className="mt-4 flex flex-col items-center"
+        animate={isSolved ? { y: [0, -10, 0] } : {}}
+        transition={{ duration: 0.5 }}
+      >
+        <div className="text-5xl drop-shadow-lg">
+          {isSolved ? "😻" : catEmotion === "excited" ? "🤩" : catEmotion === "happy" ? "😸" : "😿"}
+        </div>
+        {catMessage && !isSolved && (
+          <motion.div
+            className="text-xs font-bold text-white/90 bg-black/40 rounded-full px-3 py-1 mt-2"
+            initial={{ opacity: 0, scale: 0 }}
+            animate={{ opacity: 1, scale: 1 }}
+            key={catMessage}
+          >
+            {catMessage}
+          </motion.div>
+        )}
+      </motion.div>
     </div>
   );
 });
 
 // ============================================================================
-// CUPID'S ARROW GALLERY - Target shooting game
+// CUPID'S ARROW GALLERY - ULTIMATE target shooting with power-ups!
 // ============================================================================
 
 type GalleryTarget = {
   id: number;
   x: number;
   y: number;
-  size: "small" | "medium" | "large";
-  type: "heart" | "golden" | "cat";
+  size: "small" | "medium" | "large" | "boss";
+  type: "heart" | "golden" | "cat" | "rainbow" | "multishot" | "slowmo" | "magnet";
   vx: number;
   vy: number;
   hit?: boolean;
+  spawnTime: number;
+  health?: number; // For boss targets
 };
 
 type FlyingArrow = {
@@ -8836,8 +10207,29 @@ type ImpactEffect = {
   id: number;
   x: number;
   y: number;
-  type: "hit" | "miss" | "bullseye" | "cat";
+  type: "hit" | "miss" | "bullseye" | "cat" | "golden" | "powerup" | "boss" | "rainbow";
+  points?: number;
+  text?: string;
 };
+
+type GalleryParticle = {
+  id: number;
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  color: string;
+  size: number;
+  life: number;
+};
+
+const GALLERY_CAT_MESSAGES = [
+  { combo: 3, text: "Nice shot! 🎯", emotion: "happy" as const },
+  { combo: 5, text: "Sharp shooter! 💕", emotion: "happy" as const },
+  { combo: 8, text: "ON FIRE! 🔥", emotion: "excited" as const },
+  { combo: 12, text: "INCREDIBLE! ✨", emotion: "excited" as const },
+  { combo: 15, text: "LEGENDARY!! 👑", emotion: "excited" as const },
+];
 
 const CupidsArrowGame = memo(function CupidsArrowGame({
   onComplete
@@ -8853,8 +10245,24 @@ const CupidsArrowGame = memo(function CupidsArrowGame({
   const [score, setScore] = useState(0);
   const [combo, setCombo] = useState(0);
   const [maxCombo, setMaxCombo] = useState(0);
-  const [timeLeft, setTimeLeft] = useState(45);
+  const [timeLeft, setTimeLeft] = useState(50); // More time!
   const [impactEffects, setImpactEffects] = useState<ImpactEffect[]>([]);
+  const [particles, setParticles] = useState<GalleryParticle[]>([]);
+  const [displayedScore, setDisplayedScore] = useState(0);
+  const [totalHits, setTotalHits] = useState(0);
+  const [bullseyes, setBullseyes] = useState(0);
+  const [screenFlash, setScreenFlash] = useState<string | null>(null);
+  // NEW POWER-UP STATES!
+  const [multiShotActive, setMultiShotActive] = useState(false);
+  const [multiShotCount, setMultiShotCount] = useState(0);
+  const [slowMoActive, setSlowMoActive] = useState(false);
+  const [magnetActive, setMagnetActive] = useState(false);
+  const [bossSpawned, setBossSpawned] = useState(false);
+  const [bossDefeated, setBossDefeated] = useState(false);
+  const [catMessage, setCatMessage] = useState<string | null>(null);
+  const [catEmotion, setCatEmotion] = useState<"happy" | "excited" | "worried">("happy");
+  const [eventMessage, setEventMessage] = useState<string | null>(null);
+  const [frenzyMode, setFrenzyMode] = useState(false);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const onCompleteRef = useRef(onComplete);
@@ -8863,10 +10271,93 @@ const CupidsArrowGame = memo(function CupidsArrowGame({
   const targetIdRef = useRef(0);
   const scoreRef = useRef(0);
   const comboRef = useRef(0);
+  const particleIdRef = useRef(0);
 
   useEffect(() => { onCompleteRef.current = onComplete; }, [onComplete]);
   useEffect(() => { scoreRef.current = score; }, [score]);
   useEffect(() => { comboRef.current = combo; }, [combo]);
+
+  // Cat messages based on combo
+  useEffect(() => {
+    const message = GALLERY_CAT_MESSAGES.slice().reverse().find(m => combo >= m.combo);
+    if (message) {
+      setCatMessage(message.text);
+      setCatEmotion(message.emotion);
+    } else if (combo === 0) {
+      setCatMessage(null);
+      setCatEmotion("worried");
+    } else {
+      setCatEmotion("happy");
+    }
+  }, [combo]);
+
+  // Trigger frenzy mode at 10 combo
+  useEffect(() => {
+    if (combo >= 10 && !frenzyMode && phase === "playing") {
+      setFrenzyMode(true);
+      setEventMessage("🎯 FRENZY MODE! 🎯");
+      soundManager.rhythmCombo();
+      setTimeout(() => setEventMessage(null), 2000);
+      // Frenzy lasts 8 seconds
+      setTimeout(() => setFrenzyMode(false), 8000);
+    }
+  }, [combo, frenzyMode, phase]);
+
+  // Power-up timers
+  useEffect(() => {
+    if (!multiShotActive) return;
+    if (multiShotCount <= 0) {
+      setMultiShotActive(false);
+    }
+  }, [multiShotActive, multiShotCount]);
+
+  useEffect(() => {
+    if (!slowMoActive) return;
+    const timer = setTimeout(() => setSlowMoActive(false), 5000);
+    return () => clearTimeout(timer);
+  }, [slowMoActive]);
+
+  useEffect(() => {
+    if (!magnetActive) return;
+    const timer = setTimeout(() => setMagnetActive(false), 4000);
+    return () => clearTimeout(timer);
+  }, [magnetActive]);
+
+  // Animated score display
+  useEffect(() => {
+    if (displayedScore < score) {
+      const diff = score - displayedScore;
+      const step = Math.max(1, Math.floor(diff / 8));
+      const timer = setTimeout(() => {
+        setDisplayedScore(prev => Math.min(prev + step, score));
+      }, 20);
+      return () => clearTimeout(timer);
+    }
+  }, [displayedScore, score]);
+
+  // Spawn particles
+  const spawnParticles = useCallback((x: number, y: number, type: "hit" | "bullseye" | "miss" | "golden") => {
+    const colors = type === "bullseye" ? ["#fbbf24", "#fcd34d", "#fef08a", "#f97316"] :
+                   type === "golden" ? ["#ffd700", "#ffec8b", "#fff8dc", "#ffed4a"] :
+                   type === "hit" ? ["#f472b6", "#ec4899", "#f9a8d4", "#fb7185"] :
+                   ["#64748b", "#94a3b8", "#cbd5e1"];
+    const count = type === "bullseye" ? 20 : type === "golden" ? 25 : 12;
+    const newParticles: GalleryParticle[] = [];
+    for (let i = 0; i < count; i++) {
+      const angle = (i / count) * Math.PI * 2;
+      const speed = 2 + Math.random() * 4;
+      newParticles.push({
+        id: particleIdRef.current++,
+        x, y,
+        vx: Math.cos(angle) * speed + (Math.random() - 0.5) * 2,
+        vy: Math.sin(angle) * speed + (Math.random() - 0.5) * 2,
+        color: colors[Math.floor(Math.random() * colors.length)],
+        size: type === "bullseye" || type === "golden" ? 4 + Math.random() * 4 : 3 + Math.random() * 3,
+        life: 1
+      });
+    }
+    setParticles(prev => [...prev, ...newParticles]);
+  }, []);
 
   // Countdown
   useEffect(() => {
@@ -8877,6 +10368,7 @@ const CupidsArrowGame = memo(function CupidsArrowGame({
       return () => clearTimeout(timer);
     } else {
       soundManager.countdownGo();
+      soundManager.startGalleryMusic();
       setPhase("playing");
     }
   }, [phase, countdownNum]);
@@ -8889,8 +10381,9 @@ const CupidsArrowGame = memo(function CupidsArrowGame({
         if (t <= 1) {
           gameEndedRef.current = true;
           setPhase("done");
+          soundManager.stopMusic();
           soundManager.victory();
-          setTimeout(() => onCompleteRef.current(scoreRef.current), 2000);
+          setTimeout(() => onCompleteRef.current(scoreRef.current), 2500);
           return 0;
         }
         return t - 1;
@@ -8899,14 +10392,63 @@ const CupidsArrowGame = memo(function CupidsArrowGame({
     return () => clearInterval(timer);
   }, [phase]);
 
-  // Spawn targets
+  // Spawn boss target mid-game
+  useEffect(() => {
+    if (phase !== "playing" || bossSpawned || timeLeft > 30) return;
+    if (timeLeft === 30 && !bossSpawned) {
+      setBossSpawned(true);
+      setEventMessage("⚠️ BOSS TARGET! ⚠️");
+      soundManager.rhythmCombo();
+      setTimeout(() => setEventMessage(null), 2000);
+
+      const bossTarget: GalleryTarget = {
+        id: targetIdRef.current++,
+        x: 50,
+        y: 40,
+        size: "boss",
+        type: "heart",
+        vx: 0.3,
+        vy: 0.2,
+        spawnTime: Date.now(),
+        health: 5 // Requires 5 hits!
+      };
+      setTargets(prev => [...prev, bossTarget]);
+    }
+  }, [phase, timeLeft, bossSpawned]);
+
+  // Spawn targets - now with power-ups!
   useEffect(() => {
     if (phase !== "playing" || gameEndedRef.current) return;
+
+    const baseInterval = frenzyMode ? 600 : slowMoActive ? 1500 : 1000;
+    const speedUp = Math.min(400, (50 - timeLeft) * 8);
+    const interval = baseInterval - speedUp;
+
     const spawnInterval = setInterval(() => {
       const rand = Math.random();
-      const type: GalleryTarget["type"] = rand < 0.08 ? "cat" : rand < 0.15 ? "golden" : "heart";
+
+      // Determine target type with power-ups!
+      let type: GalleryTarget["type"];
+      if (frenzyMode) {
+        // Frenzy: more hearts, more golden
+        type = rand < 0.05 ? "cat" : rand < 0.25 ? "golden" : rand < 0.3 ? "rainbow" : "heart";
+      } else {
+        // Normal with power-ups
+        if (rand < 0.03) type = "multishot";
+        else if (rand < 0.05) type = "slowmo";
+        else if (rand < 0.07) type = "magnet";
+        else if (rand < 0.12) type = "cat";
+        else if (rand < 0.17) type = "rainbow";
+        else if (rand < 0.25) type = "golden";
+        else type = "heart";
+      }
+
       const sizeRand = Math.random();
       const size: GalleryTarget["size"] = sizeRand < 0.3 ? "small" : sizeRand < 0.7 ? "medium" : "large";
+
+      // Speed - slower when slowMoActive
+      const baseSpeed = slowMoActive ? 0.3 : 0.5;
+      const speedMultiplier = 1 + (50 - timeLeft) * 0.015;
 
       const newTarget: GalleryTarget = {
         id: targetIdRef.current++,
@@ -8914,17 +10456,19 @@ const CupidsArrowGame = memo(function CupidsArrowGame({
         y: 20 + Math.random() * 50,
         size,
         type,
-        vx: (Math.random() - 0.5) * 0.5,
-        vy: (Math.random() - 0.5) * 0.3,
+        vx: (Math.random() - 0.5) * baseSpeed * speedMultiplier,
+        vy: (Math.random() - 0.5) * baseSpeed * 0.7 * speedMultiplier,
+        spawnTime: Date.now()
       };
 
       soundManager.targetSpawn();
       setTargets(prev => [...prev.slice(-15), newTarget]);
-    }, 1200);
-    return () => clearInterval(spawnInterval);
-  }, [phase]);
+    }, Math.max(300, interval));
 
-  // Update target positions
+    return () => clearInterval(spawnInterval);
+  }, [phase, timeLeft, frenzyMode, slowMoActive]);
+
+  // Update target positions and particles
   useEffect(() => {
     if (phase !== "playing") return;
 
@@ -8940,11 +10484,11 @@ const CupidsArrowGame = memo(function CupidsArrowGame({
         let newVy = target.vy;
 
         // Bounce off walls
-        if (newX < 5 || newX > 95) newVx *= -1;
-        if (newY < 15 || newY > 75) newVy *= -1;
+        if (newX < 8 || newX > 92) newVx *= -1;
+        if (newY < 18 || newY > 72) newVy *= -1;
 
-        newX = Math.max(5, Math.min(95, newX));
-        newY = Math.max(15, Math.min(75, newY));
+        newX = Math.max(8, Math.min(92, newX));
+        newY = Math.max(18, Math.min(72, newY));
 
         return { ...target, x: newX, y: newY, vx: newVx, vy: newVy };
       }).filter(t => !t.hit || Date.now() - (t as unknown as { hitTime?: number }).hitTime! < 300));
@@ -8952,8 +10496,17 @@ const CupidsArrowGame = memo(function CupidsArrowGame({
       // Update arrows
       setFlyingArrows(prev => prev.map(arrow => ({
         ...arrow,
-        progress: arrow.progress + 0.1
+        progress: arrow.progress + 0.12
       })).filter(a => a.progress < 1));
+
+      // Update particles
+      setParticles(prev => prev.map(p => ({
+        ...p,
+        x: p.x + p.vx * 0.3,
+        y: p.y + p.vy * 0.3,
+        vy: p.vy + 0.15,
+        life: p.life - 0.025
+      })).filter(p => p.life > 0));
 
       rafRef.current = requestAnimationFrame(gameLoop);
     };
@@ -8968,58 +10521,160 @@ const CupidsArrowGame = memo(function CupidsArrowGame({
     const rect = containerRef.current.getBoundingClientRect();
     const x = ((e.clientX - rect.left) / rect.width) * 100;
     const y = ((e.clientY - rect.top) / rect.height) * 100;
-    setCrosshair({ x: Math.max(5, Math.min(95, x)), y: Math.max(10, Math.min(90, y)) });
+    setCrosshair({ x: Math.max(8, Math.min(92, x)), y: Math.max(12, Math.min(88, y)) });
   }, [phase]);
 
-  // Shoot
+  // Shoot - Now with power-ups!
   const handleShoot = useCallback(() => {
     if (!canShoot || phase !== "playing" || gameEndedRef.current) return;
 
     soundManager.arrowFire();
     setCanShoot(false);
 
-    const arrowId = Date.now();
-    setFlyingArrows(prev => [...prev, {
-      id: arrowId,
-      x: 50,
-      y: 95,
-      targetX: crosshair.x,
-      targetY: crosshair.y,
-      progress: 0
-    }]);
+    // Multi-shot: Fire 3 arrows
+    const arrowTargets: { x: number; y: number }[] = [];
 
-    // Check hit after delay
-    setTimeout(() => {
-      let hit = false;
+    if (multiShotActive) {
+      setMultiShotCount(c => c - 1);
+      // Spread pattern
+      arrowTargets.push(
+        { x: crosshair.x - 8, y: crosshair.y },
+        { x: crosshair.x, y: crosshair.y },
+        { x: crosshair.x + 8, y: crosshair.y }
+      );
+    } else {
+      // Magnet: Auto-aim to nearest target
+      if (magnetActive) {
+        const nearestTarget = targets.filter(t => !t.hit && t.type !== "cat")
+          .map(t => ({ t, d: Math.sqrt(Math.pow(crosshair.x - t.x, 2) + Math.pow(crosshair.y - t.y, 2)) }))
+          .sort((a, b) => a.d - b.d)[0];
+        if (nearestTarget && nearestTarget.d < 30) {
+          arrowTargets.push({ x: nearestTarget.t.x, y: nearestTarget.t.y });
+        } else {
+          arrowTargets.push({ x: crosshair.x, y: crosshair.y });
+        }
+      } else {
+        arrowTargets.push({ x: crosshair.x, y: crosshair.y });
+      }
+    }
 
-      setTargets(prev => {
-        const updated = prev.map(target => {
-          if (target.hit) return target;
+    const baseArrowId = Date.now();
+    arrowTargets.forEach((target, i) => {
+      setFlyingArrows(prev => [...prev, {
+        id: baseArrowId + i,
+        x: 50 + (multiShotActive ? (i - 1) * 10 : 0),
+        y: 92,
+        targetX: target.x,
+        targetY: target.y,
+        progress: 0
+      }]);
+    });
 
-          const hitRadius = target.size === "small" ? 4 : target.size === "medium" ? 6 : 8;
-          const distance = Math.sqrt(
-            Math.pow(crosshair.x - target.x, 2) + Math.pow(crosshair.y - target.y, 2)
-          );
+    // Check hits after delay for each arrow
+    arrowTargets.forEach((arrowTarget, arrowIndex) => {
+      const arrowId = baseArrowId + arrowIndex;
 
-          if (distance <= hitRadius) {
-            hit = true;
-            const isBullseye = distance <= 2;
+      setTimeout(() => {
+        let hit = false;
 
-            if (target.type === "cat") {
-              soundManager.hiss();
-              setScore(s => Math.max(0, s - 100));
-              setCombo(0);
-              comboRef.current = 0;
-              setImpactEffects(prev => [...prev, { id: arrowId, x: target.x, y: target.y, type: "cat" }]);
-            } else {
-              const basePoints = target.type === "golden" ? 300 :
+        setTargets(prev => {
+          const updated = prev.map(target => {
+            if (target.hit && target.size !== "boss") return target;
+            if (target.size === "boss" && target.health && target.health <= 0) return target;
+
+            const hitRadius = target.size === "boss" ? 12 :
+              target.size === "small" ? 5 :
+              target.size === "medium" ? 7 : 9;
+            const distance = Math.sqrt(
+              Math.pow(arrowTarget.x - target.x, 2) + Math.pow(arrowTarget.y - target.y, 2)
+            );
+
+            if (distance <= hitRadius) {
+              hit = true;
+              const isBullseye = distance <= 2.5;
+
+              // Handle power-up targets
+              if (target.type === "multishot") {
+                setMultiShotActive(true);
+                setMultiShotCount(c => c + 5);
+                setEventMessage("🎯 MULTI-SHOT x5!");
+                setTimeout(() => setEventMessage(null), 1500);
+                soundManager.rhythmGolden();
+                spawnParticles(target.x, target.y, "golden");
+                setImpactEffects(prev => [...prev, { id: arrowId, x: target.x, y: target.y, type: "powerup", text: "MULTI-SHOT!" }]);
+                return { ...target, hit: true };
+              }
+
+              if (target.type === "slowmo") {
+                setSlowMoActive(true);
+                setEventMessage("⏰ SLOW MOTION!");
+                setTimeout(() => setEventMessage(null), 1500);
+                soundManager.rhythmGolden();
+                spawnParticles(target.x, target.y, "golden");
+                setImpactEffects(prev => [...prev, { id: arrowId, x: target.x, y: target.y, type: "powerup", text: "SLOW-MO!" }]);
+                return { ...target, hit: true };
+              }
+
+              if (target.type === "magnet") {
+                setMagnetActive(true);
+                setEventMessage("🧲 MAGNET AIM!");
+                setTimeout(() => setEventMessage(null), 1500);
+                soundManager.rhythmGolden();
+                spawnParticles(target.x, target.y, "golden");
+                setImpactEffects(prev => [...prev, { id: arrowId, x: target.x, y: target.y, type: "powerup", text: "MAGNET!" }]);
+                return { ...target, hit: true };
+              }
+
+              if (target.type === "cat") {
+                soundManager.hiss();
+                setScore(s => Math.max(0, s - 100));
+                setCombo(0);
+                comboRef.current = 0;
+                setScreenFlash("red");
+                setTimeout(() => setScreenFlash(null), 150);
+                spawnParticles(target.x, target.y, "miss");
+                setImpactEffects(prev => [...prev, { id: arrowId, x: target.x, y: target.y, type: "cat", points: -100 }]);
+                return { ...target, hit: true };
+              }
+
+              // Boss target - multiple hits required!
+              if (target.size === "boss" && target.health) {
+                const newHealth = target.health - 1;
+                soundManager.arrowHit();
+                spawnParticles(target.x, target.y, "hit");
+
+                if (newHealth <= 0) {
+                  // Boss defeated!
+                  setBossDefeated(true);
+                  setEventMessage("💥 BOSS DEFEATED! +1000 💥");
+                  setScore(s => s + 1000);
+                  setTimeLeft(t => t + 10); // Bonus time!
+                  soundManager.victory();
+                  setTimeout(() => setEventMessage(null), 2000);
+                  spawnParticles(target.x, target.y, "golden");
+                  spawnParticles(target.x, target.y, "bullseye");
+                  setImpactEffects(prev => [...prev, { id: arrowId, x: target.x, y: target.y, type: "boss", points: 1000 }]);
+                  setScreenFlash("gold");
+                  setTimeout(() => setScreenFlash(null), 200);
+                  return { ...target, hit: true, health: 0 };
+                } else {
+                  setImpactEffects(prev => [...prev, { id: arrowId, x: target.x, y: target.y, type: "hit", text: `${newHealth} HP!` }]);
+                  return { ...target, health: newHealth };
+                }
+              }
+
+              // Regular targets
+              const frenzyBonus = frenzyMode ? 1.5 : 1;
+              const basePoints = target.type === "rainbow" ? 500 :
+                target.type === "golden" ? 350 :
                 target.size === "large" ? 150 :
-                target.size === "medium" ? 100 : 50;
+                target.size === "medium" ? 100 : 75;
               const bullseyeMultiplier = isBullseye ? 2 : 1;
-              const comboBonus = 1 + (comboRef.current * 0.1);
-              const points = Math.round(basePoints * bullseyeMultiplier * comboBonus);
+              const comboBonus = 1 + (comboRef.current * 0.12);
+              const points = Math.round(basePoints * bullseyeMultiplier * comboBonus * frenzyBonus);
 
               setScore(s => s + points);
+              setTotalHits(h => h + 1);
               setCombo(c => {
                 const newCombo = c + 1;
                 setMaxCombo(m => Math.max(m, newCombo));
@@ -9027,85 +10682,168 @@ const CupidsArrowGame = memo(function CupidsArrowGame({
               });
 
               if (isBullseye) {
-                soundManager.bullseye();
-                setImpactEffects(prev => [...prev, { id: arrowId, x: target.x, y: target.y, type: "bullseye" }]);
+                setBullseyes(b => b + 1);
+                if (target.type === "golden" || target.type === "rainbow") {
+                  soundManager.targetHitGolden();
+                  setScreenFlash(target.type === "rainbow" ? "purple" : "gold");
+                  spawnParticles(target.x, target.y, "golden");
+                  setImpactEffects(prev => [...prev, {
+                    id: arrowId, x: target.x, y: target.y,
+                    type: target.type === "rainbow" ? "rainbow" : "golden",
+                    points
+                  }]);
+                } else {
+                  soundManager.bullseye();
+                  setScreenFlash("yellow");
+                  spawnParticles(target.x, target.y, "bullseye");
+                  setImpactEffects(prev => [...prev, { id: arrowId, x: target.x, y: target.y, type: "bullseye", points }]);
+                }
               } else {
                 soundManager.arrowHit();
-                setImpactEffects(prev => [...prev, { id: arrowId, x: target.x, y: target.y, type: "hit" }]);
+                spawnParticles(target.x, target.y, "hit");
+                setImpactEffects(prev => [...prev, { id: arrowId, x: target.x, y: target.y, type: "hit", points }]);
               }
-            }
+              setTimeout(() => setScreenFlash(null), 100);
 
-            return { ...target, hit: true };
-          }
-          return target;
+              return { ...target, hit: true };
+            }
+            return target;
+          });
+
+          return updated;
         });
 
-        return updated;
-      });
+        if (!hit && arrowIndex === 0) {
+          soundManager.arrowMiss();
+          setCombo(0);
+          comboRef.current = 0;
+          setFrenzyMode(false);
+          setImpactEffects(prev => [...prev, { id: arrowId, x: crosshair.x, y: crosshair.y, type: "miss" }]);
+        }
 
-      if (!hit) {
-        soundManager.arrowMiss();
-        setCombo(0);
-        comboRef.current = 0;
-        setImpactEffects(prev => [...prev, { id: arrowId, x: crosshair.x, y: crosshair.y, type: "miss" }]);
-      }
+        setTimeout(() => setImpactEffects(prev => prev.filter(e => e.id !== arrowId)), 700);
+      }, 180);
+    });
 
-      setTimeout(() => setImpactEffects(prev => prev.filter(e => e.id !== arrowId)), 500);
-    }, 200);
+    // Reload - faster during frenzy
+    const reloadTime = frenzyMode ? 300 : 400;
+    setTimeout(() => setCanShoot(true), reloadTime);
+  }, [canShoot, phase, crosshair, spawnParticles, multiShotActive, magnetActive, targets, frenzyMode]);
 
-    // Reload
-    setTimeout(() => setCanShoot(true), 500);
-  }, [canShoot, phase, crosshair]);
+  // Cleanup music on unmount
+  useEffect(() => {
+    return () => soundManager.stopMusic();
+  }, []);
 
   // Tutorial
   if (phase === "tutorial") {
     return (
-      <div className="fixed inset-0 bg-gradient-to-b from-indigo-900 via-purple-900 to-slate-900 flex items-center justify-center p-4">
+      <div className="fixed inset-0 bg-gradient-to-b from-indigo-950 via-purple-950 to-slate-950 flex items-center justify-center p-4 overflow-hidden">
+        {/* Twinkling stars */}
+        {[...Array(30)].map((_, i) => (
+          <div
+            key={i}
+            className="absolute w-1 h-1 bg-white rounded-full animate-[starTwinkle_2s_ease-in-out_infinite]"
+            style={{
+              left: `${Math.random() * 100}%`,
+              top: `${Math.random() * 100}%`,
+              animationDelay: `${Math.random() * 2}s`,
+              opacity: 0.3 + Math.random() * 0.4
+            }}
+          />
+        ))}
+
         <motion.div
-          initial={{ scale: 0.8, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          className="bg-white/95 backdrop-blur-xl rounded-3xl p-6 max-w-sm w-full shadow-2xl border border-white/30"
+          initial={{ scale: 0.8, opacity: 0, y: 20 }}
+          animate={{ scale: 1, opacity: 1, y: 0 }}
+          transition={{ type: "spring", damping: 20 }}
+          className="bg-gradient-to-br from-white/95 to-white/85 backdrop-blur-xl rounded-3xl p-5 max-w-sm w-full shadow-[0_20px_60px_rgba(99,102,241,0.4)] border border-white/50 max-h-[90vh] overflow-y-auto"
         >
           <div className="text-center">
             <motion.div
-              className="text-7xl mb-4"
-              animate={{ rotate: [0, 10, -10, 0] }}
+              className="text-6xl mb-3 relative"
+              animate={{
+                rotate: [0, 15, -15, 0],
+                y: [0, -5, 0]
+              }}
               transition={{ duration: 2, repeat: Infinity }}
             >
               🏹
             </motion.div>
-            <h2 className="text-2xl font-black text-indigo-800 mb-2">Cupid's Arrow Gallery</h2>
-            <p className="text-slate-600 mb-4">
-              Aim and tap to shoot the heart targets!
+            <h2 className="text-2xl font-black bg-gradient-to-r from-indigo-600 via-purple-500 to-pink-600 bg-clip-text text-transparent mb-1">
+              Cupid's Arrow Gallery
+            </h2>
+            <p className="text-slate-600 mb-3 text-xs">
+              Aim with your finger and tap to shoot!
             </p>
 
-            <div className="flex justify-center gap-3 mb-4">
-              <div className="text-center">
-                <div className="text-2xl">💕</div>
-                <div className="text-xs text-slate-500">50-150</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl">💛</div>
-                <div className="text-xs text-yellow-600">300</div>
-              </div>
-              <div className="text-center">
-                <div className="text-2xl">😼</div>
-                <div className="text-xs text-red-500">-100!</div>
+            {/* Targets */}
+            <div className="flex justify-center gap-3 mb-3">
+              <motion.div className="text-center" whileHover={{ scale: 1.1 }}>
+                <div className="text-2xl mb-1 drop-shadow-lg">💕</div>
+                <div className="text-[10px] font-bold text-pink-600 bg-pink-100 rounded-full px-2 py-0.5">75-150</div>
+              </motion.div>
+              <motion.div className="text-center" whileHover={{ scale: 1.1 }}>
+                <div className="text-2xl mb-1 animate-[goldShimmer_1.5s_ease-in-out_infinite]">💛</div>
+                <div className="text-[10px] font-bold text-yellow-700 bg-yellow-100 rounded-full px-2 py-0.5">350</div>
+              </motion.div>
+              <motion.div className="text-center" whileHover={{ scale: 1.1 }}>
+                <div className="text-2xl mb-1 animate-[rainbowGlow_2s_linear_infinite]">🌈</div>
+                <div className="text-[10px] font-bold text-purple-700 bg-purple-100 rounded-full px-2 py-0.5">500!</div>
+              </motion.div>
+              <motion.div className="text-center" whileHover={{ scale: 1.1 }}>
+                <div className="text-2xl mb-1">😼</div>
+                <div className="text-[10px] font-bold text-red-600 bg-red-100 rounded-full px-2 py-0.5">AVOID</div>
+              </motion.div>
+            </div>
+
+            {/* Power-ups section */}
+            <div className="bg-gradient-to-r from-indigo-100 via-purple-100 to-pink-100 rounded-xl p-3 mb-3">
+              <div className="text-xs font-bold text-purple-700 mb-2">⚡ POWER-UPS ⚡</div>
+              <div className="grid grid-cols-3 gap-2 text-center">
+                <div className="bg-white/60 rounded-lg p-1.5">
+                  <div className="text-xl">🎯</div>
+                  <div className="text-[9px] text-slate-600">Multi-Shot</div>
+                </div>
+                <div className="bg-white/60 rounded-lg p-1.5">
+                  <div className="text-xl">⏰</div>
+                  <div className="text-[9px] text-slate-600">Slow-Mo</div>
+                </div>
+                <div className="bg-white/60 rounded-lg p-1.5">
+                  <div className="text-xl">🧲</div>
+                  <div className="text-[9px] text-slate-600">Auto-Aim</div>
+                </div>
               </div>
             </div>
 
-            <div className="bg-indigo-100 rounded-xl p-3 mb-4 text-sm text-slate-600">
-              <div>🎯 Bullseye = 2x points!</div>
-              <div>🔥 Combo = Bonus multiplier!</div>
+            {/* Tips */}
+            <div className="bg-gradient-to-r from-cyan-100 via-blue-100 to-indigo-100 rounded-xl p-3 mb-4 space-y-1.5">
+              <div className="flex items-center gap-2 text-xs text-slate-700">
+                <span className="text-yellow-500">🎯</span>
+                <span><strong>Bullseye</strong> = 2x points!</span>
+              </div>
+              <div className="flex items-center gap-2 text-xs text-slate-700">
+                <span className="text-orange-500">🔥</span>
+                <span><strong>10 Combo</strong> = FRENZY MODE!</span>
+              </div>
+              <div className="flex items-center gap-2 text-xs text-slate-700">
+                <span className="text-red-500">👹</span>
+                <span><strong>Boss Target</strong> appears mid-game!</span>
+              </div>
             </div>
 
             <motion.button
-              onClick={() => { soundManager.buttonPress(); setPhase("countdown"); }}
-              className="w-full py-3 bg-gradient-to-r from-indigo-500 to-purple-500 text-white font-bold rounded-xl shadow-lg"
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
+              onClick={() => { soundManager.buttonPress(); soundManager.uiWhoosh(); setPhase("countdown"); }}
+              className="w-full py-3 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 text-white font-black text-lg rounded-2xl shadow-[0_8px_30px_rgba(99,102,241,0.4)] relative overflow-hidden"
+              whileHover={{ scale: 1.03, boxShadow: "0 12px 40px rgba(99,102,241,0.5)" }}
+              whileTap={{ scale: 0.97 }}
             >
-              Start!
+              <span className="relative z-10">Take Aim! 🎯</span>
+              <motion.div
+                className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/30 to-white/0"
+                animate={{ x: ["-100%", "200%"] }}
+                transition={{ duration: 2, repeat: Infinity, repeatDelay: 1 }}
+              />
             </motion.button>
           </div>
         </motion.div>
@@ -9116,15 +10854,33 @@ const CupidsArrowGame = memo(function CupidsArrowGame({
   // Countdown
   if (phase === "countdown") {
     return (
-      <div className="fixed inset-0 bg-gradient-to-b from-indigo-900 via-purple-900 to-slate-900 flex items-center justify-center">
+      <div className="fixed inset-0 bg-gradient-to-b from-indigo-950 via-purple-950 to-slate-950 flex items-center justify-center overflow-hidden">
+        {/* Target practice animation */}
+        {[1, 2, 3].map(i => (
+          <motion.div
+            key={i}
+            className="absolute border-4 border-pink-400/30 rounded-full"
+            initial={{ width: 50, height: 50, opacity: 0.8 }}
+            animate={{ width: 400, height: 400, opacity: 0 }}
+            transition={{ duration: 1.5, repeat: Infinity, delay: i * 0.4 }}
+          />
+        ))}
+
         <motion.div
           key={countdownNum}
-          initial={{ scale: 2, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
+          initial={{ scale: 3, opacity: 0, rotateZ: -15 }}
+          animate={{ scale: 1, opacity: 1, rotateZ: 0 }}
           exit={{ scale: 0, opacity: 0 }}
-          className="text-9xl font-black text-white drop-shadow-[0_0_30px_rgba(255,255,255,0.8)]"
+          transition={{ type: "spring", damping: 15 }}
+          className={cn(
+            "text-9xl font-black text-white relative",
+            countdownNum === 0 && "text-yellow-300"
+          )}
+          style={{
+            textShadow: "0 0 60px rgba(255,255,255,0.8), 0 0 120px rgba(99,102,241,0.6)"
+          }}
         >
-          {countdownNum || "GO!"}
+          {countdownNum || "FIRE!"}
         </motion.div>
       </div>
     );
@@ -9133,16 +10889,67 @@ const CupidsArrowGame = memo(function CupidsArrowGame({
   // Done
   if (phase === "done") {
     return (
-      <div className="fixed inset-0 bg-gradient-to-b from-indigo-900 via-purple-900 to-slate-900 flex items-center justify-center p-4">
+      <div className="fixed inset-0 bg-gradient-to-b from-indigo-950 via-purple-950 to-slate-950 flex items-center justify-center p-4 overflow-hidden">
+        {/* Celebration arrows */}
+        {[...Array(20)].map((_, i) => (
+          <motion.div
+            key={i}
+            className="absolute text-2xl"
+            style={{ left: `${Math.random() * 100}%` }}
+            initial={{ y: -20, rotate: Math.random() * 45 - 22.5, opacity: 1 }}
+            animate={{
+              y: "100vh",
+              rotate: Math.random() * 360,
+              opacity: [1, 1, 0]
+            }}
+            transition={{
+              duration: 3 + Math.random() * 2,
+              delay: Math.random() * 0.5,
+              ease: "easeIn"
+            }}
+          >
+            {["🏹", "💕", "🎯", "✨", "💛"][i % 5]}
+          </motion.div>
+        ))}
+
         <motion.div
-          initial={{ scale: 0.8, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          className="bg-white/95 backdrop-blur-xl rounded-3xl p-6 text-center"
+          initial={{ scale: 0.5, opacity: 0, y: 50 }}
+          animate={{ scale: 1, opacity: 1, y: 0 }}
+          transition={{ type: "spring", damping: 15 }}
+          className="bg-gradient-to-br from-white/95 to-white/85 backdrop-blur-xl rounded-3xl p-8 text-center shadow-[0_30px_80px_rgba(99,102,241,0.5)] border border-white/50"
         >
-          <div className="text-6xl mb-4">🏹✨</div>
-          <h2 className="text-3xl font-black text-indigo-800 mb-2">Great Shooting!</h2>
-          <div className="text-5xl font-black text-purple-500 mb-2">{score.toLocaleString()}</div>
-          <div className="text-slate-600">Max Combo: {maxCombo}x</div>
+          <motion.div
+            className="text-7xl mb-4"
+            animate={{ rotate: [0, 10, -10, 0], y: [0, -5, 0] }}
+            transition={{ duration: 1.5, repeat: Infinity }}
+          >
+            🏹✨
+          </motion.div>
+          <h2 className="text-4xl font-black bg-gradient-to-r from-indigo-600 via-purple-500 to-pink-600 bg-clip-text text-transparent mb-3">
+            Sharp Shooting!
+          </h2>
+          <motion.div
+            className="text-6xl font-black text-purple-500 mb-3"
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            transition={{ delay: 0.3, type: "spring" }}
+          >
+            {score.toLocaleString()}
+          </motion.div>
+          <div className="flex justify-center gap-5 text-slate-600">
+            <div className="text-center">
+              <div className="text-2xl font-bold text-orange-500">{maxCombo}x</div>
+              <div className="text-xs">Best Combo</div>
+            </div>
+            <div className="text-center">
+              <div className="text-2xl font-bold text-pink-500">{totalHits}</div>
+              <div className="text-xs">Hits</div>
+            </div>
+            <div className="text-center">
+              <div className="text-2xl font-bold text-yellow-500">{bullseyes}</div>
+              <div className="text-xs">Bullseyes</div>
+            </div>
+          </div>
         </motion.div>
       </div>
     );
@@ -9152,209 +10959,435 @@ const CupidsArrowGame = memo(function CupidsArrowGame({
   return (
     <div
       ref={containerRef}
-      className="fixed inset-0 bg-gradient-to-b from-indigo-900 via-purple-900 to-slate-900 overflow-hidden cursor-none select-none"
+      className="fixed inset-0 bg-gradient-to-b from-indigo-950 via-purple-950 to-slate-950 overflow-hidden cursor-none select-none"
       onPointerMove={handlePointerMove}
       onClick={handleShoot}
     >
-      {/* Carnival booth frame */}
-      <div className="absolute inset-4 border-8 border-amber-600/60 rounded-3xl pointer-events-none" />
+      {/* Screen flash effect */}
+      {screenFlash && (
+        <div
+          className="absolute inset-0 pointer-events-none z-50 transition-opacity"
+          style={{
+            backgroundColor: screenFlash === "gold" ? "rgba(255, 215, 0, 0.3)" :
+                            screenFlash === "yellow" ? "rgba(253, 224, 71, 0.25)" :
+                            screenFlash === "red" ? "rgba(239, 68, 68, 0.3)" : "transparent"
+          }}
+        />
+      )}
 
-      {/* HUD */}
-      <div className="absolute top-0 left-0 right-0 z-30 p-3 bg-gradient-to-b from-black/40 to-transparent pointer-events-none">
-        <div className="flex justify-between items-center">
-          <div className="bg-slate-800/80 rounded-lg px-3 py-1">
-            <span className="text-white text-sm font-bold">{score.toLocaleString()}</span>
-          </div>
+      {/* Starfield background */}
+      <div className="absolute inset-0 pointer-events-none">
+        {[...Array(20)].map((_, i) => (
+          <div
+            key={i}
+            className="absolute w-0.5 h-0.5 bg-white rounded-full animate-[starTwinkle_3s_ease-in-out_infinite]"
+            style={{
+              left: `${Math.random() * 100}%`,
+              top: `${Math.random() * 100}%`,
+              animationDelay: `${Math.random() * 3}s`,
+              opacity: 0.2 + Math.random() * 0.3
+            }}
+          />
+        ))}
+      </div>
+
+      {/* Particles */}
+      {particles.map(p => (
+        <div
+          key={p.id}
+          className="absolute rounded-full pointer-events-none"
+          style={{
+            left: `${p.x}%`,
+            top: `${p.y}%`,
+            width: p.size,
+            height: p.size,
+            backgroundColor: p.color,
+            opacity: p.life,
+            boxShadow: `0 0 ${p.size * 2}px ${p.color}`
+          }}
+        />
+      ))}
+
+      {/* Premium carnival booth frame */}
+      <div className="absolute inset-3 pointer-events-none">
+        {/* Outer decorative border */}
+        <div className="absolute inset-0 border-[12px] border-amber-500/50 rounded-3xl" />
+        {/* Inner glow border */}
+        <div className="absolute inset-2 border-4 border-amber-400/30 rounded-2xl" />
+        {/* Corner decorations */}
+        {["-top-2 -left-2", "-top-2 -right-2", "-bottom-2 -left-2", "-bottom-2 -right-2"].map((pos, i) => (
+          <div key={i} className={`absolute ${pos} w-8 h-8 bg-amber-500/60 rounded-full border-4 border-amber-400/40`} />
+        ))}
+        {/* Top sign */}
+        <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-gradient-to-r from-amber-600 via-amber-500 to-amber-600 px-6 py-2 rounded-xl shadow-lg">
+          <span className="text-white font-black text-sm tracking-wider">CUPID'S GALLERY</span>
+        </div>
+      </div>
+
+      {/* Premium HUD */}
+      <div className="absolute top-0 left-0 right-0 z-30 p-4 bg-gradient-to-b from-black/70 to-transparent pointer-events-none">
+        <div className="flex justify-between items-center max-w-lg mx-auto">
+          {/* Score */}
+          <motion.div
+            className="bg-black/60 backdrop-blur-sm rounded-xl px-4 py-2 border border-purple-500/30"
+            animate={score !== displayedScore ? { scale: [1, 1.05, 1] } : {}}
+          >
+            <div className="text-purple-300 text-[10px] font-bold uppercase tracking-wider">Score</div>
+            <div className="text-white text-xl font-black tabular-nums">
+              {displayedScore.toLocaleString()}
+            </div>
+          </motion.div>
+
+          {/* Combo */}
+          <motion.div
+            className={cn(
+              "rounded-xl px-4 py-2 font-black text-lg transition-all backdrop-blur-sm border",
+              combo >= 8 ? "bg-gradient-to-r from-orange-500/80 to-red-500/80 text-white border-orange-400/50 animate-[comboFire_0.5s_ease-in-out_infinite]" :
+              combo >= 5 ? "bg-gradient-to-r from-yellow-500/80 to-orange-500/80 text-white border-yellow-400/50" :
+              combo >= 3 ? "bg-gradient-to-r from-pink-500/80 to-rose-500/80 text-white border-pink-400/50" :
+              "bg-black/60 text-white/80 border-purple-500/30"
+            )}
+            animate={combo > 0 ? { scale: [1, 1.1, 1] } : {}}
+            transition={{ duration: 0.15 }}
+          >
+            {combo}x {combo >= 5 && "🔥"}
+          </motion.div>
+
+          {/* Timer */}
           <div className={cn(
-            "rounded-lg px-3 py-1 font-bold text-sm",
-            combo >= 5 ? "bg-yellow-500/80 text-yellow-950" : "bg-slate-700/80 text-white"
+            "bg-black/60 backdrop-blur-sm rounded-xl px-4 py-2 border",
+            timeLeft <= 10 ? "border-red-500/50" : "border-purple-500/30"
           )}>
-            {combo}x {combo >= 5 ? "🔥" : ""}
-          </div>
-          <div className="bg-slate-800/80 rounded-lg px-3 py-1">
-            <span className="text-white text-sm font-bold">{timeLeft}s</span>
+            <div className={cn(
+              "text-[10px] font-bold uppercase tracking-wider",
+              timeLeft <= 10 ? "text-red-400" : "text-purple-300"
+            )}>Time</div>
+            <div className={cn(
+              "text-xl font-black tabular-nums",
+              timeLeft <= 10 ? "text-red-400 animate-pulse" : "text-white"
+            )}>{timeLeft}s</div>
           </div>
         </div>
       </div>
 
-      {/* Reload indicator */}
+      {/* Reload indicator - premium design */}
       {!canShoot && (
-        <div className="absolute bottom-20 left-1/2 -translate-x-1/2 w-32 h-2 bg-slate-700 rounded-full overflow-hidden">
-          <div className="h-full bg-amber-400 animate-[reloadBar_0.5s_linear]" />
-        </div>
+        <motion.div
+          className="absolute bottom-16 left-1/2 -translate-x-1/2 z-30"
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+        >
+          <div className="bg-black/70 backdrop-blur-sm rounded-full px-4 py-2 border border-amber-500/50 flex items-center gap-2">
+            <span className="text-amber-400 text-xs font-bold">RELOADING</span>
+            <div className="w-24 h-2 bg-slate-800 rounded-full overflow-hidden">
+              <div className="h-full bg-gradient-to-r from-amber-400 to-yellow-300 animate-[reloadBar_0.45s_linear]" />
+            </div>
+          </div>
+        </motion.div>
       )}
 
-      {/* Targets */}
-      {targets.filter(t => !t.hit).map(target => (
-        <div
-          key={target.id}
-          className={cn(
-            "absolute pointer-events-none animate-[targetFloat_2s_ease-in-out_infinite]",
-            target.size === "small" ? "text-3xl" :
-            target.size === "medium" ? "text-4xl" : "text-5xl"
-          )}
-          style={{
-            left: `${target.x}%`,
-            top: `${target.y}%`,
-            transform: "translate(-50%, -50%)",
-            filter: target.type === "golden" ? "drop-shadow(0 0 15px gold)" : undefined
-          }}
-        >
-          {target.type === "heart" ? "💕" : target.type === "golden" ? "💛" : "😼"}
-        </div>
-      ))}
-
-      {/* Flying arrows */}
-      {flyingArrows.map(arrow => {
-        const currentX = arrow.x + (arrow.targetX - arrow.x) * arrow.progress;
-        const currentY = arrow.y + (arrow.targetY - arrow.y) * arrow.progress - Math.sin(arrow.progress * Math.PI) * 20;
-        const angle = Math.atan2(arrow.targetY - currentY, arrow.targetX - currentX) * 180 / Math.PI;
+      {/* Targets - Premium with spawn animation */}
+      {targets.filter(t => !t.hit).map(target => {
         return (
-          <div
-            key={arrow.id}
-            className="absolute text-2xl pointer-events-none"
+          <motion.div
+            key={target.id}
+            className={cn(
+              "absolute pointer-events-none",
+              target.size === "small" ? "text-4xl" :
+              target.size === "medium" ? "text-5xl" : "text-6xl"
+            )}
             style={{
-              left: `${currentX}%`,
-              top: `${currentY}%`,
-              transform: `translate(-50%, -50%) rotate(${angle - 45}deg)`,
-              opacity: 1 - arrow.progress * 0.3
+              left: `${target.x}%`,
+              top: `${target.y}%`,
+            }}
+            initial={{ scale: 0, opacity: 0 }}
+            animate={{
+              scale: 1,
+              opacity: 1,
+              y: [0, -5, 0],
+              rotate: [0, 3, -3, 0]
+            }}
+            transition={{
+              scale: { duration: 0.3 },
+              y: { duration: 2, repeat: Infinity },
+              rotate: { duration: 3, repeat: Infinity }
             }}
           >
-            🏹
-          </div>
+            <span
+              style={{
+                filter: target.type === "golden"
+                  ? "drop-shadow(0 0 20px gold) drop-shadow(0 0 40px gold)"
+                  : target.type === "heart"
+                  ? "drop-shadow(0 0 10px rgba(244,114,182,0.6))"
+                  : "drop-shadow(0 0 5px rgba(0,0,0,0.5))",
+                display: "block",
+                transform: "translate(-50%, -50%)"
+              }}
+              className={cn(
+                target.type === "golden" && "animate-[goldShimmer_1s_ease-in-out_infinite]"
+              )}
+            >
+              {target.type === "heart" ? (
+                target.size === "small" ? "💕" : target.size === "medium" ? "💗" : "❤️"
+              ) : target.type === "golden" ? "💛" : "😼"}
+            </span>
+          </motion.div>
         );
       })}
 
-      {/* Impact effects */}
+      {/* Flying arrows - Premium with trail */}
+      {flyingArrows.map(arrow => {
+        const currentX = arrow.x + (arrow.targetX - arrow.x) * arrow.progress;
+        const currentY = arrow.y + (arrow.targetY - arrow.y) * arrow.progress - Math.sin(arrow.progress * Math.PI) * 25;
+        const angle = Math.atan2(arrow.targetY - currentY, arrow.targetX - currentX) * 180 / Math.PI;
+        return (
+          <React.Fragment key={arrow.id}>
+            {/* Arrow trail */}
+            {[0.1, 0.2, 0.3].map((offset, i) => {
+              const trailProgress = Math.max(0, arrow.progress - offset);
+              const trailX = arrow.x + (arrow.targetX - arrow.x) * trailProgress;
+              const trailY = arrow.y + (arrow.targetY - arrow.y) * trailProgress - Math.sin(trailProgress * Math.PI) * 25;
+              return (
+                <div
+                  key={i}
+                  className="absolute w-2 h-2 bg-amber-400 rounded-full pointer-events-none"
+                  style={{
+                    left: `${trailX}%`,
+                    top: `${trailY}%`,
+                    transform: "translate(-50%, -50%)",
+                    opacity: (0.5 - i * 0.15) * (1 - arrow.progress),
+                    boxShadow: "0 0 10px rgba(251, 191, 36, 0.6)"
+                  }}
+                />
+              );
+            })}
+            {/* Main arrow */}
+            <div
+              className="absolute text-3xl pointer-events-none"
+              style={{
+                left: `${currentX}%`,
+                top: `${currentY}%`,
+                transform: `translate(-50%, -50%) rotate(${angle - 45}deg)`,
+                opacity: 1 - arrow.progress * 0.2,
+                filter: "drop-shadow(0 0 10px rgba(251, 191, 36, 0.5))"
+              }}
+            >
+              🏹
+            </div>
+          </React.Fragment>
+        );
+      })}
+
+      {/* Impact effects - Premium with score popup */}
       {impactEffects.map(effect => (
         <motion.div
           key={effect.id}
-          initial={{ scale: 0.5, opacity: 1 }}
-          animate={{ scale: 2.5, opacity: 0 }}
-          transition={{ duration: 0.5 }}
-          className={cn(
-            "absolute pointer-events-none text-xl font-black",
-            effect.type === "bullseye" ? "text-yellow-400" :
-            effect.type === "hit" ? "text-green-400" :
-            effect.type === "cat" ? "text-red-400" : "text-slate-400"
-          )}
+          initial={{ scale: 0.3, opacity: 1, y: 0 }}
+          animate={{ scale: 2, opacity: 0, y: -25 }}
+          transition={{ duration: 0.6, ease: "easeOut" }}
+          className="absolute pointer-events-none text-center z-40"
           style={{
             left: `${effect.x}%`,
             top: `${effect.y}%`,
             transform: "translate(-50%, -50%)"
           }}
         >
-          {effect.type === "bullseye" ? "🎯 BULLSEYE!" :
-           effect.type === "hit" ? "💥" :
-           effect.type === "cat" ? "😾 -100" : "MISS"}
+          <div className={cn(
+            "font-black text-2xl",
+            effect.type === "bullseye" || effect.type === "golden" ? "text-yellow-300" :
+            effect.type === "hit" ? "text-green-400" :
+            effect.type === "cat" ? "text-red-400" : "text-slate-400"
+          )}
+          style={{
+            textShadow: effect.type === "bullseye" || effect.type === "golden"
+              ? "0 0 20px rgba(253,224,71,0.8), 0 0 40px rgba(253,224,71,0.4)"
+              : effect.type === "hit"
+              ? "0 0 15px rgba(74,222,128,0.8)"
+              : "0 0 10px rgba(148,163,184,0.5)"
+          }}>
+            {effect.type === "golden" ? "💎 GOLDEN!" :
+             effect.type === "bullseye" ? "🎯 BULLSEYE!" :
+             effect.type === "hit" ? "💥 HIT!" :
+             effect.type === "cat" ? "😾 OOPS!" : "MISS"}
+          </div>
+          {effect.points && (
+            <motion.div
+              className={cn(
+                "text-lg font-bold",
+                effect.points > 0 ? "text-white" : "text-red-300"
+              )}
+              initial={{ opacity: 0, y: 5 }}
+              animate={{ opacity: 1, y: 0 }}
+            >
+              {effect.points > 0 ? `+${effect.points}` : effect.points}
+            </motion.div>
+          )}
         </motion.div>
       ))}
 
-      {/* Crosshair */}
+      {/* Premium Crosshair */}
       <div
-        className={cn(
-          "absolute w-12 h-12 pointer-events-none transition-transform",
-          canShoot ? "animate-[crosshairPulse_1s_ease-in-out_infinite]" : "opacity-50"
-        )}
+        className="absolute pointer-events-none z-30"
         style={{
           left: `${crosshair.x}%`,
           top: `${crosshair.y}%`,
           transform: "translate(-50%, -50%)"
         }}
       >
-        <div className="absolute inset-0 border-4 border-red-500 rounded-full" />
-        <div className="absolute top-1/2 left-0 w-full h-0.5 bg-red-500 -translate-y-1/2" />
-        <div className="absolute left-1/2 top-0 h-full w-0.5 bg-red-500 -translate-x-1/2" />
-        <div className="absolute top-1/2 left-1/2 w-2 h-2 bg-red-500 rounded-full -translate-x-1/2 -translate-y-1/2" />
-      </div>
-    </div>
-  );
-});
+        {/* Outer rotating ring */}
+        <motion.div
+          className="absolute w-16 h-16 border-2 border-red-400/50 rounded-full"
+          style={{ transform: "translate(-50%, -50%)", left: "50%", top: "50%" }}
+          animate={{ rotate: 360 }}
+          transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
+        />
 
-// ============================================================================
-// BONUS GAME SELECTOR - Choose which bonus game to play
-// ============================================================================
-
-const BonusGameSelector = memo(function BonusGameSelector({
-  onSelect
-}: {
-  onSelect: (game: "rhythm" | "puzzle" | "gallery" | "skip") => void;
-}) {
-  return (
-    <div className="fixed inset-0 bg-gradient-to-b from-purple-900 via-pink-800 to-rose-700 flex items-center justify-center p-4">
-      <motion.div
-        initial={{ scale: 0.8, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        className="bg-white/95 backdrop-blur-xl rounded-3xl p-6 max-w-sm w-full shadow-2xl"
-      >
-        <div className="text-center mb-6">
+        {/* Main crosshair */}
+        <div
+          className={cn(
+            "w-12 h-12 transition-all",
+            canShoot ? "opacity-100" : "opacity-40"
+          )}
+        >
+          {/* Outer circle */}
+          <div className="absolute inset-0 border-3 border-red-500 rounded-full"
+            style={{
+              boxShadow: canShoot ? "0 0 15px rgba(239, 68, 68, 0.6), inset 0 0 10px rgba(239, 68, 68, 0.2)" : undefined
+            }}
+          />
+          {/* Cross lines */}
+          <div className="absolute top-1/2 left-0 w-full h-0.5 bg-red-500 -translate-y-1/2" style={{ boxShadow: "0 0 5px rgba(239, 68, 68, 0.8)" }} />
+          <div className="absolute left-1/2 top-0 h-full w-0.5 bg-red-500 -translate-x-1/2" style={{ boxShadow: "0 0 5px rgba(239, 68, 68, 0.8)" }} />
+          {/* Center dot */}
           <motion.div
-            className="text-6xl mb-2"
-            animate={{ rotate: [0, 10, -10, 0] }}
-            transition={{ duration: 2, repeat: Infinity }}
+            className="absolute top-1/2 left-1/2 w-2.5 h-2.5 bg-red-500 rounded-full"
+            style={{
+              transform: "translate(-50%, -50%)",
+              boxShadow: "0 0 10px rgba(239, 68, 68, 0.8)"
+            }}
+            animate={canShoot ? { scale: [1, 1.3, 1] } : {}}
+            transition={{ duration: 0.8, repeat: Infinity }}
+          />
+        </div>
+
+        {/* Target lock corners when near a target */}
+        {canShoot && targets.some(t => {
+          const d = Math.sqrt(Math.pow(crosshair.x - t.x, 2) + Math.pow(crosshair.y - t.y, 2));
+          return d < 12 && !t.hit;
+        }) && (
+          <>
+            {["-top-3 -left-3", "-top-3 -right-3", "-bottom-3 -left-3", "-bottom-3 -right-3"].map((pos, i) => (
+              <motion.div
+                key={i}
+                className={`absolute ${pos} w-3 h-3 border-2 border-green-400`}
+                style={{
+                  borderRadius: i === 0 ? "3px 0 0 0" : i === 1 ? "0 3px 0 0" : i === 2 ? "0 0 0 3px" : "0 0 3px 0",
+                  borderWidth: i === 0 ? "2px 0 0 2px" : i === 1 ? "2px 2px 0 0" : i === 2 ? "0 0 2px 2px" : "0 2px 2px 0"
+                }}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+              />
+            ))}
+          </>
+        )}
+      </div>
+
+      {/* Event Message Overlay */}
+      <AnimatePresence>
+        {eventMessage && (
+          <motion.div
+            initial={{ scale: 0.5, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 1.5, opacity: 0 }}
+            className="absolute inset-0 flex items-center justify-center pointer-events-none z-50"
           >
-            🎮
+            <div className="text-5xl font-black text-white drop-shadow-[0_0_30px_rgba(255,215,0,0.8)] animate-pulse">
+              {eventMessage}
+            </div>
           </motion.div>
-          <h2 className="text-2xl font-black text-purple-800">Bonus Games!</h2>
-          <p className="text-slate-600 text-sm">Pick a game for extra points!</p>
-        </div>
+        )}
+      </AnimatePresence>
 
-        <div className="space-y-3">
-          <motion.button
-            onClick={() => { soundManager.buttonPress(); onSelect("rhythm"); }}
-            className="w-full p-4 bg-gradient-to-r from-purple-500 to-fuchsia-500 rounded-2xl text-white shadow-lg"
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
+      {/* Frenzy Mode Border Effect */}
+      {frenzyMode && (
+        <div className="absolute inset-0 pointer-events-none z-40 animate-[pulseGlow_0.5s_ease-in-out_infinite]"
+          style={{
+            boxShadow: "inset 0 0 60px rgba(255, 165, 0, 0.5), inset 0 0 100px rgba(255, 100, 0, 0.3)"
+          }}
+        />
+      )}
+
+      {/* Boss Defeated Celebration */}
+      {bossDefeated && (
+        <motion.div
+          initial={{ scale: 0, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50 pointer-events-none"
+        >
+          <div className="text-4xl font-black text-yellow-300 text-center drop-shadow-[0_0_20px_rgba(255,215,0,0.8)]">
+            👑 BOSS DEFEATED! 👑
+          </div>
+        </motion.div>
+      )}
+
+      {/* Cat Message Display */}
+      <AnimatePresence>
+        {catMessage && (
+          <motion.div
+            initial={{ opacity: 0, x: -20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -20 }}
+            className="absolute bottom-20 left-4 z-40 pointer-events-none"
           >
-            <div className="flex items-center gap-3">
-              <span className="text-3xl">🎵</span>
-              <div className="text-left">
-                <div className="font-bold">Rhythm Heart Beat</div>
-                <div className="text-xs opacity-80">Tap to the beat!</div>
-              </div>
+            <div className="bg-black/70 backdrop-blur-sm rounded-2xl px-4 py-3 border border-purple-500/30 flex items-center gap-3">
+              <span className="text-3xl">
+                {catEmotion === "excited" ? "😻" : catEmotion === "worried" ? "😿" : "😺"}
+              </span>
+              <span className="text-white font-medium text-sm">{catMessage}</span>
             </div>
-          </motion.button>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-          <motion.button
-            onClick={() => { soundManager.buttonPress(); onSelect("puzzle"); }}
-            className="w-full p-4 bg-gradient-to-r from-rose-500 to-pink-500 rounded-2xl text-white shadow-lg"
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
+      {/* Power-up Status Indicators */}
+      <div className="absolute bottom-4 right-4 z-40 flex flex-col gap-2 pointer-events-none">
+        {multiShotActive && (
+          <motion.div
+            initial={{ scale: 0, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="bg-gradient-to-r from-orange-500/80 to-red-500/80 backdrop-blur-sm rounded-lg px-3 py-1 border border-orange-400/50"
           >
-            <div className="flex items-center gap-3">
-              <span className="text-3xl">🧩</span>
-              <div className="text-left">
-                <div className="font-bold">Love Letter Puzzle</div>
-                <div className="text-xs opacity-80">Slide to solve!</div>
-              </div>
-            </div>
-          </motion.button>
-
-          <motion.button
-            onClick={() => { soundManager.buttonPress(); onSelect("gallery"); }}
-            className="w-full p-4 bg-gradient-to-r from-indigo-500 to-purple-500 rounded-2xl text-white shadow-lg"
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
+            <span className="text-white font-bold text-xs">🏹 MULTI-SHOT x{multiShotCount}</span>
+          </motion.div>
+        )}
+        {slowMoActive && (
+          <motion.div
+            initial={{ scale: 0, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="bg-gradient-to-r from-cyan-500/80 to-blue-500/80 backdrop-blur-sm rounded-lg px-3 py-1 border border-cyan-400/50"
           >
-            <div className="flex items-center gap-3">
-              <span className="text-3xl">🏹</span>
-              <div className="text-left">
-                <div className="font-bold">Cupid's Arrow Gallery</div>
-                <div className="text-xs opacity-80">Aim and shoot!</div>
-              </div>
-            </div>
-          </motion.button>
-
-          <motion.button
-            onClick={() => { soundManager.buttonPress(); onSelect("skip"); }}
-            className="w-full p-3 bg-slate-200 rounded-xl text-slate-600 font-medium"
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
+            <span className="text-white font-bold text-xs">⏳ SLOW-MO</span>
+          </motion.div>
+        )}
+        {magnetActive && (
+          <motion.div
+            initial={{ scale: 0, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="bg-gradient-to-r from-purple-500/80 to-pink-500/80 backdrop-blur-sm rounded-lg px-3 py-1 border border-purple-400/50"
           >
-            Skip to Finale →
-          </motion.button>
-        </div>
-      </motion.div>
+            <span className="text-white font-bold text-xs">🧲 MAGNET</span>
+          </motion.div>
+        )}
+        {frenzyMode && (
+          <motion.div
+            initial={{ scale: 0, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="bg-gradient-to-r from-yellow-500/80 to-orange-500/80 backdrop-blur-sm rounded-lg px-3 py-1 border border-yellow-400/50 animate-pulse"
+          >
+            <span className="text-white font-bold text-xs">🔥 FRENZY!</span>
+          </motion.div>
+        )}
+      </div>
     </div>
   );
 });
@@ -10421,43 +12454,34 @@ export default function ValentineCat() {
   }
 
   if (scene === "chapter2_reject_letters") {
-    return <RejectLettersGame onComplete={(score) => { setStats(s => ({ ...s, totalScore: s.totalScore + score })); if (score >= 50) unlockAchievement("puzzle_solver"); nextScene("chapter3_boss_battle"); }} />;
+    return <RejectLettersGame onComplete={(score) => { setStats(s => ({ ...s, totalScore: s.totalScore + score })); nextScene("chapter3_rhythm"); }} />;
   }
 
-  if (scene === "chapter3_boss_battle") {
-    return <DramaKingBattle onComplete={(won) => { if (won) { unlockAchievement("rhythm_master"); nextScene("bonus_select"); } else { setCatMessage("You can't defeat my LOVE! 😼 Try again!"); setScene("chapter2_reject_letters"); } }} />;
-  }
-
-  if (scene === "bonus_select") {
-    return <BonusGameSelector onSelect={(game) => {
-      if (game === "rhythm") setScene("bonus_rhythm");
-      else if (game === "puzzle") setScene("bonus_puzzle");
-      else if (game === "gallery") setScene("bonus_gallery");
-      else nextScene("chapter3_final");
-    }} />;
-  }
-
-  if (scene === "bonus_rhythm") {
+  if (scene === "chapter3_rhythm") {
     return <RhythmHeartBeatGame onComplete={(score) => {
       setStats(s => ({ ...s, totalScore: s.totalScore + score }));
       if (score >= 2000) unlockAchievement("rhythm_master");
-      nextScene("chapter3_final");
+      nextScene("chapter3_puzzle");
     }} />;
   }
 
-  if (scene === "bonus_puzzle") {
+  if (scene === "chapter3_puzzle") {
     return <LoveLetterPuzzleGame onComplete={(score) => {
       setStats(s => ({ ...s, totalScore: s.totalScore + score }));
       if (score >= 1500) unlockAchievement("puzzle_solver");
-      nextScene("chapter3_final");
+      nextScene("chapter3_gallery");
     }} />;
   }
 
-  if (scene === "bonus_gallery") {
+  if (scene === "chapter3_gallery") {
     return <CupidsArrowGame onComplete={(score) => {
       setStats(s => ({ ...s, totalScore: s.totalScore + score }));
-      nextScene("chapter3_final");
+      nextScene("chapter3_boss_battle");
     }} />;
+  }
+
+  if (scene === "chapter3_boss_battle") {
+    return <DramaKingBattle onComplete={(won) => { if (won) { nextScene("chapter3_final"); } else { setCatMessage("You can't defeat my LOVE! 😼 Try again!"); setScene("chapter3_gallery"); } }} />;
   }
 
   if (scene === "chapter3_final") {

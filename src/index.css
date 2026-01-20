@@ -168,6 +168,130 @@ button, [role="button"] {
   to { width: 100%; }
 }
 
+/* Premium game animations */
+@keyframes noteTrail {
+  0% { opacity: 1; transform: translateY(0) scale(1); }
+  100% { opacity: 0; transform: translateY(20px) scale(0.5); }
+}
+
+@keyframes comboFire {
+  0%, 100% {
+    filter: drop-shadow(0 0 10px rgba(255, 100, 0, 0.8)) drop-shadow(0 0 20px rgba(255, 50, 0, 0.6));
+    transform: scale(1);
+  }
+  50% {
+    filter: drop-shadow(0 0 20px rgba(255, 200, 0, 1)) drop-shadow(0 0 40px rgba(255, 100, 0, 0.8));
+    transform: scale(1.1);
+  }
+}
+
+@keyframes scorePopup {
+  0% { opacity: 0; transform: translateY(0) scale(0.5); }
+  30% { opacity: 1; transform: translateY(-15px) scale(1.2); }
+  100% { opacity: 0; transform: translateY(-40px) scale(0.8); }
+}
+
+@keyframes perfectBurst {
+  0% {
+    box-shadow: 0 0 0 0 rgba(255, 215, 0, 0.8);
+    transform: scale(1);
+  }
+  50% {
+    box-shadow: 0 0 30px 15px rgba(255, 215, 0, 0.4);
+    transform: scale(1.1);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(255, 215, 0, 0);
+    transform: scale(1);
+  }
+}
+
+@keyframes screenShake {
+  0%, 100% { transform: translateX(0); }
+  10% { transform: translateX(-5px) rotate(-0.5deg); }
+  20% { transform: translateX(5px) rotate(0.5deg); }
+  30% { transform: translateX(-5px) rotate(-0.5deg); }
+  40% { transform: translateX(5px) rotate(0.5deg); }
+  50% { transform: translateX(-3px); }
+  60% { transform: translateX(3px); }
+  70% { transform: translateX(-2px); }
+  80% { transform: translateX(2px); }
+  90% { transform: translateX(-1px); }
+}
+
+@keyframes pulseGlow {
+  0%, 100% {
+    box-shadow: 0 0 20px rgba(236, 72, 153, 0.6);
+  }
+  50% {
+    box-shadow: 0 0 40px rgba(236, 72, 153, 0.9), 0 0 60px rgba(236, 72, 153, 0.4);
+  }
+}
+
+@keyframes starTwinkle {
+  0%, 100% { opacity: 0.3; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.3); }
+}
+
+@keyframes tile3DHover {
+  0% { transform: perspective(500px) rotateX(0deg) rotateY(0deg); }
+  100% { transform: perspective(500px) rotateX(-5deg) rotateY(5deg); }
+}
+
+@keyframes tileGlow {
+  0%, 100% { box-shadow: 0 4px 15px rgba(0,0,0,0.2); }
+  50% { box-shadow: 0 8px 25px rgba(236, 72, 153, 0.4); }
+}
+
+@keyframes confettiFall {
+  0% { transform: translateY(-100vh) rotate(0deg); opacity: 1; }
+  100% { transform: translateY(100vh) rotate(720deg); opacity: 0; }
+}
+
+@keyframes crosshairLock {
+  0% { transform: translate(-50%, -50%) scale(1.5); opacity: 0.5; }
+  100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+}
+
+@keyframes targetPop {
+  0% { transform: translate(-50%, -50%) scale(0); opacity: 0; }
+  50% { transform: translate(-50%, -50%) scale(1.2); }
+  100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+}
+
+@keyframes arrowTrail {
+  0% { opacity: 0.8; transform: scale(1); }
+  100% { opacity: 0; transform: scale(0.3); }
+}
+
+@keyframes hitRipple {
+  0% {
+    box-shadow: 0 0 0 0 rgba(74, 222, 128, 0.8),
+                0 0 0 0 rgba(74, 222, 128, 0.6);
+  }
+  100% {
+    box-shadow: 0 0 0 20px rgba(74, 222, 128, 0),
+                0 0 0 40px rgba(74, 222, 128, 0);
+  }
+}
+
+@keyframes gradientShift {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+@keyframes beatPulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.02); }
+}
+
+@keyframes goldShimmer {
+  0% { filter: brightness(1) drop-shadow(0 0 10px gold); }
+  50% { filter: brightness(1.3) drop-shadow(0 0 20px gold); }
+  100% { filter: brightness(1) drop-shadow(0 0 10px gold); }
+}
+
 /* GPU acceleration for animated elements */
 .gpu-accelerate {
   will-change: transform, opacity;
