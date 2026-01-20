@@ -2017,167 +2017,72 @@ const CatchTheNoGame = memo(function CatchTheNoGame({ onComplete }: { onComplete
       onMouseMove={(e) => handleMove(e.clientX, e.currentTarget.getBoundingClientRect())}
       onTouchMove={(e) => { e.preventDefault(); handleMove(e.touches[0].clientX, e.currentTarget.getBoundingClientRect()); }}
     >
-      {/* Super premium animated gradient background */}
+      {/* Optimized gradient background - no animation for performance */}
       <div
         className="absolute inset-0"
         style={{
-          background: "linear-gradient(135deg, #4338ca 0%, #6d28d9 20%, #a855f7 40%, #ec4899 60%, #db2777 80%, #9333ea 100%)",
-          backgroundSize: "400% 400%",
-          animation: "gradientShift 15s ease infinite",
+          background: "linear-gradient(135deg, #4338ca 0%, #6d28d9 25%, #a855f7 50%, #ec4899 75%, #db2777 100%)",
         }}
       />
 
-      {/* Mesh gradient overlay with animated orbs */}
+      {/* Simple ambient glow - reduced blur */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div
-          className="absolute w-[600px] h-[600px] rounded-full opacity-30 blur-3xl"
+          className="absolute w-96 h-96 rounded-full opacity-20"
           style={{
-            background: "radial-gradient(circle, rgba(139,92,246,0.8) 0%, transparent 70%)",
-            top: "-20%",
-            left: "-15%",
-            animation: "float 20s ease-in-out infinite",
-          }}
-        />
-        <div
-          className="absolute w-[500px] h-[500px] rounded-full opacity-25 blur-3xl"
-          style={{
-            background: "radial-gradient(circle, rgba(236,72,153,0.8) 0%, transparent 70%)",
-            bottom: "-20%",
-            right: "-15%",
-            animation: "float 18s ease-in-out infinite reverse",
+            background: "radial-gradient(circle, rgba(139,92,246,0.6) 0%, transparent 70%)",
+            top: "-10%",
+            left: "-10%",
+            filter: "blur(40px)",
           }}
         />
       </div>
 
-      {/* Premium grid pattern overlay */}
-      <div className="absolute inset-0 opacity-[0.07]">
-        <div className="absolute inset-0" style={{
-          backgroundImage: "linear-gradient(rgba(255,255,255,0.3) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.3) 1px, transparent 1px)",
-          backgroundSize: "60px 60px",
-        }} />
-      </div>
-
-      {/* Subtle floating sparkles - CSS only for performance */}
-      <div className="absolute inset-0 pointer-events-none">
-        {[...Array(8)].map((_, i) => (
-          <div
-            key={i}
-            className="absolute w-1 h-1 bg-white rounded-full"
-            style={{
-              left: `${10 + i * 12}%`,
-              top: `${20 + (i % 3) * 25}%`,
-              opacity: 0.4,
-              animation: `starTwinkle ${2 + (i % 3)}s ease-in-out infinite`,
-              animationDelay: `${i * 0.4}s`,
-            }}
-          />
-        ))}
-      </div>
-
-      {/* Premium glassmorphism header */}
+      {/* Optimized header - reduced blur and shadows */}
       <div className="absolute top-4 left-0 right-0 flex justify-center gap-2 sm:gap-3 z-10 px-3">
-        <motion.div
-          className="bg-white/20 backdrop-blur-xl rounded-2xl px-4 sm:px-5 py-2.5 sm:py-3 shadow-[0_8px_32px_rgba(0,0,0,0.2)] border border-white/30 flex items-center gap-2"
-          animate={noLetters > 0 ? { scale: [1, 1.05, 1] } : {}}
-          transition={{ duration: 0.2 }}
-        >
+        <div className="bg-white/25 backdrop-blur rounded-2xl px-4 sm:px-5 py-2.5 sm:py-3 shadow-lg border border-white/30 flex items-center gap-2">
           <span className="text-xl sm:text-2xl">📝</span>
-          <span className="text-lg sm:text-xl font-black text-white drop-shadow-lg">{noLetters}/5</span>
-        </motion.div>
-        <motion.div
+          <span className="text-lg sm:text-xl font-black text-white">{noLetters}/5</span>
+        </div>
+        <div
           className={cn(
-            "backdrop-blur-xl rounded-2xl px-4 sm:px-5 py-2.5 sm:py-3 shadow-[0_8px_32px_rgba(0,0,0,0.2)] border flex items-center gap-2 relative overflow-hidden",
+            "backdrop-blur rounded-2xl px-4 sm:px-5 py-2.5 sm:py-3 shadow-lg border flex items-center gap-2",
             timeLeft <= 5
-              ? "bg-red-500/30 border-red-400/50"
-              : "bg-white/20 border-white/30"
+              ? "bg-red-500/40 border-red-400/50"
+              : "bg-white/25 border-white/30"
           )}
-          animate={timeLeft <= 5 ? { scale: [1, 1.03, 1] } : {}}
-          transition={{ duration: 0.4, repeat: timeLeft <= 5 ? Infinity : 0 }}
         >
-          {/* Urgent pulse effect */}
-          {timeLeft <= 5 && (
-            <div
-              className="absolute inset-0 bg-red-500/20"
-              style={{ animation: "pulseGlow 0.5s ease-in-out infinite" }}
-            />
-          )}
-          <span className="text-xl sm:text-2xl relative">⏱️</span>
+          <span className="text-xl sm:text-2xl">⏱️</span>
           <span className={cn(
-            "text-lg sm:text-xl font-black relative drop-shadow-lg",
+            "text-lg sm:text-xl font-black",
             timeLeft <= 5 ? "text-red-100" : "text-white"
           )}>
             {timeLeft}s
           </span>
-        </motion.div>
-        <AnimatePresence>
-          {combo >= 2 && (
-            <motion.div
-              initial={{ scale: 0, rotate: -20, opacity: 0 }}
-              animate={{ scale: 1, rotate: 0, opacity: 1 }}
-              exit={{ scale: 0, opacity: 0 }}
-              className="bg-gradient-to-r from-amber-500 via-orange-500 to-red-500 rounded-2xl px-3 sm:px-4 py-2.5 sm:py-3 shadow-[0_8px_32px_rgba(251,146,60,0.4)] border border-amber-400/50 relative overflow-hidden"
-              style={{ animation: combo >= 5 ? "comboFire 0.5s ease-in-out infinite" : undefined }}
-            >
-              {/* Shimmer effect */}
-              <div
-                className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent -skew-x-12"
-                style={{ animation: "shimmer 1.5s ease-in-out infinite" }}
-              />
-              <span className="text-lg sm:text-xl font-black text-white relative drop-shadow-lg">x{combo} 🔥</span>
-            </motion.div>
-          )}
-        </AnimatePresence>
+        </div>
+        {combo >= 2 && (
+          <div className="bg-gradient-to-r from-amber-500 to-orange-500 rounded-2xl px-3 sm:px-4 py-2.5 sm:py-3 shadow-lg border border-amber-400/50">
+            <span className="text-lg sm:text-xl font-black text-white">x{combo} 🔥</span>
+          </div>
+        )}
       </div>
 
-      {/* Cat with emotions - premium styling */}
-      <motion.div
-        className="absolute top-24 left-1/2 -translate-x-1/2 text-center z-20"
-        animate={{ y: [0, -5, 0] }}
-        transition={{ duration: 2, repeat: Infinity }}
-      >
-        {/* Cat glow effect */}
+      {/* Optimized cat - reduced effects */}
+      <div className="absolute top-24 left-1/2 -translate-x-1/2 text-center z-20">
         <div className="relative">
           <div
-            className="absolute inset-0 blur-2xl rounded-full"
-            style={{
-              background: catEmotion === "worried"
-                ? "radial-gradient(circle, rgba(239,68,68,0.4) 0%, transparent 70%)"
-                : catEmotion === "angry"
-                  ? "radial-gradient(circle, rgba(251,146,60,0.4) 0%, transparent 70%)"
-                  : "radial-gradient(circle, rgba(74,222,128,0.4) 0%, transparent 70%)",
-              width: "120px",
-              height: "120px",
-              left: "50%",
-              top: "50%",
-              transform: "translate(-50%, -50%)",
-            }}
-          />
-          <motion.div
-            className="text-6xl sm:text-7xl mb-2 relative"
-            style={{ filter: "drop-shadow(0 4px 20px rgba(0,0,0,0.3))" }}
-            animate={catEmotion === "worried" ? { rotate: [0, -5, 5, 0] } : {}}
-            transition={{ duration: 0.5, repeat: catEmotion === "worried" ? Infinity : 0 }}
+            className="text-6xl sm:text-7xl mb-2"
+            style={{ filter: "drop-shadow(0 4px 12px rgba(0,0,0,0.3))" }}
           >
             {catEmotion === "happy" ? "😼" : catEmotion === "angry" ? "😾" : "🙀"}
-          </motion.div>
+          </div>
         </div>
-        <AnimatePresence>
-          {catMessage && (
-            <motion.div
-              initial={{ scale: 0, y: 10, opacity: 0 }}
-              animate={{ scale: 1, y: 0, opacity: 1 }}
-              exit={{ scale: 0, y: -10, opacity: 0 }}
-              className="bg-gradient-to-r from-pink-500 via-rose-500 to-red-500 text-white px-5 py-2 rounded-full font-bold shadow-[0_8px_32px_rgba(236,72,153,0.4)] text-sm border border-pink-400/50 relative overflow-hidden"
-            >
-              <div
-                className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -skew-x-12"
-                style={{ animation: "shimmer 1s ease-in-out" }}
-              />
-              <span className="relative">{catMessage}</span>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </motion.div>
+        {catMessage && (
+          <div className="bg-gradient-to-r from-pink-500 to-rose-500 text-white px-4 py-2 rounded-full font-bold shadow-lg text-sm">
+            {catMessage}
+          </div>
+        )}
+      </div>
 
       {/* Premium skip button */}
       <button
@@ -2285,152 +2190,67 @@ const CatchTheNoGame = memo(function CatchTheNoGame({ onComplete }: { onComplete
         )}
       </AnimatePresence>
 
-      {/* Premium falling items with enhanced visuals */}
+      {/* Optimized falling items - simpler effects */}
       {items.map(item => (
         <div
           key={item.id}
-          className="absolute pointer-events-none gpu-accelerate"
+          className="absolute pointer-events-none"
           style={{
             left: `${item.x}%`,
             top: `${item.y}%`,
             transform: `translate(-50%, -50%) rotate(${item.rotation}deg) scale(${item.scale})`,
           }}
         >
-          {item.type === "heart" ? (
-            <span
-              className="text-5xl sm:text-6xl"
-              style={{ filter: "drop-shadow(0 4px 12px rgba(236,72,153,0.5))" }}
-            >
-              💕
-            </span>
-          ) : item.type === "star" ? (
-            <span
-              className="text-5xl sm:text-6xl"
-              style={{
-                filter: "drop-shadow(0 0 20px rgba(251,191,36,0.8))",
-                animation: "goldShimmer 1s ease-in-out infinite",
-              }}
-            >
-              ⭐
-            </span>
-          ) : (
-            <span
-              className="text-5xl sm:text-6xl font-black"
-              style={{
-                background: "linear-gradient(180deg, #ffffff 0%, #fecaca 100%)",
-                backgroundClip: "text",
-                WebkitBackgroundClip: "text",
-                color: "transparent",
-                filter: "drop-shadow(0 0 15px rgba(239,68,68,0.8)) drop-shadow(2px 2px 0 #b91c1c)",
-              }}
-            >
-              {item.type}
-            </span>
-          )}
+          <span className="text-5xl">
+            {item.type === "heart" ? "💕" : item.type === "star" ? "⭐" : item.type}
+          </span>
         </div>
       ))}
 
-      {/* Premium basket with dynamic glow effect */}
-      <motion.div
+      {/* Optimized basket - simplified */}
+      <div
         className="absolute bottom-24"
         style={{
           left: `${basketX}%`,
           transform: "translateX(-50%)",
         }}
-        animate={{ y: [0, -3, 0] }}
-        transition={{ duration: 1.5, repeat: Infinity }}
       >
-        <div className="relative">
-          {/* Multi-layer glow effect */}
-          <div
-            className={cn(
-              "absolute blur-2xl rounded-full transition-all duration-300",
-              basketGlow ? "bg-green-400/70" : "bg-amber-400/40"
-            )}
-            style={{
-              width: "100px",
-              height: "100px",
-              left: "50%",
-              top: "50%",
-              transform: "translate(-50%, -50%)",
-              animation: basketGlow ? "perfectBurst 0.3s ease-out" : undefined,
-            }}
-          />
-          {/* Catch zone indicator ring - CSS animation for performance */}
-          <div
-            className="absolute rounded-full border-2 border-white/30"
-            style={{
-              width: "90px",
-              height: "90px",
-              left: "50%",
-              top: "50%",
-              transform: "translate(-50%, -50%)",
-              animation: "crosshairPulse 2s ease-in-out infinite",
-            }}
-          />
-          <motion.span
-            className="text-6xl sm:text-7xl relative"
-            style={{ filter: "drop-shadow(0 8px 24px rgba(0,0,0,0.4))" }}
-            animate={basketGlow ? { scale: [1, 1.15, 1] } : {}}
-            transition={{ duration: 0.2 }}
-          >
-            🧺
-          </motion.span>
-        </div>
-      </motion.div>
+        <span
+          className={cn(
+            "text-6xl sm:text-7xl transition-transform duration-200",
+            basketGlow && "scale-110"
+          )}
+          style={{ filter: "drop-shadow(0 4px 12px rgba(0,0,0,0.3))" }}
+        >
+          🧺
+        </span>
+      </div>
 
-      {/* Super premium progress bar with glassmorphism */}
+      {/* Optimized progress bar - reduced effects */}
       <div className="absolute bottom-6 sm:bottom-8 left-3 right-3 sm:left-4 sm:right-4 z-10">
-        <div className="bg-white/10 backdrop-blur-xl rounded-2xl p-3 shadow-[0_8px_32px_rgba(0,0,0,0.2)] border border-white/20">
+        <div className="bg-white/15 backdrop-blur rounded-2xl p-3 shadow-lg border border-white/20">
           <div className="flex gap-1.5 sm:gap-2 items-center">
             {["N", "O", " ", "N", "O"].map((letter, i) => (
-              <motion.div
+              <div
                 key={i}
                 className={cn(
-                  "flex-1 h-9 sm:h-10 rounded-xl flex items-center justify-center font-black text-lg sm:text-xl transition-all duration-300 relative overflow-hidden",
+                  "flex-1 h-9 sm:h-10 rounded-xl flex items-center justify-center font-black text-lg sm:text-xl",
                   i < noLetters
-                    ? "text-white"
-                    : "bg-white/10 text-white/30 border border-white/10"
+                    ? "bg-gradient-to-b from-green-400 to-green-500 text-white shadow-md"
+                    : "bg-white/10 text-white/30"
                 )}
-                style={i < noLetters ? {
-                  background: "linear-gradient(135deg, #4ade80 0%, #22c55e 50%, #16a34a 100%)",
-                  boxShadow: "0 4px 20px rgba(74,222,128,0.4), inset 0 1px 0 rgba(255,255,255,0.3)",
-                } : {}}
-                animate={i < noLetters ? { scale: [1, 1.08, 1] } : {}}
-                transition={{ duration: 0.3 }}
               >
-                {i < noLetters && (
-                  <div
-                    className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent -skew-x-12"
-                    style={{ animation: "shimmer 2s ease-in-out infinite", animationDelay: `${i * 0.1}s` }}
-                  />
-                )}
-                <span className="relative">{letter !== " " ? (i < noLetters ? letter : "?") : ""}</span>
-              </motion.div>
+                {letter !== " " ? (i < noLetters ? letter : "?") : ""}
+              </div>
             ))}
           </div>
-          <motion.p
-            className="text-white/80 text-sm mt-2 text-center font-medium"
-            animate={noLetters >= 5 ? { scale: [1, 1.05, 1] } : {}}
-            transition={{ duration: 0.5, repeat: noLetters >= 5 ? Infinity : 0 }}
-          >
+          <p className="text-white/80 text-sm mt-2 text-center font-medium">
             {noLetters < 5 ? (
               <>Collect <span className="text-green-300 font-bold">{5 - noLetters}</span> more letters!</>
             ) : (
-              <span
-                style={{
-                  background: "linear-gradient(90deg, #4ade80, #22c55e, #4ade80)",
-                  backgroundSize: "200% auto",
-                  backgroundClip: "text",
-                  WebkitBackgroundClip: "text",
-                  color: "transparent",
-                  animation: "shimmer 2s linear infinite",
-                }}
-              >
-                You spelled NO! 🎉
-              </span>
+              <span className="text-green-300">You spelled NO! 🎉</span>
             )}
-          </motion.p>
+          </p>
         </div>
       </div>
     </motion.div>
@@ -3110,150 +2930,79 @@ const SmashTheHeartsGame = memo(function SmashTheHeartsGame({ onComplete }: { on
     );
   }
 
-  // Super premium main game screen
+  // Optimized main game screen - reduced effects for performance
   return (
     <motion.div
       className="fixed inset-0 overflow-hidden select-none"
       animate={screenShake ? { x: [0, -8, 8, -8, 8, 0] } : {}}
       transition={{ duration: 0.3 }}
     >
-      {/* Super premium animated gradient background */}
+      {/* Static gradient background - no animation for performance */}
       <div
         className="absolute inset-0"
         style={{
           background: "linear-gradient(135deg, #e11d48 0%, #db2777 20%, #c026d3 40%, #9333ea 60%, #dc2626 80%, #f43f5e 100%)",
-          backgroundSize: "400% 400%",
-          animation: "gradientShift 12s ease infinite",
         }}
       />
 
-      {/* Animated mesh gradient orbs */}
+      {/* Simple ambient glow - reduced blur */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div
-          className="absolute w-[500px] h-[500px] rounded-full opacity-30 blur-3xl"
+          className="absolute w-96 h-96 rounded-full opacity-20"
           style={{
-            background: "radial-gradient(circle, rgba(251,113,133,0.8) 0%, transparent 70%)",
-            top: "-15%",
+            background: "radial-gradient(circle, rgba(251,113,133,0.6) 0%, transparent 70%)",
+            top: "-10%",
             left: "-10%",
-            animation: "float 15s ease-in-out infinite",
-          }}
-        />
-        <div
-          className="absolute w-[400px] h-[400px] rounded-full opacity-25 blur-3xl"
-          style={{
-            background: "radial-gradient(circle, rgba(249,115,22,0.8) 0%, transparent 70%)",
-            bottom: "-15%",
-            right: "-10%",
-            animation: "float 12s ease-in-out infinite reverse",
+            filter: "blur(40px)",
           }}
         />
       </div>
 
-      {/* Premium pattern overlay */}
-      <div className="absolute inset-0 opacity-[0.08]">
-        <div className="absolute inset-0" style={{
-          backgroundImage: "radial-gradient(circle, white 2px, transparent 2px)",
-          backgroundSize: "40px 40px",
-        }} />
-      </div>
-
-      {/* Premium glassmorphism header */}
+      {/* Optimized header - reduced blur */}
       <div className="absolute top-4 left-0 right-0 flex justify-center gap-2 sm:gap-3 z-20 px-3">
-        <motion.div
-          className="bg-white/20 backdrop-blur-xl rounded-2xl px-4 sm:px-5 py-2.5 sm:py-3 shadow-[0_8px_32px_rgba(0,0,0,0.2)] border border-white/30 flex items-center gap-2"
-          animate={score > 0 ? { scale: [1, 1.05, 1] } : {}}
-          transition={{ duration: 0.2 }}
-        >
+        <div className="bg-white/25 backdrop-blur rounded-2xl px-4 sm:px-5 py-2.5 sm:py-3 shadow-lg border border-white/30 flex items-center gap-2">
           <span className="text-xl sm:text-2xl">💯</span>
-          <span className="text-lg sm:text-xl font-black text-white drop-shadow-lg">{score}</span>
-        </motion.div>
-        <motion.div
+          <span className="text-lg sm:text-xl font-black text-white">{score}</span>
+        </div>
+        <div
           className={cn(
-            "backdrop-blur-xl rounded-2xl px-4 sm:px-5 py-2.5 sm:py-3 shadow-[0_8px_32px_rgba(0,0,0,0.2)] border flex items-center gap-2 relative overflow-hidden",
+            "backdrop-blur rounded-2xl px-4 sm:px-5 py-2.5 sm:py-3 shadow-lg border flex items-center gap-2",
             timeLeft <= 5
               ? "bg-red-500/40 border-red-400/50"
-              : "bg-white/20 border-white/30"
+              : "bg-white/25 border-white/30"
           )}
-          animate={timeLeft <= 5 ? { scale: [1, 1.03, 1] } : {}}
-          transition={{ duration: 0.4, repeat: timeLeft <= 5 ? Infinity : 0 }}
         >
-          {timeLeft <= 5 && (
-            <div
-              className="absolute inset-0 bg-red-500/30"
-              style={{ animation: "pulseGlow 0.5s ease-in-out infinite" }}
-            />
-          )}
-          <span className="text-xl sm:text-2xl relative">⏱️</span>
+          <span className="text-xl sm:text-2xl">⏱️</span>
           <span className={cn(
-            "text-lg sm:text-xl font-black relative drop-shadow-lg",
+            "text-lg sm:text-xl font-black",
             timeLeft <= 5 ? "text-red-100" : "text-white"
           )}>
             {timeLeft}s
           </span>
-        </motion.div>
-        <AnimatePresence>
-          {combo >= 3 && (
-            <motion.div
-              initial={{ scale: 0, rotate: -20, opacity: 0 }}
-              animate={{ scale: 1, rotate: 0, opacity: 1 }}
-              exit={{ scale: 0, opacity: 0 }}
-              className="bg-gradient-to-r from-orange-500 via-red-500 to-rose-500 rounded-2xl px-3 sm:px-4 py-2.5 sm:py-3 shadow-[0_8px_32px_rgba(249,115,22,0.4)] border border-orange-400/50 relative overflow-hidden"
-              style={{ animation: combo >= 5 ? "comboFire 0.5s ease-in-out infinite" : undefined }}
-            >
-              <div
-                className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent -skew-x-12"
-                style={{ animation: "shimmer 1.5s ease-in-out infinite" }}
-              />
-              <span className="text-lg sm:text-xl font-black text-white relative drop-shadow-lg">x{combo} 🔥</span>
-            </motion.div>
-          )}
-        </AnimatePresence>
+        </div>
+        {combo >= 3 && (
+          <div className="bg-gradient-to-r from-orange-500 via-red-500 to-rose-500 rounded-2xl px-3 sm:px-4 py-2.5 sm:py-3 shadow-lg border border-orange-400/50">
+            <span className="text-lg sm:text-xl font-black text-white">x{combo} 🔥</span>
+          </div>
+        )}
       </div>
 
-      {/* Premium cat with reactions */}
-      <motion.div
-        className="absolute top-20 left-1/2 -translate-x-1/2 text-center z-20"
-        animate={{ y: [0, -3, 0] }}
-        transition={{ duration: 1.5, repeat: Infinity }}
-      >
+      {/* Optimized cat - simplified */}
+      <div className="absolute top-20 left-1/2 -translate-x-1/2 text-center z-20">
         <div className="relative">
           <div
-            className="absolute blur-2xl rounded-full"
-            style={{
-              background: catEmotion === "shocked"
-                ? "radial-gradient(circle, rgba(239,68,68,0.5) 0%, transparent 70%)"
-                : catEmotion === "sad"
-                  ? "radial-gradient(circle, rgba(59,130,246,0.4) 0%, transparent 70%)"
-                  : "radial-gradient(circle, rgba(251,146,60,0.4) 0%, transparent 70%)",
-              width: "100px",
-              height: "100px",
-              left: "50%",
-              top: "50%",
-              transform: "translate(-50%, -50%)",
-            }}
-          />
-          <motion.div
-            className="text-5xl sm:text-6xl mb-1 relative"
-            style={{ filter: "drop-shadow(0 4px 20px rgba(0,0,0,0.3))" }}
-            animate={catEmotion === "shocked" ? { scale: [1, 1.3, 1], rotate: [0, -10, 10, 0] } : {}}
-            transition={{ duration: 0.3, repeat: catEmotion === "shocked" ? Infinity : 0 }}
+            className="text-5xl sm:text-6xl mb-1"
+            style={{ filter: "drop-shadow(0 4px 12px rgba(0,0,0,0.3))" }}
           >
             {catEmotion === "happy" ? "😼" : catEmotion === "angry" ? "😾" : catEmotion === "sad" ? "😿" : "🙀"}
-          </motion.div>
+          </div>
         </div>
-        <AnimatePresence>
-          {catReaction && (
-            <motion.div
-              initial={{ scale: 0, y: 10, opacity: 0 }}
-              animate={{ scale: 1, y: 0, opacity: 1 }}
-              exit={{ scale: 0, y: -10, opacity: 0 }}
-              className="bg-white/95 backdrop-blur-xl text-red-600 px-4 py-2 rounded-full font-bold shadow-[0_8px_32px_rgba(0,0,0,0.2)] text-sm whitespace-nowrap border border-white/50"
-            >
-              {catReaction}
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </motion.div>
+        {catReaction && (
+          <div className="bg-white/90 backdrop-blur text-red-600 px-4 py-2 rounded-full font-bold shadow-lg text-sm whitespace-nowrap border border-white/50">
+            {catReaction}
+          </div>
+        )}
+      </div>
 
       {/* Premium skip button */}
       <button
@@ -3263,44 +3012,39 @@ const SmashTheHeartsGame = memo(function SmashTheHeartsGame({ onComplete }: { on
             onComplete(score);
           }
         }}
-        className="absolute top-4 right-4 bg-white/15 backdrop-blur-xl rounded-full px-4 py-2 text-white/90 text-sm z-20 hover:bg-white/25 transition-all duration-300 border border-white/20 shadow-lg"
+        className="absolute top-4 right-4 bg-white/15 backdrop-blur rounded-full px-4 py-2 text-white/90 text-sm z-20 hover:bg-white/25 transition-colors border border-white/20 shadow-lg"
       >
         Skip →
       </button>
 
-      {/* Premium smash particles */}
-      <AnimatePresence>
-        {particles.map(p => (
-          <motion.div
-            key={p.id}
-            initial={{ scale: 1, opacity: 1 }}
-            animate={{ scale: 0, opacity: 0, y: -50 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.6 }}
-            className={cn("absolute text-2xl pointer-events-none z-30", p.color)}
-            style={{
-              left: p.x,
-              top: p.y,
-              filter: "drop-shadow(0 0 10px currentColor)",
-            }}
-          >
-            {p.emoji}
-          </motion.div>
-        ))}
-      </AnimatePresence>
+      {/* Simplified smash particles */}
+      {particles.map(p => (
+        <div
+          key={p.id}
+          className={cn("absolute text-2xl pointer-events-none z-30", p.color)}
+          style={{
+            left: p.x,
+            top: p.y,
+            animation: "scorePopup 0.6s ease-out forwards",
+          }}
+        >
+          {p.emoji}
+        </div>
+      ))}
 
-      {/* Premium hearts grid with glassmorphism */}
+      {/* Optimized hearts grid - reduced blur */}
       <div className="absolute inset-0 flex items-center justify-center pt-32 pb-20">
-        <div className="bg-white/10 backdrop-blur-md rounded-3xl p-4 sm:p-5 shadow-[0_8px_32px_rgba(0,0,0,0.2)] border border-white/20">
+        <div className="bg-white/15 backdrop-blur rounded-3xl p-4 sm:p-5 shadow-lg border border-white/20">
           <div className="grid grid-cols-5 gap-2 sm:gap-3">
             {hearts.map(heart => (
-              <motion.button
+              <button
                 key={heart.id}
                 onClick={(e) => smashHeart(heart, e)}
                 disabled={heart.smashed}
                 className={cn(
-                  "w-14 h-14 sm:w-16 sm:h-16 rounded-2xl flex items-center justify-center text-3xl sm:text-4xl transition-all relative overflow-hidden",
-                  heart.smashed ? "opacity-0 scale-0" : "active:scale-90",
+                  "w-14 h-14 sm:w-16 sm:h-16 rounded-2xl flex items-center justify-center text-3xl sm:text-4xl transition-all active:scale-90",
+                  heart.smashed && "opacity-0 scale-0",
+                  heart.shaking && "animate-pulse",
                 )}
                 style={!heart.smashed ? {
                   background: heart.type === "pink" ? "linear-gradient(135deg, rgba(251,207,232,0.9) 0%, rgba(244,114,182,0.6) 100%)"
@@ -3309,73 +3053,35 @@ const SmashTheHeartsGame = memo(function SmashTheHeartsGame({ onComplete }: { on
                     : heart.type === "cat" ? "linear-gradient(135deg, rgba(226,232,240,0.9) 0%, rgba(148,163,184,0.6) 100%)"
                     : "linear-gradient(135deg, rgba(254,215,170,0.9) 0%, rgba(251,146,60,0.6) 100%)",
                   boxShadow: heart.type === "gold"
-                    ? "0 4px 20px rgba(250,204,21,0.4), inset 0 1px 0 rgba(255,255,255,0.5)"
-                    : "0 4px 20px rgba(0,0,0,0.15), inset 0 1px 0 rgba(255,255,255,0.5)",
+                    ? "0 4px 15px rgba(250,204,21,0.4)"
+                    : "0 4px 12px rgba(0,0,0,0.15)",
                   border: "1px solid rgba(255,255,255,0.3)",
                 } : {}}
-                initial={{ scale: 0, rotate: -180 }}
-                animate={{
-                  scale: heart.smashed ? 0 : 1,
-                  rotate: heart.shaking ? [0, -15, 15, -15, 15, 0] : 0,
-                  y: heart.smashed ? -20 : 0,
-                }}
-                transition={{
-                  type: "spring",
-                  stiffness: 300,
-                  damping: 20,
-                  rotate: { duration: 0.4 },
-                }}
-                whileHover={{ scale: heart.smashed ? 0 : 1.1, y: -2 }}
-                whileTap={{ scale: heart.smashed ? 0 : 0.85 }}
               >
-                {/* Shimmer effect on gold */}
-                {heart.type === "gold" && !heart.smashed && (
-                  <div
-                    className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent -skew-x-12"
-                    style={{ animation: "shimmer 2s ease-in-out infinite" }}
-                  />
-                )}
-                <span className="relative" style={{ filter: heart.type === "gold" ? "drop-shadow(0 0 8px rgba(250,204,21,0.8))" : undefined }}>
+                <span>
                   {heart.type === "pink" && "💕"}
                   {heart.type === "red" && "❤️"}
                   {heart.type === "gold" && "💛"}
                   {heart.type === "cat" && "😺"}
-                  {heart.type === "bomb" && (
-                    <span style={{ animation: "pulseGlow 0.5s ease-in-out infinite" }}>💣</span>
-                  )}
+                  {heart.type === "bomb" && "💣"}
                 </span>
-              </motion.button>
+              </button>
             ))}
           </div>
         </div>
       </div>
 
-      {/* Super premium progress / instructions bar */}
+      {/* Optimized instructions bar */}
       <div className="absolute bottom-6 left-3 right-3 sm:left-4 sm:right-4 z-10">
-        <div className="bg-white/10 backdrop-blur-xl rounded-2xl p-3 sm:p-4 text-center shadow-[0_8px_32px_rgba(0,0,0,0.2)] border border-white/20">
+        <div className="bg-white/15 backdrop-blur rounded-2xl p-3 sm:p-4 text-center shadow-lg border border-white/20">
           <p className="text-white/90 font-medium text-sm sm:text-base">
             👆 Tap hearts to smash! Avoid the cat! 😺
           </p>
-          <AnimatePresence>
-            {combo >= 2 && (
-              <motion.p
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: "auto" }}
-                exit={{ opacity: 0, height: 0 }}
-                className="text-sm mt-1 font-bold"
-                style={{
-                  background: "linear-gradient(90deg, #fde047, #fb923c, #fde047)",
-                  backgroundSize: "200% auto",
-                  backgroundClip: "text",
-                  WebkitBackgroundClip: "text",
-                  color: "transparent",
-                  animation: "shimmer 2s linear infinite",
-                }}
-              >
-                🔥 {combo} combo! +{Math.floor(combo / 3) * 5} bonus per hit!
-              </motion.p>
-            )}
-          </AnimatePresence>
+          {combo >= 2 && (
+            <p className="text-sm mt-1 font-bold text-amber-300">
+              🔥 {combo} combo! +{Math.floor(combo / 3) * 5} bonus per hit!
+            </p>
+          )}
         </div>
       </div>
     </motion.div>
@@ -4399,7 +4105,7 @@ const DodgeTheLoveGame = memo(function DodgeTheLoveGame({ onComplete }: { onComp
     );
   }
 
-  // Super premium main game
+  // Optimized main game - reduced effects for performance
   return (
     <motion.div
       className="fixed inset-0 overflow-hidden select-none touch-none"
@@ -4416,154 +4122,79 @@ const DodgeTheLoveGame = memo(function DodgeTheLoveGame({ onComplete }: { onComp
         handleMove(e.touches[0].clientX, e.touches[0].clientY, e.currentTarget.getBoundingClientRect());
       }}
     >
-      {/* Super premium animated gradient background */}
+      {/* Static gradient background - no animation for performance */}
       <div
         className="absolute inset-0"
         style={{
           background: slowMo
             ? "linear-gradient(135deg, #1e3a5f 0%, #1e1b4b 25%, #312e81 50%, #4c1d95 75%, #2e1065 100%)"
             : "linear-gradient(135deg, #0f172a 0%, #1e1b4b 20%, #4c1d95 45%, #7e22ce 70%, #581c87 100%)",
-          backgroundSize: "300% 300%",
-          animation: "gradientShift 20s ease infinite",
         }}
       />
 
-      {/* Animated nebula orbs */}
+      {/* Simple ambient glow - reduced blur */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div
-          className="absolute w-[600px] h-[600px] rounded-full opacity-30 blur-3xl"
+          className="absolute w-96 h-96 rounded-full opacity-20"
           style={{
             background: "radial-gradient(circle, rgba(168,85,247,0.6) 0%, transparent 70%)",
-            top: "-20%",
-            left: "-15%",
-            animation: "float 25s ease-in-out infinite",
-          }}
-        />
-        <div
-          className="absolute w-[500px] h-[500px] rounded-full opacity-20 blur-3xl"
-          style={{
-            background: "radial-gradient(circle, rgba(236,72,153,0.6) 0%, transparent 70%)",
-            bottom: "-15%",
-            right: "-15%",
-            animation: "float 20s ease-in-out infinite reverse",
+            top: "-10%",
+            left: "-10%",
+            filter: "blur(40px)",
           }}
         />
       </div>
 
-      {/* Optimized star field - CSS animations */}
+      {/* Reduced star field - fewer stars for performance */}
       <div className="absolute inset-0 pointer-events-none overflow-hidden">
-        {[...Array(30)].map((_, i) => (
+        {[...Array(15)].map((_, i) => (
           <div
             key={i}
-            className="absolute rounded-full bg-white"
+            className="absolute rounded-full bg-white opacity-50"
             style={{
               left: `${(i * 17 + 3) % 100}%`,
               top: `${(i * 23 + 7) % 100}%`,
-              width: i % 3 === 0 ? "3px" : i % 2 === 0 ? "2px" : "1px",
-              height: i % 3 === 0 ? "3px" : i % 2 === 0 ? "2px" : "1px",
-              animation: `starTwinkle ${2 + (i % 3)}s ease-in-out infinite`,
-              animationDelay: `${(i * 0.1) % 2}s`,
+              width: i % 3 === 0 ? "2px" : "1px",
+              height: i % 3 === 0 ? "2px" : "1px",
             }}
           />
         ))}
       </div>
 
-      {/* Subtle ambient particles - reduced for performance */}
-      <div className="absolute inset-0 pointer-events-none overflow-hidden">
-        {[...Array(5)].map((_, i) => (
-          <div
-            key={`ambient-${i}`}
-            className="absolute w-2 h-2 rounded-full bg-pink-400/20 blur-sm"
-            style={{
-              left: `${15 + i * 18}%`,
-              top: `${25 + (i % 3) * 20}%`,
-              animation: `float ${5 + i}s ease-in-out infinite`,
-              animationDelay: `${i * 0.5}s`,
-            }}
-          />
-        ))}
-      </div>
-
-      {/* Slow-mo effect */}
+      {/* Simple slow-mo indicator */}
       {slowMo && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          className="absolute inset-0 pointer-events-none"
-        >
-          <div className="absolute inset-0 bg-blue-500/10" />
-          <motion.div
-            className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[150%] h-[150%] border-2 border-blue-400/20 rounded-full"
-            animate={{ scale: [1, 1.1, 1], opacity: [0.3, 0.1, 0.3] }}
-            transition={{ duration: 2, repeat: Infinity }}
-          />
-          <motion.div
-            className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[100%] h-[100%] border border-cyan-400/15 rounded-full"
-            animate={{ scale: [1.1, 1, 1.1], opacity: [0.2, 0.4, 0.2] }}
-            transition={{ duration: 1.5, repeat: Infinity }}
-          />
-        </motion.div>
+        <div className="absolute inset-0 pointer-events-none bg-blue-500/10" />
       )}
 
-      {/* Premium glassmorphism header */}
+      {/* Optimized header - reduced blur */}
       <div className="absolute top-3 left-0 right-0 flex justify-center gap-2 z-30 px-3">
-        <motion.div
-          className="bg-white/10 backdrop-blur-xl rounded-2xl px-4 py-2 shadow-[0_8px_32px_rgba(0,0,0,0.3)] border border-white/20 flex items-center gap-1.5"
-          animate={score > 0 ? { scale: [1, 1.03, 1] } : {}}
-          transition={{ duration: 0.2 }}
-        >
+        <div className="bg-white/15 backdrop-blur rounded-2xl px-4 py-2 shadow-lg border border-white/20 flex items-center gap-1.5">
           <span className="text-lg">⭐</span>
-          <span className="text-base font-bold text-white drop-shadow-lg">{score}</span>
-        </motion.div>
-        <motion.div
+          <span className="text-base font-bold text-white">{score}</span>
+        </div>
+        <div
           className={cn(
-            "backdrop-blur-xl rounded-2xl px-4 py-2 shadow-[0_8px_32px_rgba(0,0,0,0.3)] border flex items-center gap-1.5 relative overflow-hidden",
-            timeLeft <= 5 ? "bg-red-500/30 border-red-400/40" : "bg-white/10 border-white/20"
+            "backdrop-blur rounded-2xl px-4 py-2 shadow-lg border flex items-center gap-1.5",
+            timeLeft <= 5 ? "bg-red-500/30 border-red-400/40" : "bg-white/15 border-white/20"
           )}
-          animate={timeLeft <= 5 ? { scale: [1, 1.03, 1] } : {}}
-          transition={{ duration: 0.4, repeat: timeLeft <= 5 ? Infinity : 0 }}
         >
-          {timeLeft <= 5 && (
-            <div
-              className="absolute inset-0 bg-red-500/20"
-              style={{ animation: "pulseGlow 0.5s ease-in-out infinite" }}
-            />
-          )}
-          <span className="text-lg relative">⏱️</span>
-          <span className={cn("text-base font-bold relative drop-shadow-lg", timeLeft <= 5 ? "text-red-200" : "text-white")}>
+          <span className="text-lg">⏱️</span>
+          <span className={cn("text-base font-bold", timeLeft <= 5 ? "text-red-200" : "text-white")}>
             {timeLeft}s
           </span>
-        </motion.div>
-        <div className="bg-white/10 backdrop-blur-xl rounded-2xl px-3 py-2 shadow-[0_8px_32px_rgba(0,0,0,0.3)] border border-white/20 flex items-center gap-0.5">
+        </div>
+        <div className="bg-white/15 backdrop-blur rounded-2xl px-3 py-2 shadow-lg border border-white/20 flex items-center gap-0.5">
           {[...Array(5)].map((_, i) => (
-            <motion.div
-              key={i}
-              animate={i >= health ? { scale: 0, opacity: 0 } : { scale: 1, opacity: 1 }}
-              transition={{ type: "spring", stiffness: 500 }}
-            >
-              <span className={cn("text-base", i < health ? "" : "grayscale opacity-30")}>
-                {i < health ? "❤️" : "🖤"}
-              </span>
-            </motion.div>
+            <span key={i} className={cn("text-base", i < health ? "" : "grayscale opacity-30")}>
+              {i < health ? "❤️" : "🖤"}
+            </span>
           ))}
         </div>
-        <AnimatePresence>
-          {combo >= 5 && (
-            <motion.div
-              initial={{ scale: 0, x: 20, opacity: 0 }}
-              animate={{ scale: 1, x: 0, opacity: 1 }}
-              exit={{ scale: 0, opacity: 0 }}
-              className="bg-gradient-to-r from-orange-500/60 via-yellow-500/60 to-amber-500/60 backdrop-blur-xl rounded-2xl px-4 py-2 shadow-[0_8px_32px_rgba(251,191,36,0.3)] border border-yellow-400/40 relative overflow-hidden"
-              style={{ animation: combo >= 10 ? "comboFire 0.5s ease-in-out infinite" : undefined }}
-            >
-              <div
-                className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent -skew-x-12"
-                style={{ animation: "shimmer 1.5s ease-in-out infinite" }}
-              />
-              <span className="text-base font-bold text-yellow-100 relative drop-shadow-lg">x{combo} 🔥</span>
-            </motion.div>
-          )}
-        </AnimatePresence>
+        {combo >= 5 && (
+          <div className="bg-gradient-to-r from-orange-500/60 via-yellow-500/60 to-amber-500/60 backdrop-blur rounded-2xl px-4 py-2 shadow-lg border border-yellow-400/40">
+            <span className="text-base font-bold text-yellow-100">x{combo} 🔥</span>
+          </div>
+        )}
       </div>
 
       {/* Pattern announcement */}
@@ -4582,40 +4213,17 @@ const DodgeTheLoveGame = memo(function DodgeTheLoveGame({ onComplete }: { onComp
         )}
       </AnimatePresence>
 
-      {/* Cat */}
-      <motion.div
-        className="absolute top-12 left-1/2 -translate-x-1/2 text-center z-20"
-        animate={{
-          y: catEmotion === "attacking" ? [0, -3, 0] : [0, -5, 0],
-          scale: catEmotion === "charging" ? [1, 1.1, 1] : 1,
-        }}
-        transition={{ duration: catEmotion === "attacking" ? 0.3 : 1.5, repeat: Infinity }}
-      >
-        <div className="relative">
-          {catEmotion === "charging" && (
-            <motion.div
-              className="absolute inset-0 -m-4 rounded-full bg-pink-500/30"
-              animate={{ scale: [1, 1.5, 1], opacity: [0.5, 0, 0.5] }}
-              transition={{ duration: 0.5, repeat: Infinity }}
-            />
-          )}
-          <span className="text-5xl drop-shadow-lg">
-            {catEmotion === "love" ? "😻" : catEmotion === "charging" ? "😼" : catEmotion === "attacking" ? "😾" : "🙀"}
-          </span>
-        </div>
-        <AnimatePresence>
-          {catMessage && (
-            <motion.div
-              initial={{ scale: 0, y: 5 }}
-              animate={{ scale: 1, y: 0 }}
-              exit={{ scale: 0, y: -5 }}
-              className="absolute top-full left-1/2 -translate-x-1/2 mt-1 bg-white/95 text-purple-600 px-3 py-1 rounded-full font-bold shadow-xl text-xs whitespace-nowrap"
-            >
-              {catMessage}
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </motion.div>
+      {/* Simplified cat */}
+      <div className="absolute top-12 left-1/2 -translate-x-1/2 text-center z-20">
+        <span className="text-5xl" style={{ filter: "drop-shadow(0 4px 8px rgba(0,0,0,0.3))" }}>
+          {catEmotion === "love" ? "😻" : catEmotion === "charging" ? "😼" : catEmotion === "attacking" ? "😾" : "🙀"}
+        </span>
+        {catMessage && (
+          <div className="absolute top-full left-1/2 -translate-x-1/2 mt-1 bg-white/90 text-purple-600 px-3 py-1 rounded-full font-bold shadow-lg text-xs whitespace-nowrap">
+            {catMessage}
+          </div>
+        )}
+      </div>
 
       {/* Skip */}
       <button
@@ -4646,33 +4254,20 @@ const DodgeTheLoveGame = memo(function DodgeTheLoveGame({ onComplete }: { onComp
         </motion.div>
       ))}
 
-      {/* Power-ups */}
+      {/* Simplified power-ups */}
       {powerUps.map(pu => (
-        <motion.div
+        <div
           key={pu.id}
           className="absolute z-15"
           style={{ left: `${pu.x}%`, top: `${pu.y}%`, transform: "translate(-50%, -50%)" }}
-          animate={{ y: [0, -8, 0], rotate: [0, 5, -5, 0] }}
-          transition={{ duration: 2, repeat: Infinity }}
         >
-          <div className="relative">
-            <motion.div
-              className={cn(
-                "absolute inset-0 -m-3 rounded-full blur-md",
-                pu.type === "shield" ? "bg-blue-400/50" :
-                pu.type === "heal" ? "bg-green-400/50" : "bg-amber-400/50"
-              )}
-              animate={{ scale: [1, 1.3, 1], opacity: [0.6, 0.3, 0.6] }}
-              transition={{ duration: 1.5, repeat: Infinity }}
-            />
-            <span className="relative text-3xl drop-shadow-lg">
-              {pu.type === "shield" ? "🛡️" : pu.type === "heal" ? "💚" : "⏰"}
-            </span>
-          </div>
-        </motion.div>
+          <span className="text-3xl" style={{ filter: "drop-shadow(0 4px 8px rgba(0,0,0,0.3))" }}>
+            {pu.type === "shield" ? "🛡️" : pu.type === "heal" ? "💚" : "⏰"}
+          </span>
+        </div>
       ))}
 
-      {/* Projectiles */}
+      {/* Simplified projectiles - removed glow blur */}
       {projectiles.map(p => (
         <div
           key={p.id}
@@ -4681,13 +4276,9 @@ const DodgeTheLoveGame = memo(function DodgeTheLoveGame({ onComplete }: { onComp
             left: `${p.x}%`,
             top: `${p.y}%`,
             transform: `translate(-50%, -50%) scale(${p.size}) rotate(${p.rotation}deg)`,
-            willChange: "transform, left, top",
           }}
         >
-          {p.glow && (
-            <div className="absolute inset-0 -m-2 bg-pink-400/30 rounded-full blur-md" />
-          )}
-          <span className={cn("text-2xl", p.glow && "drop-shadow-[0_0_8px_rgba(236,72,153,0.8)]")}>
+          <span className="text-2xl">
             {p.type === "heart" && "💕"}
             {p.type === "kiss" && "💋"}
             {p.type === "sparkle" && "✨"}
@@ -4696,29 +4287,30 @@ const DodgeTheLoveGame = memo(function DodgeTheLoveGame({ onComplete }: { onComp
         </div>
       ))}
 
-      {/* Player trail */}
-      {trail.map((t, index) => (
-        <motion.div
+      {/* Simplified player trail - reduced items */}
+      {trail.slice(-4).map((t, index) => (
+        <div
           key={t.id}
           className="absolute pointer-events-none z-5"
-          style={{ left: `${t.x}%`, top: `${t.y}%`, transform: "translate(-50%, -50%)" }}
-          initial={{ opacity: 0.5, scale: 0.9 }}
-          animate={{ opacity: 0, scale: 0.2 }}
-          transition={{ duration: 0.5 }}
+          style={{
+            left: `${t.x}%`,
+            top: `${t.y}%`,
+            transform: "translate(-50%, -50%)",
+            opacity: 0.3 - index * 0.06,
+          }}
         >
           <div
-            className="rounded-full"
+            className="rounded-full bg-purple-400/40"
             style={{
-              width: `${24 - index * 2}px`,
-              height: `${24 - index * 2}px`,
-              background: `linear-gradient(135deg, rgba(168, 85, 247, ${0.4 - index * 0.04}), rgba(236, 72, 153, ${0.3 - index * 0.03}))`,
+              width: `${16 - index * 3}px`,
+              height: `${16 - index * 3}px`,
             }}
           />
-        </motion.div>
+        </div>
       ))}
 
-      {/* Particles */}
-      {particles.map(p => (
+      {/* Simplified particles - removed glow */}
+      {particles.slice(-15).map(p => (
         <div
           key={p.id}
           className="absolute pointer-events-none z-25"
@@ -4732,144 +4324,65 @@ const DodgeTheLoveGame = memo(function DodgeTheLoveGame({ onComplete }: { onComp
           <div
             className="rounded-full"
             style={{
-              width: `${p.size * 8}px`,
-              height: `${p.size * 8}px`,
+              width: `${p.size * 6}px`,
+              height: `${p.size * 6}px`,
               backgroundColor: p.color,
-              boxShadow: `0 0 ${p.size * 4}px ${p.color}`,
             }}
           />
         </div>
       ))}
 
-      {/* Score popups */}
-      <AnimatePresence>
-        {scorePopups.map(popup => (
-          <motion.div
-            key={popup.id}
-            className="absolute pointer-events-none z-30"
-            style={{ left: `${popup.x}%`, top: `${popup.y}%` }}
-            initial={{ opacity: 1, y: 0, scale: 0.5 }}
-            animate={{ opacity: 0, y: -30, scale: 1.2 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.8, ease: "easeOut" }}
-          >
-            <span className={cn(
-              "font-black text-lg drop-shadow-lg",
-              popup.type === "dodge" && "text-indigo-300",
-              popup.type === "powerup" && "text-emerald-300",
-              popup.type === "combo" && "text-yellow-300"
-            )}>
-              +{popup.value}
-              {popup.type === "combo" && " COMBO!"}
-            </span>
-          </motion.div>
-        ))}
-      </AnimatePresence>
+      {/* Simplified score popups */}
+      {scorePopups.slice(-3).map(popup => (
+        <div
+          key={popup.id}
+          className="absolute pointer-events-none z-30"
+          style={{
+            left: `${popup.x}%`,
+            top: `${popup.y}%`,
+            animation: "scorePopup 0.8s ease-out forwards",
+          }}
+        >
+          <span className={cn(
+            "font-black text-lg",
+            popup.type === "dodge" && "text-indigo-300",
+            popup.type === "powerup" && "text-emerald-300",
+            popup.type === "combo" && "text-yellow-300"
+          )}>
+            +{popup.value}
+            {popup.type === "combo" && " COMBO!"}
+          </span>
+        </div>
+      ))}
 
-      {/* Player character */}
-      <motion.div
+      {/* Simplified player character */}
+      <div
         className="absolute z-20"
         style={{
           left: `${playerX}%`,
           top: `${playerY}%`,
           transform: "translate(-50%, -50%)",
-          willChange: "left, top",
         }}
       >
         <div className="relative">
-          {/* Outer glow ring */}
-          <motion.div
-            className={cn(
-              "absolute rounded-full blur-md",
-              playerEmotion === "hurt" ? "bg-red-400/40" :
-              playerEmotion === "happy" ? "bg-yellow-400/40" :
-              "bg-purple-400/30"
-            )}
-            style={{ width: "56px", height: "56px", left: "-8px", top: "-8px" }}
-            animate={{
-              scale: [1, 1.15, 1],
-              opacity: playerEmotion === "hurt" ? [0.6, 0.3, 0.6] : [0.4, 0.6, 0.4],
-            }}
-            transition={{ duration: playerEmotion === "hurt" ? 0.3 : 1.5, repeat: Infinity }}
-          />
-
-          {/* Shield effect */}
+          {/* Simple shield indicator */}
           {shield && (
-            <>
-              <motion.div
-                className="absolute rounded-full border-2 border-blue-400/80"
-                style={{ width: "64px", height: "64px", left: "-12px", top: "-12px" }}
-                animate={{ scale: [1, 1.1, 1], opacity: [0.8, 0.4, 0.8] }}
-                transition={{ duration: 1, repeat: Infinity }}
-              />
-              <motion.div
-                className="absolute rounded-full bg-blue-400/20"
-                style={{ width: "60px", height: "60px", left: "-10px", top: "-10px" }}
-                animate={{ scale: [1.05, 1, 1.05] }}
-                transition={{ duration: 0.8, repeat: Infinity }}
-              />
-              {/* Shield sparkles */}
-              {[0, 1, 2, 3].map(i => (
-                <motion.div
-                  key={i}
-                  className="absolute w-1.5 h-1.5 bg-blue-300 rounded-full"
-                  style={{
-                    left: `${20 + Math.cos(i * Math.PI / 2) * 28}px`,
-                    top: `${20 + Math.sin(i * Math.PI / 2) * 28}px`,
-                  }}
-                  animate={{
-                    opacity: [0, 1, 0],
-                    scale: [0.5, 1, 0.5],
-                  }}
-                  transition={{ duration: 1.5, repeat: Infinity, delay: i * 0.3 }}
-                />
-              ))}
-            </>
+            <div
+              className="absolute rounded-full border-2 border-blue-400/80 bg-blue-400/20"
+              style={{ width: "52px", height: "52px", left: "-6px", top: "-6px" }}
+            />
           )}
 
-          {/* Invincibility effect */}
+          {/* Simple invincibility indicator */}
           {invincible && (
-            <>
-              <motion.div
-                className="absolute rounded-full bg-white/40"
-                style={{ width: "52px", height: "52px", left: "-6px", top: "-6px" }}
-                animate={{ opacity: [0.2, 0.6, 0.2], scale: [1, 1.1, 1] }}
-                transition={{ duration: 0.3, repeat: Infinity }}
-              />
-              {[0, 1, 2, 3, 4, 5].map(i => (
-                <motion.div
-                  key={i}
-                  className="absolute w-1 h-1 bg-white rounded-full"
-                  style={{
-                    left: `${20 + Math.cos(i * Math.PI / 3) * 24}px`,
-                    top: `${20 + Math.sin(i * Math.PI / 3) * 24}px`,
-                  }}
-                  animate={{
-                    opacity: [1, 0],
-                    y: [-5, -15],
-                  }}
-                  transition={{ duration: 0.5, repeat: Infinity, delay: i * 0.1 }}
-                />
-              ))}
-            </>
+            <div
+              className="absolute rounded-full bg-white/30"
+              style={{ width: "48px", height: "48px", left: "-4px", top: "-4px" }}
+            />
           )}
 
-          {/* Character body */}
-          <motion.div
-            className="relative"
-            animate={
-              playerEmotion === "hurt"
-                ? { rotate: [-5, 5, -5, 5, 0], y: [0, -3, 0] }
-                : playerEmotion === "happy"
-                  ? { y: [0, -4, 0], scale: [1, 1.05, 1] }
-                  : { y: [0, -3, 0] }
-            }
-            transition={{
-              duration: playerEmotion === "hurt" ? 0.3 : playerEmotion === "happy" ? 0.4 : 0.8,
-              repeat: Infinity,
-              ease: "easeInOut"
-            }}
-          >
+          {/* Simplified character body */}
+          <div className="relative">
             {/* Main body */}
             <div
               className={cn(
@@ -4886,45 +4399,31 @@ const DodgeTheLoveGame = memo(function DodgeTheLoveGame({ onComplete }: { onComp
               <div className="absolute top-1 left-1 w-3 h-3 bg-white/40 rounded-full blur-sm" />
               <div className="absolute top-2 left-2 w-1.5 h-1.5 bg-white/60 rounded-full" />
 
-              {/* Eyes */}
-              <motion.div
-                className="absolute top-2.5 left-1.5 w-2.5 h-3 bg-white rounded-full shadow-inner"
-                animate={playerEmotion === "scared" ? { scaleY: [1, 1.2, 1] } : {}}
-                transition={{ duration: 0.3, repeat: playerEmotion === "scared" ? Infinity : 0 }}
-              >
-                <motion.div
+              {/* Simplified eyes */}
+              <div className="absolute top-2.5 left-1.5 w-2.5 h-3 bg-white rounded-full shadow-inner">
+                <div
                   className="absolute bg-slate-800 rounded-full"
                   style={{
-                    width: playerEmotion === "hurt" ? "4px" : "5px",
-                    height: playerEmotion === "hurt" ? "4px" : "5px",
-                    bottom: playerEmotion === "hurt" ? "3px" : "2px",
+                    width: "5px",
+                    height: "5px",
+                    bottom: "2px",
                     left: "3px",
                   }}
-                  animate={playerEmotion === "happy" ? { y: [0, -1, 0] } : {}}
-                  transition={{ duration: 0.5, repeat: Infinity }}
                 />
-                {/* Eye shine */}
                 <div className="absolute top-1 right-0.5 w-1 h-1 bg-white rounded-full" />
-              </motion.div>
-              <motion.div
-                className="absolute top-2.5 right-1.5 w-2.5 h-3 bg-white rounded-full shadow-inner"
-                animate={playerEmotion === "scared" ? { scaleY: [1, 1.2, 1] } : {}}
-                transition={{ duration: 0.3, repeat: playerEmotion === "scared" ? Infinity : 0 }}
-              >
-                <motion.div
+              </div>
+              <div className="absolute top-2.5 right-1.5 w-2.5 h-3 bg-white rounded-full shadow-inner">
+                <div
                   className="absolute bg-slate-800 rounded-full"
                   style={{
-                    width: playerEmotion === "hurt" ? "4px" : "5px",
-                    height: playerEmotion === "hurt" ? "4px" : "5px",
-                    bottom: playerEmotion === "hurt" ? "3px" : "2px",
+                    width: "5px",
+                    height: "5px",
+                    bottom: "2px",
                     left: "3px",
                   }}
-                  animate={playerEmotion === "happy" ? { y: [0, -1, 0] } : {}}
-                  transition={{ duration: 0.5, repeat: Infinity }}
                 />
-                {/* Eye shine */}
                 <div className="absolute top-1 right-0.5 w-1 h-1 bg-white rounded-full" />
-              </motion.div>
+              </div>
 
               {/* Eyebrows for hurt */}
               {playerEmotion === "hurt" && (
@@ -4934,87 +4433,51 @@ const DodgeTheLoveGame = memo(function DodgeTheLoveGame({ onComplete }: { onComp
                 </>
               )}
 
-              {/* Blush marks */}
-              <motion.div
-                className={cn(
-                  "absolute top-5 left-0 w-2 h-1.5 rounded-full",
-                  playerEmotion === "happy" ? "bg-orange-300/80" : "bg-pink-300/50"
-                )}
-                animate={playerEmotion === "happy" ? { opacity: [0.6, 0.9, 0.6] } : {}}
-                transition={{ duration: 0.8, repeat: Infinity }}
-              />
-              <motion.div
-                className={cn(
-                  "absolute top-5 right-0 w-2 h-1.5 rounded-full",
-                  playerEmotion === "happy" ? "bg-orange-300/80" : "bg-pink-300/50"
-                )}
-                animate={playerEmotion === "happy" ? { opacity: [0.6, 0.9, 0.6] } : {}}
-                transition={{ duration: 0.8, repeat: Infinity }}
-              />
+              {/* Simple blush marks */}
+              <div className={cn(
+                "absolute top-5 left-0 w-2 h-1.5 rounded-full",
+                playerEmotion === "happy" ? "bg-orange-300/80" : "bg-pink-300/50"
+              )} />
+              <div className={cn(
+                "absolute top-5 right-0 w-2 h-1.5 rounded-full",
+                playerEmotion === "happy" ? "bg-orange-300/80" : "bg-pink-300/50"
+              )} />
 
-              {/* Mouth - changes with emotion */}
+              {/* Simple mouth */}
               {playerEmotion === "happy" ? (
-                <motion.div
-                  className="absolute bottom-1.5 left-1/2 -translate-x-1/2 w-3 h-2 border-b-2 border-l-2 border-r-2 border-slate-700 rounded-b-full bg-pink-200/50"
-                  animate={{ scaleY: [1, 1.1, 1] }}
-                  transition={{ duration: 0.4, repeat: Infinity }}
-                />
+                <div className="absolute bottom-1.5 left-1/2 -translate-x-1/2 w-3 h-2 border-b-2 border-l-2 border-r-2 border-slate-700 rounded-b-full bg-pink-200/50" />
               ) : playerEmotion === "hurt" ? (
-                <motion.div
-                  className="absolute bottom-2 left-1/2 -translate-x-1/2 w-2.5 h-1.5 border-t-2 border-slate-700 rounded-t-full"
-                  animate={{ scaleX: [1, 0.9, 1] }}
-                  transition={{ duration: 0.2, repeat: Infinity }}
-                />
+                <div className="absolute bottom-2 left-1/2 -translate-x-1/2 w-2.5 h-1.5 border-t-2 border-slate-700 rounded-t-full" />
               ) : (
                 <div className="absolute bottom-1.5 left-1/2 -translate-x-1/2 w-2 h-1.5 border-b-2 border-slate-600 rounded-b-full" />
               )}
             </div>
 
-            {/* Little feet */}
-            <motion.div
-              className="absolute -bottom-1 left-1 w-2 h-1.5 bg-purple-400 rounded-full"
-              animate={{ rotate: [-5, 5, -5] }}
-              transition={{ duration: 0.4, repeat: Infinity }}
-            />
-            <motion.div
-              className="absolute -bottom-1 right-1 w-2 h-1.5 bg-purple-400 rounded-full"
-              animate={{ rotate: [5, -5, 5] }}
-              transition={{ duration: 0.4, repeat: Infinity, delay: 0.2 }}
-            />
-          </motion.div>
+            {/* Simple feet */}
+            <div className="absolute -bottom-1 left-1 w-2 h-1.5 bg-purple-400 rounded-full" />
+            <div className="absolute -bottom-1 right-1 w-2 h-1.5 bg-purple-400 rounded-full" />
+          </div>
         </div>
-      </motion.div>
+      </div>
 
-      {/* Bottom info bar */}
+      {/* Simplified bottom info bar */}
       <div className="absolute bottom-4 left-3 right-3 z-20">
-        <div className="bg-black/30 backdrop-blur-md rounded-2xl p-2.5 border border-white/10">
+        <div className="bg-black/30 backdrop-blur rounded-2xl p-2.5 border border-white/10">
           <div className="flex justify-center items-center gap-2 flex-wrap">
             {shield && (
-              <motion.span
-                initial={{ scale: 0 }}
-                animate={{ scale: 1 }}
-                className="bg-blue-500/60 text-white px-2.5 py-1 rounded-full text-xs font-bold border border-blue-400/30"
-              >
+              <span className="bg-blue-500/60 text-white px-2.5 py-1 rounded-full text-xs font-bold border border-blue-400/30">
                 🛡️ Shield
-              </motion.span>
+              </span>
             )}
             {slowMo && (
-              <motion.span
-                initial={{ scale: 0 }}
-                animate={{ scale: 1 }}
-                className="bg-amber-500/60 text-white px-2.5 py-1 rounded-full text-xs font-bold border border-amber-400/30"
-              >
+              <span className="bg-amber-500/60 text-white px-2.5 py-1 rounded-full text-xs font-bold border border-amber-400/30">
                 ⏰ Slow-Mo
-              </motion.span>
+              </span>
             )}
             {invincible && (
-              <motion.span
-                animate={{ opacity: [1, 0.5, 1] }}
-                transition={{ duration: 0.3, repeat: Infinity }}
-                className="bg-white/60 text-purple-700 px-2.5 py-1 rounded-full text-xs font-bold"
-              >
+              <span className="bg-white/60 text-purple-700 px-2.5 py-1 rounded-full text-xs font-bold">
                 ✨ Invincible
-              </motion.span>
+              </span>
             )}
             {!shield && !slowMo && !invincible && (
               <span className="text-white/50 text-xs">Drag to move!</span>
@@ -6810,238 +6273,132 @@ const RejectLettersGame = memo(function RejectLettersGame({ onComplete }: { onCo
     );
   }
 
-  // Super premium main game - letter queue view
+  // Optimized main game - letter queue view - reduced effects for performance
   return (
     <motion.div
       className="fixed inset-0 overflow-hidden"
       animate={screenShake > 0 ? { x: [0, -screenShake, screenShake, 0] } : {}}
     >
-      {/* Super premium animated gradient background */}
+      {/* Static gradient background - no animation for performance */}
       <div
         className="absolute inset-0"
         style={{
           background: "linear-gradient(135deg, #fef3c7 0%, #fecaca 20%, #fbcfe8 40%, #fce7f3 60%, #ffe4e6 80%, #fef9c3 100%)",
-          backgroundSize: "400% 400%",
-          animation: "gradientShift 15s ease infinite",
         }}
       />
 
-      {/* Animated mesh gradient orbs */}
+      {/* Simple ambient glow - reduced blur */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div
-          className="absolute w-[500px] h-[500px] rounded-full opacity-30 blur-3xl"
+          className="absolute w-96 h-96 rounded-full opacity-20"
           style={{
             background: "radial-gradient(circle, rgba(251,113,133,0.6) 0%, transparent 70%)",
-            top: "-15%",
+            top: "-10%",
             left: "-10%",
-            animation: "float 20s ease-in-out infinite",
-          }}
-        />
-        <div
-          className="absolute w-[400px] h-[400px] rounded-full opacity-25 blur-3xl"
-          style={{
-            background: "radial-gradient(circle, rgba(251,191,36,0.6) 0%, transparent 70%)",
-            bottom: "-10%",
-            right: "-10%",
-            animation: "float 15s ease-in-out infinite reverse",
+            filter: "blur(40px)",
           }}
         />
       </div>
 
-      {/* Premium diagonal pattern overlay */}
-      <div className="absolute inset-0 opacity-[0.05] pointer-events-none">
-        <div className="absolute inset-0" style={{
-          backgroundImage: `repeating-linear-gradient(45deg, transparent, transparent 20px, rgba(244,63,94,0.3) 20px, rgba(244,63,94,0.3) 40px)`,
-        }} />
-      </div>
-
-      {/* Premium glassmorphism header */}
+      {/* Optimized header - reduced blur */}
       <div className="absolute top-3 left-3 right-3 flex justify-between items-center z-30">
-        <motion.div
-          className="bg-white/30 backdrop-blur-xl rounded-2xl px-4 py-2.5 shadow-[0_8px_32px_rgba(0,0,0,0.1)] border border-white/50 flex items-center gap-2"
-          animate={score > 0 ? { scale: [1, 1.03, 1] } : {}}
-          transition={{ duration: 0.2 }}
-        >
+        <div className="bg-white/40 backdrop-blur rounded-2xl px-4 py-2.5 shadow-lg border border-white/50 flex items-center gap-2">
           <span className="text-xl">💔</span>
-          <span className="text-lg font-bold text-rose-600 drop-shadow">{score}</span>
-        </motion.div>
+          <span className="text-lg font-bold text-rose-600">{score}</span>
+        </div>
 
-        <motion.div
+        <div
           className={cn(
-            "backdrop-blur-xl rounded-2xl px-4 py-2.5 shadow-[0_8px_32px_rgba(0,0,0,0.1)] border flex items-center gap-2 relative overflow-hidden",
-            timeLeft <= 10 ? "bg-red-500/20 border-red-400/50" : "bg-white/30 border-white/50"
+            "backdrop-blur rounded-2xl px-4 py-2.5 shadow-lg border flex items-center gap-2",
+            timeLeft <= 10 ? "bg-red-500/20 border-red-400/50" : "bg-white/40 border-white/50"
           )}
-          animate={timeLeft <= 10 ? { scale: [1, 1.03, 1] } : {}}
-          transition={{ duration: 0.4, repeat: timeLeft <= 10 ? Infinity : 0 }}
         >
-          {timeLeft <= 10 && (
-            <div
-              className="absolute inset-0 bg-red-500/20"
-              style={{ animation: "pulseGlow 0.5s ease-in-out infinite" }}
-            />
-          )}
-          <span className="text-xl relative">⏱️</span>
-          <span className={cn("text-lg font-bold relative", timeLeft <= 10 ? "text-red-600" : "text-rose-600")}>
+          <span className="text-xl">⏱️</span>
+          <span className={cn("text-lg font-bold", timeLeft <= 10 ? "text-red-600" : "text-rose-600")}>
             {timeLeft}s
           </span>
-        </motion.div>
-      </div>
-
-      {/* Premium cat with mailbag */}
-      <div className="absolute top-16 left-1/2 -translate-x-1/2 text-center z-20">
-        <div className="relative">
-          <div
-            className="absolute blur-2xl rounded-full"
-            style={{
-              background: catEmotion === "devastated" || catEmotion === "crying"
-                ? "radial-gradient(circle, rgba(239,68,68,0.3) 0%, transparent 70%)"
-                : "radial-gradient(circle, rgba(251,146,60,0.3) 0%, transparent 70%)",
-              width: "100px",
-              height: "100px",
-              left: "50%",
-              top: "50%",
-              transform: "translate(-50%, -50%)",
-            }}
-          />
-          <motion.div
-            animate={{ y: [0, -8, 0], rotate: [-2, 2, -2] }}
-            transition={{ duration: 2, repeat: Infinity }}
-          >
-            <span className="text-6xl relative" style={{ filter: "drop-shadow(0 4px 16px rgba(0,0,0,0.2))" }}>
-              {catEmotion === "devastated" ? "😭" : catEmotion === "crying" ? "😿" : catEmotion === "nervous" ? "🙀" : "😸"}
-            </span>
-          </motion.div>
         </div>
-        <motion.p
-          className="text-rose-600/90 font-medium text-sm mt-1"
-          animate={{ opacity: [0.7, 1, 0.7] }}
-          transition={{ duration: 2, repeat: Infinity }}
-        >
-          {letterQueue.length === 0 ? "Sending more letters..." : "Please read my letters! 💕"}
-        </motion.p>
-        <AnimatePresence>
-          {catMessage && (
-            <motion.div
-              initial={{ scale: 0, y: 5, opacity: 0 }}
-              animate={{ scale: 1, y: 0, opacity: 1 }}
-              exit={{ scale: 0, opacity: 0 }}
-              className="absolute top-full left-1/2 -translate-x-1/2 mt-2 bg-white/95 backdrop-blur-xl text-rose-600 px-4 py-2 rounded-full font-bold shadow-[0_8px_32px_rgba(0,0,0,0.15)] text-sm whitespace-nowrap border border-rose-200/50"
-            >
-              {catMessage}
-            </motion.div>
-          )}
-        </AnimatePresence>
       </div>
 
-      {/* Premium stats bar with glassmorphism */}
+      {/* Simplified cat */}
+      <div className="absolute top-16 left-1/2 -translate-x-1/2 text-center z-20">
+        <span className="text-6xl" style={{ filter: "drop-shadow(0 4px 8px rgba(0,0,0,0.2))" }}>
+          {catEmotion === "devastated" ? "😭" : catEmotion === "crying" ? "😿" : catEmotion === "nervous" ? "🙀" : "😸"}
+        </span>
+        <p className="text-rose-600/90 font-medium text-sm mt-1">
+          {letterQueue.length === 0 ? "Sending more letters..." : "Please read my letters! 💕"}
+        </p>
+        {catMessage && (
+          <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 bg-white/90 backdrop-blur text-rose-600 px-4 py-2 rounded-full font-bold shadow-lg text-sm whitespace-nowrap border border-rose-200/50">
+            {catMessage}
+          </div>
+        )}
+      </div>
+
+      {/* Simplified stats bar - reduced blur */}
       <div className="absolute top-32 left-1/2 -translate-x-1/2 flex gap-2 z-20">
-        <div className="bg-white/40 backdrop-blur-xl rounded-xl px-3 py-1.5 text-center shadow-[0_4px_20px_rgba(0,0,0,0.08)] border border-white/50">
+        <div className="bg-white/50 backdrop-blur rounded-xl px-3 py-1.5 text-center shadow-md border border-white/50">
           <div className="text-lg font-bold text-rose-600">{lettersDestroyed}</div>
           <div className="text-[9px] text-rose-400 font-medium">destroyed</div>
         </div>
-        <div className="bg-orange-100/50 backdrop-blur-xl rounded-xl px-3 py-1.5 text-center shadow-[0_4px_20px_rgba(251,146,60,0.15)] border border-orange-200/50">
+        <div className="bg-orange-100/60 backdrop-blur rounded-xl px-3 py-1.5 text-center shadow-md border border-orange-200/50">
           <div className="text-lg font-bold text-orange-600">{burnCount} 🔥</div>
           <div className="text-[9px] text-orange-400 font-medium">burned</div>
         </div>
-        <div className="bg-slate-100/50 backdrop-blur-xl rounded-xl px-3 py-1.5 text-center shadow-[0_4px_20px_rgba(0,0,0,0.05)] border border-slate-200/50">
+        <div className="bg-slate-100/60 backdrop-blur rounded-xl px-3 py-1.5 text-center shadow-md border border-slate-200/50">
           <div className="text-lg font-bold text-slate-600">{ripCount} ✂️</div>
           <div className="text-[9px] text-slate-400 font-medium">ripped</div>
         </div>
       </div>
 
-      {/* Letter queue */}
+      {/* Simplified letter queue */}
       <div className="absolute top-48 left-0 right-0 bottom-24 flex items-center justify-center">
         <div className="flex flex-wrap justify-center gap-4 p-4 max-w-md">
-          <AnimatePresence mode="popLayout">
-            {letterQueue.map((letter, index) => (
-              <motion.button
-                key={letter.id}
-                initial={{ scale: 0, rotate: -20, y: 50 }}
-                animate={{
-                  scale: 1,
-                  rotate: (index - 2) * 5,
-                  y: 0,
-                }}
-                exit={{ scale: 0, rotate: 20, y: -50 }}
-                transition={{ type: "spring", stiffness: 300, damping: 25 }}
-                onClick={() => handleOpenLetter(letter)}
-                className={cn(
-                  "relative p-4 rounded-xl shadow-xl border-2 touch-manipulation",
-                  letter.envelope === "pink" && "bg-gradient-to-br from-pink-100 to-rose-200 border-pink-300",
-                  letter.envelope === "red" && "bg-gradient-to-br from-red-100 to-rose-200 border-red-300",
-                  letter.envelope === "gold" && "bg-gradient-to-br from-yellow-100 to-amber-200 border-yellow-400",
-                  letter.envelope === "purple" && "bg-gradient-to-br from-purple-100 to-violet-200 border-purple-300",
-                )}
-                whileHover={{ scale: 1.1, rotate: 0 }}
-                whileTap={{ scale: 0.95 }}
-              >
-                {/* Envelope */}
-                <motion.div
-                  className="text-5xl"
-                  animate={{ y: [0, -3, 0] }}
-                  transition={{ duration: 1.5, repeat: Infinity, delay: index * 0.2 }}
-                >
-                  {letter.isGold ? "💛" : "💌"}
-                </motion.div>
+          {letterQueue.map((letter, index) => (
+            <button
+              key={letter.id}
+              onClick={() => handleOpenLetter(letter)}
+              className={cn(
+                "relative p-4 rounded-xl shadow-lg border-2 touch-manipulation transition-transform active:scale-95",
+                letter.envelope === "pink" && "bg-gradient-to-br from-pink-100 to-rose-200 border-pink-300",
+                letter.envelope === "red" && "bg-gradient-to-br from-red-100 to-rose-200 border-red-300",
+                letter.envelope === "gold" && "bg-gradient-to-br from-yellow-100 to-amber-200 border-yellow-400",
+                letter.envelope === "purple" && "bg-gradient-to-br from-purple-100 to-violet-200 border-purple-300",
+              )}
+              style={{ transform: `rotate(${(index - 2) * 5}deg)` }}
+            >
+              <span className="text-5xl">{letter.isGold ? "💛" : "💌"}</span>
 
-                {/* Wax seal */}
-                <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-6 h-6 bg-gradient-to-br from-red-500 to-red-700 rounded-full shadow flex items-center justify-center">
-                  <span className="text-xs">💕</span>
+              {/* Wax seal */}
+              <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 w-6 h-6 bg-gradient-to-br from-red-500 to-red-700 rounded-full shadow flex items-center justify-center">
+                <span className="text-xs">💕</span>
+              </div>
+
+              {/* "New" badge */}
+              {index === letterQueue.length - 1 && (
+                <div className="absolute -top-2 -right-2 bg-rose-500 text-white text-[8px] font-bold px-2 py-0.5 rounded-full">
+                  NEW!
                 </div>
-
-                {/* Gold glow */}
-                {letter.isGold && (
-                  <motion.div
-                    className="absolute inset-0 -m-1 rounded-xl bg-yellow-400/30 -z-10"
-                    animate={{ opacity: [0.3, 0.6, 0.3], scale: [1, 1.05, 1] }}
-                    transition={{ duration: 1, repeat: Infinity }}
-                  />
-                )}
-
-                {/* "New" badge */}
-                {index === letterQueue.length - 1 && (
-                  <motion.div
-                    initial={{ scale: 0 }}
-                    animate={{ scale: 1 }}
-                    className="absolute -top-2 -right-2 bg-rose-500 text-white text-[8px] font-bold px-2 py-0.5 rounded-full"
-                  >
-                    NEW!
-                  </motion.div>
-                )}
-              </motion.button>
-            ))}
-          </AnimatePresence>
+              )}
+            </button>
+          ))}
 
           {letterQueue.length === 0 && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="text-center text-rose-400"
-            >
-              <motion.div
-                className="text-6xl mb-2"
-                animate={{ rotate: [0, 10, -10, 0] }}
-                transition={{ duration: 2, repeat: Infinity }}
-              >
-                📮
-              </motion.div>
+            <div className="text-center text-rose-400">
+              <div className="text-6xl mb-2">📮</div>
               <p className="font-medium">Waiting for letters...</p>
-            </motion.div>
+            </div>
           )}
         </div>
       </div>
 
-      {/* Bottom instruction */}
+      {/* Simplified bottom instruction */}
       <div className="absolute bottom-4 left-4 right-4 z-20">
-        <motion.div
-          className="bg-white/80 backdrop-blur-md rounded-2xl p-3 border border-rose-200 shadow-lg"
-          initial={{ y: 20, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-        >
+        <div className="bg-white/80 backdrop-blur rounded-2xl p-3 border border-rose-200 shadow-lg">
           <p className="text-rose-600 text-center text-sm font-medium">
             👆 Tap a letter to open and read it!
           </p>
-        </motion.div>
+        </div>
       </div>
 
       {/* Skip button */}
