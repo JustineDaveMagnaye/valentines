@@ -538,6 +538,88 @@ class SoundManager {
     });
     this.currentMusic = [];
   }
+
+  // === RHYTHM GAME SOUNDS ===
+  rhythmHit() {
+    this.playTone(880, 0.08, "sine", 0.25);
+    this.playTone(1100, 0.06, "sine", 0.15, 0.02);
+  }
+
+  rhythmPerfect() {
+    this.playTone(1047, 0.1, "sine", 0.3); // C6
+    this.playTone(1319, 0.08, "sine", 0.2, 0.03); // E6
+    this.playTone(1568, 0.1, "sine", 0.25, 0.06); // G6
+  }
+
+  rhythmMiss() {
+    this.playTone(200, 0.15, "sawtooth", 0.2);
+    this.playNoise(0.1, 0.1);
+  }
+
+  rhythmBeat() {
+    this.playTone(80, 0.1, "sine", 0.15);
+  }
+
+  rhythmCombo() {
+    this.playTone(600, 0.1, "sine", 0.2);
+    this.playTone(800, 0.08, "sine", 0.15, 0.05);
+    this.playTone(1000, 0.1, "sine", 0.2, 0.1);
+  }
+
+  // === PUZZLE GAME SOUNDS ===
+  tileSlide() {
+    this.playTone(400, 0.05, "sine", 0.2);
+    this.playTone(500, 0.05, "sine", 0.15, 0.02);
+  }
+
+  tileClick() {
+    this.playTone(600, 0.03, "sine", 0.15);
+  }
+
+  puzzleSolved() {
+    const notes = [523, 659, 784, 1047, 1319, 1568];
+    notes.forEach((freq, i) => {
+      this.playTone(freq, 0.2, "sine", 0.2, i * 0.1);
+    });
+  }
+
+  invalidMove() {
+    this.playTone(200, 0.1, "square", 0.15);
+  }
+
+  // === ARROW GALLERY SOUNDS ===
+  bowDraw() {
+    this.playTone(200, 0.1, "sine", 0.1);
+    this.playTone(250, 0.15, "sine", 0.1, 0.05);
+  }
+
+  arrowFire() {
+    this.playNoise(0.1, 0.2);
+    this.playTone(400, 0.1, "sine", 0.15);
+    this.playTone(600, 0.08, "sine", 0.1, 0.03);
+  }
+
+  arrowHit() {
+    this.playTone(800, 0.1, "sine", 0.25);
+    this.playTone(1000, 0.08, "sine", 0.2, 0.03);
+    this.playNoise(0.05, 0.15);
+  }
+
+  arrowMiss() {
+    this.playNoise(0.08, 0.1);
+    this.playTone(300, 0.1, "sine", 0.1);
+  }
+
+  bullseye() {
+    this.playTone(1047, 0.15, "sine", 0.3);
+    this.playTone(1319, 0.12, "sine", 0.25, 0.05);
+    this.playTone(1568, 0.15, "sine", 0.3, 0.1);
+  }
+
+  targetSpawn() {
+    this.playTone(500, 0.08, "sine", 0.15);
+    this.playTone(700, 0.06, "sine", 0.1, 0.04);
+  }
 }
 
 // Global sound manager instance
@@ -556,6 +638,10 @@ type GameScene =
   | "chapter2_escape"
   | "chapter2_reject_letters"
   | "chapter3_boss_battle"
+  | "bonus_select"
+  | "bonus_rhythm"
+  | "bonus_puzzle"
+  | "bonus_gallery"
   | "chapter3_final"
   | "ending_good"
   | "ending_perfect";
@@ -8004,6 +8090,1276 @@ const DramaKingBattle = memo(function DramaKingBattle({ onComplete }: { onComple
 });
 
 // ============================================================================
+// RHYTHM HEART BEAT - Rhythm game with falling hearts
+// ============================================================================
+
+type RhythmNote = {
+  id: number;
+  lane: 0 | 1 | 2;
+  y: number;
+  type: "heart" | "golden" | "broken";
+  speed: number;
+  hit?: "perfect" | "good" | "miss";
+};
+
+type RhythmHitEffect = {
+  id: number;
+  lane: number;
+  type: "perfect" | "good" | "miss";
+  y: number;
+};
+
+const RhythmHeartBeatGame = memo(function RhythmHeartBeatGame({
+  onComplete
+}: {
+  onComplete: (score: number) => void;
+}) {
+  const [phase, setPhase] = useState<"tutorial" | "countdown" | "playing" | "done">("tutorial");
+  const [countdownNum, setCountdownNum] = useState(3);
+  const [notes, setNotes] = useState<RhythmNote[]>([]);
+  const [score, setScore] = useState(0);
+  const [combo, setCombo] = useState(0);
+  const [maxCombo, setMaxCombo] = useState(0);
+  const [timeLeft, setTimeLeft] = useState(30);
+  const [hitEffects, setHitEffects] = useState<RhythmHitEffect[]>([]);
+  const [laneFlash, setLaneFlash] = useState<[boolean, boolean, boolean]>([false, false, false]);
+  const [beatPulse, setBeatPulse] = useState(false);
+  const [catEmotion, setCatEmotion] = useState<"happy" | "impressed" | "worried">("happy");
+
+  const onCompleteRef = useRef(onComplete);
+  const gameEndedRef = useRef(false);
+  const rafRef = useRef<number>(0);
+  const noteIdRef = useRef(0);
+  const scoreRef = useRef(0);
+  const comboRef = useRef(0);
+
+  useEffect(() => { onCompleteRef.current = onComplete; }, [onComplete]);
+  useEffect(() => { scoreRef.current = score; }, [score]);
+  useEffect(() => { comboRef.current = combo; }, [combo]);
+
+  // Countdown
+  useEffect(() => {
+    if (phase !== "countdown") return;
+    if (countdownNum > 0) {
+      soundManager.countdown();
+      const timer = setTimeout(() => setCountdownNum(c => c - 1), 1000);
+      return () => clearTimeout(timer);
+    } else {
+      soundManager.countdownGo();
+      setPhase("playing");
+    }
+  }, [phase, countdownNum]);
+
+  // Timer
+  useEffect(() => {
+    if (phase !== "playing" || gameEndedRef.current) return;
+    const timer = setInterval(() => {
+      setTimeLeft(t => {
+        if (t <= 1) {
+          gameEndedRef.current = true;
+          setPhase("done");
+          soundManager.victory();
+          setTimeout(() => onCompleteRef.current(scoreRef.current), 2000);
+          return 0;
+        }
+        return t - 1;
+      });
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [phase]);
+
+  // Beat pulse
+  useEffect(() => {
+    if (phase !== "playing") return;
+    const beatInterval = setInterval(() => {
+      setBeatPulse(true);
+      soundManager.rhythmBeat();
+      setTimeout(() => setBeatPulse(false), 100);
+    }, 500);
+    return () => clearInterval(beatInterval);
+  }, [phase]);
+
+  // Spawn notes
+  useEffect(() => {
+    if (phase !== "playing" || gameEndedRef.current) return;
+    const spawnInterval = setInterval(() => {
+      const lane = Math.floor(Math.random() * 3) as 0 | 1 | 2;
+      const rand = Math.random();
+      const type: RhythmNote["type"] = rand < 0.1 ? "broken" : rand < 0.2 ? "golden" : "heart";
+      const newNote: RhythmNote = {
+        id: noteIdRef.current++,
+        lane,
+        y: -5,
+        type,
+        speed: 1.2 + (30 - timeLeft) * 0.02,
+      };
+      setNotes(prev => [...prev, newNote]);
+    }, 800 - Math.min(400, (30 - timeLeft) * 10));
+    return () => clearInterval(spawnInterval);
+  }, [phase, timeLeft]);
+
+  // Game loop - update note positions
+  useEffect(() => {
+    if (phase !== "playing") return;
+
+    const gameLoop = () => {
+      if (gameEndedRef.current) return;
+
+      setNotes(prev => {
+        const updated = prev.map(note => ({
+          ...note,
+          y: note.y + note.speed
+        }));
+
+        // Check for missed notes
+        const missed = updated.filter(n => n.y > 95 && !n.hit);
+        missed.forEach(n => {
+          if (n.type !== "broken") {
+            setCombo(0);
+            comboRef.current = 0;
+            soundManager.rhythmMiss();
+            setHitEffects(prev => [...prev, { id: n.id, lane: n.lane, type: "miss", y: 85 }]);
+            setTimeout(() => setHitEffects(prev => prev.filter(e => e.id !== n.id)), 500);
+          }
+        });
+
+        return updated.filter(n => n.y <= 100 && !n.hit);
+      });
+
+      rafRef.current = requestAnimationFrame(gameLoop);
+    };
+
+    rafRef.current = requestAnimationFrame(gameLoop);
+    return () => cancelAnimationFrame(rafRef.current);
+  }, [phase]);
+
+  // Handle lane tap
+  const handleLaneTap = useCallback((lane: 0 | 1 | 2) => {
+    if (phase !== "playing" || gameEndedRef.current) return;
+
+    // Flash lane
+    setLaneFlash(prev => {
+      const newFlash = [...prev] as [boolean, boolean, boolean];
+      newFlash[lane] = true;
+      return newFlash;
+    });
+    setTimeout(() => setLaneFlash(prev => {
+      const newFlash = [...prev] as [boolean, boolean, boolean];
+      newFlash[lane] = false;
+      return newFlash;
+    }), 100);
+
+    const hitZone = 85;
+    const activeNotes = notes.filter(n => n.lane === lane && !n.hit);
+
+    for (const note of activeNotes) {
+      const distance = Math.abs(note.y - hitZone);
+
+      if (distance <= 12) {
+        // Hit!
+        if (note.type === "broken") {
+          // Hit a trap
+          setScore(s => Math.max(0, s - 50));
+          setCombo(0);
+          comboRef.current = 0;
+          soundManager.rhythmMiss();
+          setHitEffects(prev => [...prev, { id: note.id, lane, type: "miss", y: hitZone }]);
+        } else {
+          const isPerfect = distance <= 5;
+          const basePoints = note.type === "golden" ? 200 : 100;
+          const comboMultiplier = comboRef.current >= 10 ? 3 : comboRef.current >= 5 ? 2 : 1;
+          const points = (isPerfect ? basePoints : Math.floor(basePoints / 2)) * comboMultiplier;
+
+          setScore(s => s + points);
+          setCombo(c => {
+            const newCombo = c + 1;
+            setMaxCombo(m => Math.max(m, newCombo));
+            if (newCombo % 10 === 0) soundManager.rhythmCombo();
+            return newCombo;
+          });
+
+          if (isPerfect) {
+            soundManager.rhythmPerfect();
+          } else {
+            soundManager.rhythmHit();
+          }
+
+          setHitEffects(prev => [...prev, { id: note.id, lane, type: isPerfect ? "perfect" : "good", y: hitZone }]);
+        }
+
+        setTimeout(() => setHitEffects(prev => prev.filter(e => e.id !== note.id)), 500);
+
+        setNotes(prev => prev.map(n =>
+          n.id === note.id ? { ...n, hit: distance <= 5 ? "perfect" : "good" } : n
+        ));
+
+        break;
+      }
+    }
+  }, [phase, notes]);
+
+  // Update cat emotion based on combo
+  useEffect(() => {
+    if (combo >= 15) setCatEmotion("impressed");
+    else if (combo >= 5) setCatEmotion("happy");
+    else setCatEmotion("worried");
+  }, [combo]);
+
+  // Tutorial
+  if (phase === "tutorial") {
+    return (
+      <div className="fixed inset-0 bg-gradient-to-b from-purple-900 via-fuchsia-800 to-pink-700 flex items-center justify-center p-4">
+        <motion.div
+          initial={{ scale: 0.8, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          className="bg-white/95 backdrop-blur-xl rounded-3xl p-6 max-w-sm w-full shadow-2xl border border-white/30"
+        >
+          <div className="text-center">
+            <motion.div
+              className="text-7xl mb-4"
+              animate={{ scale: [1, 1.1, 1], rotate: [0, 5, -5, 0] }}
+              transition={{ duration: 2, repeat: Infinity }}
+            >
+              🎵
+            </motion.div>
+            <h2 className="text-2xl font-black text-purple-800 mb-2">Rhythm Heart Beat</h2>
+            <p className="text-slate-600 mb-4">
+              Tap the lanes when hearts reach the glowing zone!
+            </p>
+
+            <div className="flex justify-center gap-4 mb-4">
+              <div className="text-center">
+                <div className="text-3xl">💕</div>
+                <div className="text-xs text-slate-500">+100</div>
+              </div>
+              <div className="text-center">
+                <div className="text-3xl">💛</div>
+                <div className="text-xs text-yellow-600">+200</div>
+              </div>
+              <div className="text-center">
+                <div className="text-3xl">💔</div>
+                <div className="text-xs text-red-500">Avoid!</div>
+              </div>
+            </div>
+
+            <div className="bg-purple-100 rounded-xl p-3 mb-4">
+              <div className="flex justify-around text-sm">
+                <span>🎯 Perfect = Full Points</span>
+              </div>
+              <div className="flex justify-around text-sm mt-1">
+                <span>🔥 Combos = Multiplier!</span>
+              </div>
+            </div>
+
+            <motion.button
+              onClick={() => { soundManager.buttonPress(); setPhase("countdown"); }}
+              className="w-full py-3 bg-gradient-to-r from-purple-500 to-pink-500 text-white font-bold rounded-xl shadow-lg"
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+            >
+              Start!
+            </motion.button>
+          </div>
+        </motion.div>
+      </div>
+    );
+  }
+
+  // Countdown
+  if (phase === "countdown") {
+    return (
+      <div className="fixed inset-0 bg-gradient-to-b from-purple-900 via-fuchsia-800 to-pink-700 flex items-center justify-center">
+        <motion.div
+          key={countdownNum}
+          initial={{ scale: 2, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          exit={{ scale: 0, opacity: 0 }}
+          className="text-9xl font-black text-white drop-shadow-[0_0_30px_rgba(255,255,255,0.8)]"
+        >
+          {countdownNum || "GO!"}
+        </motion.div>
+      </div>
+    );
+  }
+
+  // Done
+  if (phase === "done") {
+    return (
+      <div className="fixed inset-0 bg-gradient-to-b from-purple-900 via-fuchsia-800 to-pink-700 flex items-center justify-center p-4">
+        <motion.div
+          initial={{ scale: 0.8, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          className="bg-white/95 backdrop-blur-xl rounded-3xl p-6 text-center"
+        >
+          <div className="text-6xl mb-4">🎵✨</div>
+          <h2 className="text-3xl font-black text-purple-800 mb-2">Great Rhythm!</h2>
+          <div className="text-5xl font-black text-pink-500 mb-2">{score.toLocaleString()}</div>
+          <div className="text-slate-600">Max Combo: {maxCombo}x</div>
+        </motion.div>
+      </div>
+    );
+  }
+
+  // Playing
+  return (
+    <div className="fixed inset-0 bg-gradient-to-b from-purple-900 via-fuchsia-800 to-pink-700 overflow-hidden select-none">
+      {/* HUD */}
+      <div className="absolute top-0 left-0 right-0 z-30 p-3 bg-gradient-to-b from-black/40 to-transparent">
+        <div className="flex justify-between items-center">
+          <div className="bg-slate-800/80 rounded-lg px-3 py-1">
+            <span className="text-white text-sm font-bold">{score.toLocaleString()}</span>
+          </div>
+          <div className={cn(
+            "rounded-lg px-3 py-1 font-bold text-sm transition-all",
+            combo >= 10 ? "bg-yellow-500/80 text-yellow-950" :
+            combo >= 5 ? "bg-pink-500/80 text-white" :
+            "bg-slate-700/80 text-white"
+          )}>
+            {combo}x {combo >= 10 ? "🔥" : ""}
+          </div>
+          <div className="bg-slate-800/80 rounded-lg px-3 py-1">
+            <span className="text-white text-sm font-bold">{timeLeft}s</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Lanes */}
+      <div className="absolute inset-x-4 top-16 bottom-32 flex gap-2">
+        {[0, 1, 2].map(lane => (
+          <button
+            key={lane}
+            onClick={() => handleLaneTap(lane as 0 | 1 | 2)}
+            className={cn(
+              "flex-1 rounded-2xl border-2 border-white/20 transition-all relative overflow-hidden",
+              laneFlash[lane] ? "bg-white/30" : "bg-white/5"
+            )}
+          >
+            {/* Lane glow animation */}
+            <div className="absolute inset-0 animate-[laneGlow_2s_ease-in-out_infinite]" />
+          </button>
+        ))}
+      </div>
+
+      {/* Hit Zone */}
+      <div
+        className={cn(
+          "absolute left-4 right-4 h-4 rounded-full transition-all",
+          "bg-gradient-to-r from-pink-500 via-rose-400 to-pink-500"
+        )}
+        style={{
+          top: "85%",
+          boxShadow: beatPulse
+            ? "0 0 40px rgba(236,72,153,0.8), 0 0 60px rgba(236,72,153,0.4)"
+            : "0 0 20px rgba(236,72,153,0.6)"
+        }}
+      />
+
+      {/* Notes */}
+      {notes.filter(n => !n.hit).map(note => (
+        <div
+          key={note.id}
+          className="absolute text-4xl pointer-events-none transition-transform"
+          style={{
+            left: `calc(${(note.lane * 33.33) + 16.66}% - 16px + 1rem)`,
+            top: `${note.y}%`,
+            filter: note.type === "golden" ? "drop-shadow(0 0 15px gold)" : "drop-shadow(0 0 10px rgba(255,182,193,0.8))"
+          }}
+        >
+          {note.type === "heart" ? "💕" : note.type === "golden" ? "💛" : "💔"}
+        </div>
+      ))}
+
+      {/* Hit Effects */}
+      {hitEffects.map(effect => (
+        <motion.div
+          key={effect.id}
+          initial={{ scale: 0.5, opacity: 1 }}
+          animate={{ scale: 2, opacity: 0 }}
+          transition={{ duration: 0.5 }}
+          className="absolute pointer-events-none text-2xl font-black"
+          style={{
+            left: `calc(${(effect.lane * 33.33) + 16.66}% + 1rem)`,
+            top: `${effect.y}%`,
+            transform: "translate(-50%, -50%)"
+          }}
+        >
+          <span className={cn(
+            effect.type === "perfect" ? "text-yellow-400" :
+            effect.type === "good" ? "text-green-400" : "text-red-400"
+          )}>
+            {effect.type === "perfect" ? "PERFECT!" : effect.type === "good" ? "GOOD!" : "MISS!"}
+          </span>
+        </motion.div>
+      ))}
+
+      {/* Cat */}
+      <div className="absolute bottom-4 left-1/2 -translate-x-1/2">
+        <div className="text-5xl">
+          {catEmotion === "impressed" ? "😻" : catEmotion === "happy" ? "😸" : "😿"}
+        </div>
+      </div>
+    </div>
+  );
+});
+
+// ============================================================================
+// LOVE LETTER PUZZLE - Sliding tile puzzle
+// ============================================================================
+
+const PUZZLE_TILES = ["💕", "💗", "💖", "💝", "❤️", "💘", "💓", "💞"];
+
+const LoveLetterPuzzleGame = memo(function LoveLetterPuzzleGame({
+  onComplete
+}: {
+  onComplete: (score: number) => void;
+}) {
+  const [phase, setPhase] = useState<"tutorial" | "countdown" | "playing" | "done">("tutorial");
+  const [countdownNum, setCountdownNum] = useState(3);
+  const [tiles, setTiles] = useState<number[]>([]);
+  const [emptyIndex, setEmptyIndex] = useState(8);
+  const [moves, setMoves] = useState(0);
+  const [timeLeft, setTimeLeft] = useState(60);
+  const [isSolved, setIsSolved] = useState(false);
+  const [shakingTile, setShakingTile] = useState<number | null>(null);
+  const [score, setScore] = useState(0);
+
+  const onCompleteRef = useRef(onComplete);
+  const gameEndedRef = useRef(false);
+
+  useEffect(() => { onCompleteRef.current = onComplete; }, [onComplete]);
+
+  // Check if puzzle configuration is solvable
+  const isSolvable = useCallback((arr: number[]) => {
+    let inversions = 0;
+    for (let i = 0; i < arr.length; i++) {
+      for (let j = i + 1; j < arr.length; j++) {
+        if (arr[i] !== 0 && arr[j] !== 0 && arr[i] > arr[j]) {
+          inversions++;
+        }
+      }
+    }
+    return inversions % 2 === 0;
+  }, []);
+
+  // Shuffle puzzle
+  const shufflePuzzle = useCallback(() => {
+    let shuffled: number[];
+    do {
+      shuffled = [1, 2, 3, 4, 5, 6, 7, 8, 0];
+      for (let i = shuffled.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+      }
+    } while (!isSolvable(shuffled) || checkSolution(shuffled));
+    return shuffled;
+  }, [isSolvable]);
+
+  // Check if solved
+  const checkSolution = useCallback((arr: number[]) => {
+    return arr.every((tile, index) => {
+      if (index === 8) return tile === 0;
+      return tile === index + 1;
+    });
+  }, []);
+
+  // Initialize puzzle
+  useEffect(() => {
+    const shuffled = shufflePuzzle();
+    setTiles(shuffled);
+    setEmptyIndex(shuffled.indexOf(0));
+  }, [shufflePuzzle]);
+
+  // Countdown
+  useEffect(() => {
+    if (phase !== "countdown") return;
+    if (countdownNum > 0) {
+      soundManager.countdown();
+      const timer = setTimeout(() => setCountdownNum(c => c - 1), 1000);
+      return () => clearTimeout(timer);
+    } else {
+      soundManager.countdownGo();
+      setPhase("playing");
+    }
+  }, [phase, countdownNum]);
+
+  // Timer
+  useEffect(() => {
+    if (phase !== "playing" || gameEndedRef.current || isSolved) return;
+    const timer = setInterval(() => {
+      setTimeLeft(t => {
+        if (t <= 1) {
+          gameEndedRef.current = true;
+          setPhase("done");
+          soundManager.fail();
+          setTimeout(() => onCompleteRef.current(0), 2000);
+          return 0;
+        }
+        return t - 1;
+      });
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [phase, isSolved]);
+
+  // Handle tile tap
+  const handleTileTap = useCallback((tileIndex: number) => {
+    if (phase !== "playing" || gameEndedRef.current || isSolved) return;
+    if (tiles[tileIndex] === 0) return;
+
+    const gridSize = 3;
+    const emptyRow = Math.floor(emptyIndex / gridSize);
+    const emptyCol = emptyIndex % gridSize;
+    const tileRow = Math.floor(tileIndex / gridSize);
+    const tileCol = tileIndex % gridSize;
+
+    const isAdjacent =
+      (Math.abs(emptyRow - tileRow) === 1 && emptyCol === tileCol) ||
+      (Math.abs(emptyCol - tileCol) === 1 && emptyRow === tileRow);
+
+    if (!isAdjacent) {
+      soundManager.invalidMove();
+      setShakingTile(tileIndex);
+      setTimeout(() => setShakingTile(null), 300);
+      return;
+    }
+
+    soundManager.tileSlide();
+    setMoves(m => m + 1);
+
+    setTiles(prev => {
+      const newTiles = [...prev];
+      [newTiles[tileIndex], newTiles[emptyIndex]] = [newTiles[emptyIndex], newTiles[tileIndex]];
+
+      if (checkSolution(newTiles)) {
+        gameEndedRef.current = true;
+        setIsSolved(true);
+        soundManager.puzzleSolved();
+
+        // Calculate score
+        const baseScore = 1000;
+        const timeBonus = timeLeft * 50;
+        const movePenalty = Math.max(0, (moves - 25) * 5);
+        const finalScore = Math.max(100, baseScore + timeBonus - movePenalty);
+        setScore(finalScore);
+
+        setTimeout(() => {
+          setPhase("done");
+          setTimeout(() => onCompleteRef.current(finalScore), 2000);
+        }, 1500);
+      }
+
+      return newTiles;
+    });
+    setEmptyIndex(tileIndex);
+  }, [phase, tiles, emptyIndex, isSolved, checkSolution, moves, timeLeft]);
+
+  // Tutorial
+  if (phase === "tutorial") {
+    return (
+      <div className="fixed inset-0 bg-gradient-to-b from-rose-600 via-pink-600 to-fuchsia-700 flex items-center justify-center p-4">
+        <motion.div
+          initial={{ scale: 0.8, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          className="bg-white/95 backdrop-blur-xl rounded-3xl p-6 max-w-sm w-full shadow-2xl border border-white/30"
+        >
+          <div className="text-center">
+            <motion.div
+              className="text-7xl mb-4"
+              animate={{ rotate: [0, 5, -5, 0] }}
+              transition={{ duration: 2, repeat: Infinity }}
+            >
+              🧩
+            </motion.div>
+            <h2 className="text-2xl font-black text-rose-800 mb-2">Love Letter Puzzle</h2>
+            <p className="text-slate-600 mb-4">
+              Slide the tiles to complete the heart pattern!
+            </p>
+
+            <div className="grid grid-cols-3 gap-1 w-32 mx-auto mb-4">
+              {PUZZLE_TILES.map((emoji, i) => (
+                <div key={i} className="aspect-square bg-rose-100 rounded-lg flex items-center justify-center text-lg">
+                  {emoji}
+                </div>
+              ))}
+              <div className="aspect-square bg-slate-200 rounded-lg border-2 border-dashed border-slate-300" />
+            </div>
+
+            <div className="bg-rose-100 rounded-xl p-3 mb-4 text-sm text-slate-600">
+              <div>⏱️ 60 seconds to solve</div>
+              <div>🎯 Fewer moves = Higher score!</div>
+            </div>
+
+            <motion.button
+              onClick={() => { soundManager.buttonPress(); setPhase("countdown"); }}
+              className="w-full py-3 bg-gradient-to-r from-rose-500 to-pink-500 text-white font-bold rounded-xl shadow-lg"
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+            >
+              Start!
+            </motion.button>
+          </div>
+        </motion.div>
+      </div>
+    );
+  }
+
+  // Countdown
+  if (phase === "countdown") {
+    return (
+      <div className="fixed inset-0 bg-gradient-to-b from-rose-600 via-pink-600 to-fuchsia-700 flex items-center justify-center">
+        <motion.div
+          key={countdownNum}
+          initial={{ scale: 2, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          exit={{ scale: 0, opacity: 0 }}
+          className="text-9xl font-black text-white drop-shadow-[0_0_30px_rgba(255,255,255,0.8)]"
+        >
+          {countdownNum || "GO!"}
+        </motion.div>
+      </div>
+    );
+  }
+
+  // Done
+  if (phase === "done") {
+    return (
+      <div className="fixed inset-0 bg-gradient-to-b from-rose-600 via-pink-600 to-fuchsia-700 flex items-center justify-center p-4">
+        <motion.div
+          initial={{ scale: 0.8, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          className="bg-white/95 backdrop-blur-xl rounded-3xl p-6 text-center"
+        >
+          <div className="text-6xl mb-4">{isSolved ? "🧩✨" : "😿"}</div>
+          <h2 className="text-3xl font-black text-rose-800 mb-2">
+            {isSolved ? "Puzzle Complete!" : "Time's Up!"}
+          </h2>
+          {isSolved && (
+            <>
+              <div className="text-5xl font-black text-pink-500 mb-2">{score.toLocaleString()}</div>
+              <div className="text-slate-600">Moves: {moves} | Time: {60 - timeLeft}s</div>
+            </>
+          )}
+        </motion.div>
+      </div>
+    );
+  }
+
+  // Playing
+  return (
+    <div className="fixed inset-0 bg-gradient-to-b from-rose-600 via-pink-600 to-fuchsia-700 flex flex-col items-center justify-center p-4">
+      {/* HUD */}
+      <div className="absolute top-0 left-0 right-0 z-30 p-3 bg-gradient-to-b from-black/40 to-transparent">
+        <div className="flex justify-between items-center">
+          <div className="bg-slate-800/80 rounded-lg px-3 py-1">
+            <span className="text-white text-sm font-bold">Moves: {moves}</span>
+          </div>
+          <div className={cn(
+            "rounded-lg px-3 py-1 font-bold text-sm",
+            timeLeft <= 10 ? "bg-red-500/80 text-white animate-pulse" : "bg-slate-700/80 text-white"
+          )}>
+            {timeLeft}s
+          </div>
+        </div>
+      </div>
+
+      {/* Puzzle Grid */}
+      <motion.div
+        className={cn(
+          "bg-white/20 backdrop-blur-xl rounded-3xl p-4 shadow-2xl border border-white/30",
+          isSolved && "animate-[rainbowGlow_2s_linear_infinite]"
+        )}
+        animate={isSolved ? { scale: [1, 1.05, 1] } : {}}
+        transition={{ duration: 0.5 }}
+      >
+        <div className="grid grid-cols-3 gap-2 w-64 h-64">
+          {tiles.map((tile, index) => (
+            tile === 0 ? (
+              <div
+                key={index}
+                className="aspect-square rounded-2xl border-2 border-dashed border-white/30 bg-black/10"
+              />
+            ) : (
+              <motion.button
+                key={tile}
+                layout
+                onClick={() => handleTileTap(index)}
+                className={cn(
+                  "aspect-square bg-gradient-to-br from-white via-rose-50 to-pink-100",
+                  "rounded-2xl shadow-lg border-2 border-white/50",
+                  "flex items-center justify-center text-3xl font-bold",
+                  "cursor-pointer active:scale-95 transition-transform",
+                  shakingTile === index && "animate-[tileShake_0.3s_ease-in-out]"
+                )}
+                whileHover={{ scale: 1.05, boxShadow: "0 10px 30px rgba(0,0,0,0.2)" }}
+                whileTap={{ scale: 0.95 }}
+                transition={{ type: "spring", stiffness: 500, damping: 30 }}
+              >
+                {PUZZLE_TILES[tile - 1]}
+              </motion.button>
+            )
+          ))}
+        </div>
+      </motion.div>
+
+      {/* Cat */}
+      <div className="mt-6 text-5xl">
+        {isSolved ? "😻" : moves > 30 ? "😿" : "😸"}
+      </div>
+    </div>
+  );
+});
+
+// ============================================================================
+// CUPID'S ARROW GALLERY - Target shooting game
+// ============================================================================
+
+type GalleryTarget = {
+  id: number;
+  x: number;
+  y: number;
+  size: "small" | "medium" | "large";
+  type: "heart" | "golden" | "cat";
+  vx: number;
+  vy: number;
+  hit?: boolean;
+};
+
+type FlyingArrow = {
+  id: number;
+  x: number;
+  y: number;
+  targetX: number;
+  targetY: number;
+  progress: number;
+};
+
+type ImpactEffect = {
+  id: number;
+  x: number;
+  y: number;
+  type: "hit" | "miss" | "bullseye" | "cat";
+};
+
+const CupidsArrowGame = memo(function CupidsArrowGame({
+  onComplete
+}: {
+  onComplete: (score: number) => void;
+}) {
+  const [phase, setPhase] = useState<"tutorial" | "countdown" | "playing" | "done">("tutorial");
+  const [countdownNum, setCountdownNum] = useState(3);
+  const [targets, setTargets] = useState<GalleryTarget[]>([]);
+  const [crosshair, setCrosshair] = useState({ x: 50, y: 50 });
+  const [flyingArrows, setFlyingArrows] = useState<FlyingArrow[]>([]);
+  const [canShoot, setCanShoot] = useState(true);
+  const [score, setScore] = useState(0);
+  const [combo, setCombo] = useState(0);
+  const [maxCombo, setMaxCombo] = useState(0);
+  const [timeLeft, setTimeLeft] = useState(45);
+  const [impactEffects, setImpactEffects] = useState<ImpactEffect[]>([]);
+
+  const containerRef = useRef<HTMLDivElement>(null);
+  const onCompleteRef = useRef(onComplete);
+  const gameEndedRef = useRef(false);
+  const rafRef = useRef<number>(0);
+  const targetIdRef = useRef(0);
+  const scoreRef = useRef(0);
+  const comboRef = useRef(0);
+
+  useEffect(() => { onCompleteRef.current = onComplete; }, [onComplete]);
+  useEffect(() => { scoreRef.current = score; }, [score]);
+  useEffect(() => { comboRef.current = combo; }, [combo]);
+
+  // Countdown
+  useEffect(() => {
+    if (phase !== "countdown") return;
+    if (countdownNum > 0) {
+      soundManager.countdown();
+      const timer = setTimeout(() => setCountdownNum(c => c - 1), 1000);
+      return () => clearTimeout(timer);
+    } else {
+      soundManager.countdownGo();
+      setPhase("playing");
+    }
+  }, [phase, countdownNum]);
+
+  // Timer
+  useEffect(() => {
+    if (phase !== "playing" || gameEndedRef.current) return;
+    const timer = setInterval(() => {
+      setTimeLeft(t => {
+        if (t <= 1) {
+          gameEndedRef.current = true;
+          setPhase("done");
+          soundManager.victory();
+          setTimeout(() => onCompleteRef.current(scoreRef.current), 2000);
+          return 0;
+        }
+        return t - 1;
+      });
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [phase]);
+
+  // Spawn targets
+  useEffect(() => {
+    if (phase !== "playing" || gameEndedRef.current) return;
+    const spawnInterval = setInterval(() => {
+      const rand = Math.random();
+      const type: GalleryTarget["type"] = rand < 0.08 ? "cat" : rand < 0.15 ? "golden" : "heart";
+      const sizeRand = Math.random();
+      const size: GalleryTarget["size"] = sizeRand < 0.3 ? "small" : sizeRand < 0.7 ? "medium" : "large";
+
+      const newTarget: GalleryTarget = {
+        id: targetIdRef.current++,
+        x: 10 + Math.random() * 80,
+        y: 20 + Math.random() * 50,
+        size,
+        type,
+        vx: (Math.random() - 0.5) * 0.5,
+        vy: (Math.random() - 0.5) * 0.3,
+      };
+
+      soundManager.targetSpawn();
+      setTargets(prev => [...prev.slice(-15), newTarget]);
+    }, 1200);
+    return () => clearInterval(spawnInterval);
+  }, [phase]);
+
+  // Update target positions
+  useEffect(() => {
+    if (phase !== "playing") return;
+
+    const gameLoop = () => {
+      if (gameEndedRef.current) return;
+
+      setTargets(prev => prev.map(target => {
+        if (target.hit) return target;
+
+        let newX = target.x + target.vx;
+        let newY = target.y + target.vy;
+        let newVx = target.vx;
+        let newVy = target.vy;
+
+        // Bounce off walls
+        if (newX < 5 || newX > 95) newVx *= -1;
+        if (newY < 15 || newY > 75) newVy *= -1;
+
+        newX = Math.max(5, Math.min(95, newX));
+        newY = Math.max(15, Math.min(75, newY));
+
+        return { ...target, x: newX, y: newY, vx: newVx, vy: newVy };
+      }).filter(t => !t.hit || Date.now() - (t as unknown as { hitTime?: number }).hitTime! < 300));
+
+      // Update arrows
+      setFlyingArrows(prev => prev.map(arrow => ({
+        ...arrow,
+        progress: arrow.progress + 0.1
+      })).filter(a => a.progress < 1));
+
+      rafRef.current = requestAnimationFrame(gameLoop);
+    };
+
+    rafRef.current = requestAnimationFrame(gameLoop);
+    return () => cancelAnimationFrame(rafRef.current);
+  }, [phase]);
+
+  // Track pointer
+  const handlePointerMove = useCallback((e: React.PointerEvent) => {
+    if (!containerRef.current || phase !== "playing") return;
+    const rect = containerRef.current.getBoundingClientRect();
+    const x = ((e.clientX - rect.left) / rect.width) * 100;
+    const y = ((e.clientY - rect.top) / rect.height) * 100;
+    setCrosshair({ x: Math.max(5, Math.min(95, x)), y: Math.max(10, Math.min(90, y)) });
+  }, [phase]);
+
+  // Shoot
+  const handleShoot = useCallback(() => {
+    if (!canShoot || phase !== "playing" || gameEndedRef.current) return;
+
+    soundManager.arrowFire();
+    setCanShoot(false);
+
+    const arrowId = Date.now();
+    setFlyingArrows(prev => [...prev, {
+      id: arrowId,
+      x: 50,
+      y: 95,
+      targetX: crosshair.x,
+      targetY: crosshair.y,
+      progress: 0
+    }]);
+
+    // Check hit after delay
+    setTimeout(() => {
+      let hit = false;
+
+      setTargets(prev => {
+        const updated = prev.map(target => {
+          if (target.hit) return target;
+
+          const hitRadius = target.size === "small" ? 4 : target.size === "medium" ? 6 : 8;
+          const distance = Math.sqrt(
+            Math.pow(crosshair.x - target.x, 2) + Math.pow(crosshair.y - target.y, 2)
+          );
+
+          if (distance <= hitRadius) {
+            hit = true;
+            const isBullseye = distance <= 2;
+
+            if (target.type === "cat") {
+              soundManager.hiss();
+              setScore(s => Math.max(0, s - 100));
+              setCombo(0);
+              comboRef.current = 0;
+              setImpactEffects(prev => [...prev, { id: arrowId, x: target.x, y: target.y, type: "cat" }]);
+            } else {
+              const basePoints = target.type === "golden" ? 300 :
+                target.size === "large" ? 150 :
+                target.size === "medium" ? 100 : 50;
+              const bullseyeMultiplier = isBullseye ? 2 : 1;
+              const comboBonus = 1 + (comboRef.current * 0.1);
+              const points = Math.round(basePoints * bullseyeMultiplier * comboBonus);
+
+              setScore(s => s + points);
+              setCombo(c => {
+                const newCombo = c + 1;
+                setMaxCombo(m => Math.max(m, newCombo));
+                return newCombo;
+              });
+
+              if (isBullseye) {
+                soundManager.bullseye();
+                setImpactEffects(prev => [...prev, { id: arrowId, x: target.x, y: target.y, type: "bullseye" }]);
+              } else {
+                soundManager.arrowHit();
+                setImpactEffects(prev => [...prev, { id: arrowId, x: target.x, y: target.y, type: "hit" }]);
+              }
+            }
+
+            return { ...target, hit: true };
+          }
+          return target;
+        });
+
+        return updated;
+      });
+
+      if (!hit) {
+        soundManager.arrowMiss();
+        setCombo(0);
+        comboRef.current = 0;
+        setImpactEffects(prev => [...prev, { id: arrowId, x: crosshair.x, y: crosshair.y, type: "miss" }]);
+      }
+
+      setTimeout(() => setImpactEffects(prev => prev.filter(e => e.id !== arrowId)), 500);
+    }, 200);
+
+    // Reload
+    setTimeout(() => setCanShoot(true), 500);
+  }, [canShoot, phase, crosshair]);
+
+  // Tutorial
+  if (phase === "tutorial") {
+    return (
+      <div className="fixed inset-0 bg-gradient-to-b from-indigo-900 via-purple-900 to-slate-900 flex items-center justify-center p-4">
+        <motion.div
+          initial={{ scale: 0.8, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          className="bg-white/95 backdrop-blur-xl rounded-3xl p-6 max-w-sm w-full shadow-2xl border border-white/30"
+        >
+          <div className="text-center">
+            <motion.div
+              className="text-7xl mb-4"
+              animate={{ rotate: [0, 10, -10, 0] }}
+              transition={{ duration: 2, repeat: Infinity }}
+            >
+              🏹
+            </motion.div>
+            <h2 className="text-2xl font-black text-indigo-800 mb-2">Cupid's Arrow Gallery</h2>
+            <p className="text-slate-600 mb-4">
+              Aim and tap to shoot the heart targets!
+            </p>
+
+            <div className="flex justify-center gap-3 mb-4">
+              <div className="text-center">
+                <div className="text-2xl">💕</div>
+                <div className="text-xs text-slate-500">50-150</div>
+              </div>
+              <div className="text-center">
+                <div className="text-2xl">💛</div>
+                <div className="text-xs text-yellow-600">300</div>
+              </div>
+              <div className="text-center">
+                <div className="text-2xl">😼</div>
+                <div className="text-xs text-red-500">-100!</div>
+              </div>
+            </div>
+
+            <div className="bg-indigo-100 rounded-xl p-3 mb-4 text-sm text-slate-600">
+              <div>🎯 Bullseye = 2x points!</div>
+              <div>🔥 Combo = Bonus multiplier!</div>
+            </div>
+
+            <motion.button
+              onClick={() => { soundManager.buttonPress(); setPhase("countdown"); }}
+              className="w-full py-3 bg-gradient-to-r from-indigo-500 to-purple-500 text-white font-bold rounded-xl shadow-lg"
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+            >
+              Start!
+            </motion.button>
+          </div>
+        </motion.div>
+      </div>
+    );
+  }
+
+  // Countdown
+  if (phase === "countdown") {
+    return (
+      <div className="fixed inset-0 bg-gradient-to-b from-indigo-900 via-purple-900 to-slate-900 flex items-center justify-center">
+        <motion.div
+          key={countdownNum}
+          initial={{ scale: 2, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          exit={{ scale: 0, opacity: 0 }}
+          className="text-9xl font-black text-white drop-shadow-[0_0_30px_rgba(255,255,255,0.8)]"
+        >
+          {countdownNum || "GO!"}
+        </motion.div>
+      </div>
+    );
+  }
+
+  // Done
+  if (phase === "done") {
+    return (
+      <div className="fixed inset-0 bg-gradient-to-b from-indigo-900 via-purple-900 to-slate-900 flex items-center justify-center p-4">
+        <motion.div
+          initial={{ scale: 0.8, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          className="bg-white/95 backdrop-blur-xl rounded-3xl p-6 text-center"
+        >
+          <div className="text-6xl mb-4">🏹✨</div>
+          <h2 className="text-3xl font-black text-indigo-800 mb-2">Great Shooting!</h2>
+          <div className="text-5xl font-black text-purple-500 mb-2">{score.toLocaleString()}</div>
+          <div className="text-slate-600">Max Combo: {maxCombo}x</div>
+        </motion.div>
+      </div>
+    );
+  }
+
+  // Playing
+  return (
+    <div
+      ref={containerRef}
+      className="fixed inset-0 bg-gradient-to-b from-indigo-900 via-purple-900 to-slate-900 overflow-hidden cursor-none select-none"
+      onPointerMove={handlePointerMove}
+      onClick={handleShoot}
+    >
+      {/* Carnival booth frame */}
+      <div className="absolute inset-4 border-8 border-amber-600/60 rounded-3xl pointer-events-none" />
+
+      {/* HUD */}
+      <div className="absolute top-0 left-0 right-0 z-30 p-3 bg-gradient-to-b from-black/40 to-transparent pointer-events-none">
+        <div className="flex justify-between items-center">
+          <div className="bg-slate-800/80 rounded-lg px-3 py-1">
+            <span className="text-white text-sm font-bold">{score.toLocaleString()}</span>
+          </div>
+          <div className={cn(
+            "rounded-lg px-3 py-1 font-bold text-sm",
+            combo >= 5 ? "bg-yellow-500/80 text-yellow-950" : "bg-slate-700/80 text-white"
+          )}>
+            {combo}x {combo >= 5 ? "🔥" : ""}
+          </div>
+          <div className="bg-slate-800/80 rounded-lg px-3 py-1">
+            <span className="text-white text-sm font-bold">{timeLeft}s</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Reload indicator */}
+      {!canShoot && (
+        <div className="absolute bottom-20 left-1/2 -translate-x-1/2 w-32 h-2 bg-slate-700 rounded-full overflow-hidden">
+          <div className="h-full bg-amber-400 animate-[reloadBar_0.5s_linear]" />
+        </div>
+      )}
+
+      {/* Targets */}
+      {targets.filter(t => !t.hit).map(target => (
+        <div
+          key={target.id}
+          className={cn(
+            "absolute pointer-events-none animate-[targetFloat_2s_ease-in-out_infinite]",
+            target.size === "small" ? "text-3xl" :
+            target.size === "medium" ? "text-4xl" : "text-5xl"
+          )}
+          style={{
+            left: `${target.x}%`,
+            top: `${target.y}%`,
+            transform: "translate(-50%, -50%)",
+            filter: target.type === "golden" ? "drop-shadow(0 0 15px gold)" : undefined
+          }}
+        >
+          {target.type === "heart" ? "💕" : target.type === "golden" ? "💛" : "😼"}
+        </div>
+      ))}
+
+      {/* Flying arrows */}
+      {flyingArrows.map(arrow => {
+        const currentX = arrow.x + (arrow.targetX - arrow.x) * arrow.progress;
+        const currentY = arrow.y + (arrow.targetY - arrow.y) * arrow.progress - Math.sin(arrow.progress * Math.PI) * 20;
+        const angle = Math.atan2(arrow.targetY - currentY, arrow.targetX - currentX) * 180 / Math.PI;
+        return (
+          <div
+            key={arrow.id}
+            className="absolute text-2xl pointer-events-none"
+            style={{
+              left: `${currentX}%`,
+              top: `${currentY}%`,
+              transform: `translate(-50%, -50%) rotate(${angle - 45}deg)`,
+              opacity: 1 - arrow.progress * 0.3
+            }}
+          >
+            🏹
+          </div>
+        );
+      })}
+
+      {/* Impact effects */}
+      {impactEffects.map(effect => (
+        <motion.div
+          key={effect.id}
+          initial={{ scale: 0.5, opacity: 1 }}
+          animate={{ scale: 2.5, opacity: 0 }}
+          transition={{ duration: 0.5 }}
+          className={cn(
+            "absolute pointer-events-none text-xl font-black",
+            effect.type === "bullseye" ? "text-yellow-400" :
+            effect.type === "hit" ? "text-green-400" :
+            effect.type === "cat" ? "text-red-400" : "text-slate-400"
+          )}
+          style={{
+            left: `${effect.x}%`,
+            top: `${effect.y}%`,
+            transform: "translate(-50%, -50%)"
+          }}
+        >
+          {effect.type === "bullseye" ? "🎯 BULLSEYE!" :
+           effect.type === "hit" ? "💥" :
+           effect.type === "cat" ? "😾 -100" : "MISS"}
+        </motion.div>
+      ))}
+
+      {/* Crosshair */}
+      <div
+        className={cn(
+          "absolute w-12 h-12 pointer-events-none transition-transform",
+          canShoot ? "animate-[crosshairPulse_1s_ease-in-out_infinite]" : "opacity-50"
+        )}
+        style={{
+          left: `${crosshair.x}%`,
+          top: `${crosshair.y}%`,
+          transform: "translate(-50%, -50%)"
+        }}
+      >
+        <div className="absolute inset-0 border-4 border-red-500 rounded-full" />
+        <div className="absolute top-1/2 left-0 w-full h-0.5 bg-red-500 -translate-y-1/2" />
+        <div className="absolute left-1/2 top-0 h-full w-0.5 bg-red-500 -translate-x-1/2" />
+        <div className="absolute top-1/2 left-1/2 w-2 h-2 bg-red-500 rounded-full -translate-x-1/2 -translate-y-1/2" />
+      </div>
+    </div>
+  );
+});
+
+// ============================================================================
+// BONUS GAME SELECTOR - Choose which bonus game to play
+// ============================================================================
+
+const BonusGameSelector = memo(function BonusGameSelector({
+  onSelect
+}: {
+  onSelect: (game: "rhythm" | "puzzle" | "gallery" | "skip") => void;
+}) {
+  return (
+    <div className="fixed inset-0 bg-gradient-to-b from-purple-900 via-pink-800 to-rose-700 flex items-center justify-center p-4">
+      <motion.div
+        initial={{ scale: 0.8, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        className="bg-white/95 backdrop-blur-xl rounded-3xl p-6 max-w-sm w-full shadow-2xl"
+      >
+        <div className="text-center mb-6">
+          <motion.div
+            className="text-6xl mb-2"
+            animate={{ rotate: [0, 10, -10, 0] }}
+            transition={{ duration: 2, repeat: Infinity }}
+          >
+            🎮
+          </motion.div>
+          <h2 className="text-2xl font-black text-purple-800">Bonus Games!</h2>
+          <p className="text-slate-600 text-sm">Pick a game for extra points!</p>
+        </div>
+
+        <div className="space-y-3">
+          <motion.button
+            onClick={() => { soundManager.buttonPress(); onSelect("rhythm"); }}
+            className="w-full p-4 bg-gradient-to-r from-purple-500 to-fuchsia-500 rounded-2xl text-white shadow-lg"
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+          >
+            <div className="flex items-center gap-3">
+              <span className="text-3xl">🎵</span>
+              <div className="text-left">
+                <div className="font-bold">Rhythm Heart Beat</div>
+                <div className="text-xs opacity-80">Tap to the beat!</div>
+              </div>
+            </div>
+          </motion.button>
+
+          <motion.button
+            onClick={() => { soundManager.buttonPress(); onSelect("puzzle"); }}
+            className="w-full p-4 bg-gradient-to-r from-rose-500 to-pink-500 rounded-2xl text-white shadow-lg"
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+          >
+            <div className="flex items-center gap-3">
+              <span className="text-3xl">🧩</span>
+              <div className="text-left">
+                <div className="font-bold">Love Letter Puzzle</div>
+                <div className="text-xs opacity-80">Slide to solve!</div>
+              </div>
+            </div>
+          </motion.button>
+
+          <motion.button
+            onClick={() => { soundManager.buttonPress(); onSelect("gallery"); }}
+            className="w-full p-4 bg-gradient-to-r from-indigo-500 to-purple-500 rounded-2xl text-white shadow-lg"
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+          >
+            <div className="flex items-center gap-3">
+              <span className="text-3xl">🏹</span>
+              <div className="text-left">
+                <div className="font-bold">Cupid's Arrow Gallery</div>
+                <div className="text-xs opacity-80">Aim and shoot!</div>
+              </div>
+            </div>
+          </motion.button>
+
+          <motion.button
+            onClick={() => { soundManager.buttonPress(); onSelect("skip"); }}
+            className="w-full p-3 bg-slate-200 rounded-xl text-slate-600 font-medium"
+            whileHover={{ scale: 1.02 }}
+            whileTap={{ scale: 0.98 }}
+          >
+            Skip to Finale →
+          </motion.button>
+        </div>
+      </motion.div>
+    </div>
+  );
+});
+
+// ============================================================================
 // FINAL PROPOSAL SCENE - After defeating the boss
 // ============================================================================
 
@@ -9069,7 +10425,39 @@ export default function ValentineCat() {
   }
 
   if (scene === "chapter3_boss_battle") {
-    return <DramaKingBattle onComplete={(won) => { if (won) { unlockAchievement("rhythm_master"); nextScene("chapter3_final"); } else { setCatMessage("You can't defeat my LOVE! 😼 Try again!"); setScene("chapter2_reject_letters"); } }} />;
+    return <DramaKingBattle onComplete={(won) => { if (won) { unlockAchievement("rhythm_master"); nextScene("bonus_select"); } else { setCatMessage("You can't defeat my LOVE! 😼 Try again!"); setScene("chapter2_reject_letters"); } }} />;
+  }
+
+  if (scene === "bonus_select") {
+    return <BonusGameSelector onSelect={(game) => {
+      if (game === "rhythm") setScene("bonus_rhythm");
+      else if (game === "puzzle") setScene("bonus_puzzle");
+      else if (game === "gallery") setScene("bonus_gallery");
+      else nextScene("chapter3_final");
+    }} />;
+  }
+
+  if (scene === "bonus_rhythm") {
+    return <RhythmHeartBeatGame onComplete={(score) => {
+      setStats(s => ({ ...s, totalScore: s.totalScore + score }));
+      if (score >= 2000) unlockAchievement("rhythm_master");
+      nextScene("chapter3_final");
+    }} />;
+  }
+
+  if (scene === "bonus_puzzle") {
+    return <LoveLetterPuzzleGame onComplete={(score) => {
+      setStats(s => ({ ...s, totalScore: s.totalScore + score }));
+      if (score >= 1500) unlockAchievement("puzzle_solver");
+      nextScene("chapter3_final");
+    }} />;
+  }
+
+  if (scene === "bonus_gallery") {
+    return <CupidsArrowGame onComplete={(score) => {
+      setStats(s => ({ ...s, totalScore: s.totalScore + score }));
+      nextScene("chapter3_final");
+    }} />;
   }
 
   if (scene === "chapter3_final") {

@@ -92,6 +92,82 @@ button, [role="button"] {
   50% { transform: translate(-50%, -50%) scale(1.05); }
 }
 
+/* New mini-game animations */
+@keyframes rhythmPulse {
+  0%, 100% { transform: scaleY(1); box-shadow: 0 0 20px currentColor; }
+  50% { transform: scaleY(1.02); box-shadow: 0 0 40px currentColor; }
+}
+
+@keyframes noteFall {
+  from { transform: translateY(-100%); }
+  to { transform: translateY(100vh); }
+}
+
+@keyframes hitFlash {
+  0% { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; transform: scale(2); }
+}
+
+@keyframes laneGlow {
+  0%, 100% { background: rgba(255,255,255,0.05); }
+  50% { background: rgba(255,255,255,0.15); }
+}
+
+@keyframes tileSlide {
+  0% { transform: scale(1); }
+  50% { transform: scale(0.95); }
+  100% { transform: scale(1); }
+}
+
+@keyframes tileSolved {
+  0% { box-shadow: 0 0 0 0 rgba(74, 222, 128, 0.7); }
+  70% { box-shadow: 0 0 0 10px rgba(74, 222, 128, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(74, 222, 128, 0); }
+}
+
+@keyframes tileShake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-5px); }
+  75% { transform: translateX(5px); }
+}
+
+@keyframes rainbowGlow {
+  0% { box-shadow: 0 0 30px rgba(255,0,0,0.5); }
+  16% { box-shadow: 0 0 30px rgba(255,165,0,0.5); }
+  33% { box-shadow: 0 0 30px rgba(255,255,0,0.5); }
+  50% { box-shadow: 0 0 30px rgba(0,255,0,0.5); }
+  66% { box-shadow: 0 0 30px rgba(0,0,255,0.5); }
+  83% { box-shadow: 0 0 30px rgba(148,0,211,0.5); }
+  100% { box-shadow: 0 0 30px rgba(255,0,0,0.5); }
+}
+
+@keyframes targetFloat {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  25% { transform: translateY(-8px) rotate(5deg); }
+  75% { transform: translateY(8px) rotate(-5deg); }
+}
+
+@keyframes arrowFlight {
+  0% { transform: translate(0, 0) rotate(0deg) scale(1); opacity: 1; }
+  50% { transform: translate(var(--dx), calc(var(--dy) - 30px)) rotate(-15deg) scale(1.1); }
+  100% { transform: translate(var(--dx), var(--dy)) rotate(0deg) scale(0.8); opacity: 0.8; }
+}
+
+@keyframes crosshairPulse {
+  0%, 100% { transform: translate(-50%, -50%) scale(1); opacity: 0.9; }
+  50% { transform: translate(-50%, -50%) scale(1.1); opacity: 1; }
+}
+
+@keyframes impactBurst {
+  0% { transform: scale(0); opacity: 1; }
+  100% { transform: scale(2.5); opacity: 0; }
+}
+
+@keyframes reloadBar {
+  from { width: 0%; }
+  to { width: 100%; }
+}
+
 /* GPU acceleration for animated elements */
 .gpu-accelerate {
   will-change: transform, opacity;
