@@ -6372,9 +6372,12 @@ const DramaKingBattle = memo(function DramaKingBattle({ onComplete }: { onComple
       setRageMode(false);
       setRageModeTimer(0);
       setBossScale(1);
+      setShowingPhaseTransition(false);
+      setPhaseTransitionText("");
       phase2TriggeredRef.current = false;
       phase3TriggeredRef.current = false;
       lastPowerUpSpawnRef.current = Date.now();
+      lastAttackTimeRef.current = Date.now(); // Reset attack timer
       setPhase("battle");
       return;
     }
@@ -6708,14 +6711,15 @@ const DramaKingBattle = memo(function DramaKingBattle({ onComplete }: { onComple
     const attackInterval = bossPhase === "phase3" ? 2000 : bossPhase === "phase2" ? 2500 : 3500;
 
     const timer = setInterval(() => {
-      if (!currentAttack && Date.now() - lastAttackTimeRef.current > attackInterval) {
+      // Only launch if no attack active and not in phase transition
+      if (!currentAttack && !showingPhaseTransition && Date.now() - lastAttackTimeRef.current > attackInterval) {
         lastAttackTimeRef.current = Date.now();
         launchBossAttack();
       }
     }, 500);
 
     return () => clearInterval(timer);
-  }, [phase, bossPhase, currentAttack, launchBossAttack]);
+  }, [phase, bossPhase, currentAttack, showingPhaseTransition, launchBossAttack]);
 
   // Current attack countdown
   useEffect(() => {
@@ -7411,7 +7415,12 @@ const DramaKingBattle = memo(function DramaKingBattle({ onComplete }: { onComple
   // MAIN BATTLE SCREEN
   return (
     <div
-      className="fixed inset-0 bg-gradient-to-b from-slate-900 via-purple-950 to-slate-900 overflow-hidden select-none"
+      className={cn(
+        "fixed inset-0 overflow-hidden select-none transition-colors duration-500",
+        bossPhase === "phase3" ? "bg-gradient-to-b from-slate-900 via-red-950/80 to-slate-900" :
+        bossPhase === "phase2" ? "bg-gradient-to-b from-slate-900 via-purple-950 to-slate-900" :
+        "bg-gradient-to-b from-slate-900 via-indigo-950 to-slate-900"
+      )}
       style={{
         transform: screenShake ? `translate(${(Math.random() - 0.5) * screenShake}px, ${(Math.random() - 0.5) * screenShake}px)` : undefined,
       }}
@@ -7420,187 +7429,247 @@ const DramaKingBattle = memo(function DramaKingBattle({ onComplete }: { onComple
       onMouseDown={handleMouseDown}
       onMouseUp={handleMouseUp}
     >
+      {/* Subtle background pattern */}
+      <div className="absolute inset-0 opacity-5 pointer-events-none"
+        style={{ backgroundImage: "radial-gradient(circle at 2px 2px, white 1px, transparent 0)", backgroundSize: "32px 32px" }}
+      />
+
       {/* Flash effect */}
       {flashColor && (
-        <div className="absolute inset-0 z-50 pointer-events-none" style={{ backgroundColor: flashColor }} />
+        <div className="absolute inset-0 z-50 pointer-events-none transition-opacity" style={{ backgroundColor: flashColor }} />
       )}
 
-      {/* HP Bars - Top */}
-      <div className="absolute top-4 left-4 right-4 z-30 space-y-2">
+      {/* Top HUD Container */}
+      <div className="absolute top-0 left-0 right-0 z-30 p-3 bg-gradient-to-b from-black/40 to-transparent">
         {/* Boss HP */}
-        <div className="flex items-center gap-2">
-          <span className="text-lg">👑</span>
-          <div className="flex-1 h-4 bg-slate-800 rounded-full overflow-hidden border border-slate-600">
-            <motion.div
-              className={cn(
-                "h-full transition-all duration-200",
-                bossPhase === "phase3" ? "bg-gradient-to-r from-red-500 to-orange-500" :
-                bossPhase === "phase2" ? "bg-gradient-to-r from-purple-500 to-red-500" :
-                "bg-gradient-to-r from-purple-400 to-pink-500"
-              )}
-              style={{ width: `${bossHP}%` }}
-            />
+        <div className="flex items-center gap-2 mb-2">
+          <div className="w-8 h-8 rounded-lg bg-purple-900/80 flex items-center justify-center border border-purple-500/30">
+            <span className="text-sm">👑</span>
           </div>
-          <span className="text-white text-xs font-bold w-8">{Math.ceil(bossHP)}%</span>
+          <div className="flex-1">
+            <div className="flex justify-between items-center mb-0.5">
+              <span className="text-[10px] font-bold text-purple-300 uppercase tracking-wider">Drama King</span>
+              <span className={cn(
+                "text-[10px] font-bold px-1.5 py-0.5 rounded",
+                bossPhase === "phase3" ? "bg-red-500/40 text-red-200" :
+                bossPhase === "phase2" ? "bg-purple-500/40 text-purple-200" :
+                "bg-slate-500/40 text-slate-300"
+              )}>
+                {bossPhase === "phase3" ? "FINAL" : bossPhase === "phase2" ? "P2" : "P1"}
+              </span>
+            </div>
+            <div className="h-3 bg-slate-900/80 rounded-full overflow-hidden shadow-inner">
+              <div
+                className={cn(
+                  "h-full transition-all duration-300 rounded-full",
+                  bossPhase === "phase3" ? "bg-gradient-to-r from-red-600 via-orange-500 to-red-600" :
+                  bossPhase === "phase2" ? "bg-gradient-to-r from-purple-600 via-pink-500 to-purple-600" :
+                  "bg-gradient-to-r from-purple-500 via-pink-400 to-purple-500"
+                )}
+                style={{ width: `${bossHP}%`, boxShadow: "0 0 10px currentColor" }}
+              />
+            </div>
+          </div>
+          <span className="text-white text-xs font-bold w-10 text-right tabular-nums">{Math.ceil(bossHP)}</span>
         </div>
 
         {/* Player HP */}
-        <div className="flex items-center gap-2">
-          <span className="text-lg">💖</span>
-          <div className="flex-1 h-4 bg-slate-800 rounded-full overflow-hidden border border-slate-600">
-            <div
-              className="h-full bg-gradient-to-r from-pink-500 to-rose-500 transition-all duration-200"
-              style={{ width: `${playerHP}%` }}
-            />
+        <div className="flex items-center gap-2 mb-2">
+          <div className="w-8 h-8 rounded-lg bg-pink-900/80 flex items-center justify-center border border-pink-500/30">
+            <span className="text-sm">💖</span>
           </div>
-          <span className="text-white text-xs font-bold w-8">{Math.ceil(playerHP)}%</span>
+          <div className="flex-1">
+            <div className="flex justify-between items-center mb-0.5">
+              <span className="text-[10px] font-bold text-pink-300 uppercase tracking-wider">You</span>
+              {hasShield && <span className="text-[10px] text-cyan-300">🛡️ Protected</span>}
+            </div>
+            <div className="h-3 bg-slate-900/80 rounded-full overflow-hidden shadow-inner">
+              <div
+                className="h-full bg-gradient-to-r from-pink-500 via-rose-400 to-pink-500 transition-all duration-300 rounded-full"
+                style={{ width: `${playerHP}%`, boxShadow: "0 0 8px rgba(236,72,153,0.6)" }}
+              />
+            </div>
+          </div>
+          <span className="text-white text-xs font-bold w-10 text-right tabular-nums">{Math.ceil(playerHP)}</span>
         </div>
 
-        {/* Score and Combo */}
+        {/* Score and Combo Row */}
         <div className="flex justify-between items-center">
-          <span className="text-white text-sm">Score: {score}</span>
-          {combo > 0 && (
-            <motion.span
-              key={combo}
-              initial={{ scale: 1.5 }}
-              animate={{ scale: 1 }}
-              className={cn(
-                "font-bold text-sm",
-                combo >= 20 ? "text-yellow-400" : combo >= 10 ? "text-pink-400" : "text-purple-400"
+          <div className="bg-slate-800/60 rounded-lg px-3 py-1 border border-slate-700/50">
+            <span className="text-[10px] text-slate-400 uppercase">Score</span>
+            <span className="text-white text-sm font-bold ml-2 tabular-nums">{score.toLocaleString()}</span>
+          </div>
+
+          {combo > 0 ? (
+            <div className={cn(
+              "rounded-lg px-3 py-1 border transition-all",
+              combo >= 30 ? "bg-yellow-500/20 border-yellow-500/50" :
+              combo >= 20 ? "bg-orange-500/20 border-orange-500/50" :
+              combo >= 10 ? "bg-pink-500/20 border-pink-500/50" :
+              "bg-purple-500/20 border-purple-500/50"
+            )}>
+              <span className={cn(
+                "font-black text-sm",
+                combo >= 30 ? "text-yellow-300" :
+                combo >= 20 ? "text-orange-300" :
+                combo >= 10 ? "text-pink-300" : "text-purple-300"
+              )}>
+                {combo}x {combo >= 30 ? "🔥🔥🔥" : combo >= 20 ? "🔥🔥" : combo >= 10 ? "🔥" : ""}
+              </span>
+              {combo >= 10 && (
+                <span className="text-[10px] ml-1 opacity-80">
+                  ({combo >= 30 ? "2.5x" : combo >= 20 ? "2x" : "1.5x"})
+                </span>
               )}
-            >
-              {combo} COMBO! {combo >= 20 ? "🔥🔥" : combo >= 10 ? "🔥" : ""}
-            </motion.span>
+            </div>
+          ) : (
+            <div className="bg-slate-800/40 rounded-lg px-3 py-1 border border-slate-700/30">
+              <span className="text-slate-500 text-xs">No Combo</span>
+            </div>
           )}
         </div>
       </div>
 
       {/* Boss Area - Center */}
-      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 flex flex-col items-center z-20">
-        <motion.div
-          className="text-7xl text-center"
-          animate={bossShaking ? { x: [-10, 10, -10, 10, 0], scale: bossScale } : { y: [0, -8, 0], scale: bossScale }}
-          transition={{ duration: bossShaking ? 0.3 : 2, repeat: bossShaking ? 0 : Infinity }}
-        >
-          <div className="text-4xl">👑</div>
+      <div className="absolute top-[28%] left-1/2 -translate-x-1/2 flex flex-col items-center z-20">
+        {/* Boss glow effect for phases */}
+        {bossPhase !== "phase1" && (
           <div className={cn(
-            bossPhase === "phase3" && "drop-shadow-[0_0_10px_rgba(255,0,0,0.8)]",
-            bossPhase === "phase2" && "drop-shadow-[0_0_8px_rgba(128,0,255,0.6)]"
+            "absolute inset-0 rounded-full blur-3xl -z-10 transition-opacity duration-500",
+            bossPhase === "phase3" ? "bg-red-500/30 scale-150" : "bg-purple-500/20 scale-125"
+          )} />
+        )}
+
+        <div
+          className="text-center transition-transform duration-300"
+          style={{ transform: `scale(${bossScale})${bossShaking ? " translateX(3px)" : ""}` }}
+        >
+          <div className={cn(
+            "text-5xl mb-1 transition-all",
+            bossPhase === "phase3" && "animate-pulse"
+          )}>👑</div>
+          <div className={cn(
+            "text-7xl transition-all",
+            bossPhase === "phase3" && "drop-shadow-[0_0_20px_rgba(255,50,50,0.8)]",
+            bossPhase === "phase2" && "drop-shadow-[0_0_15px_rgba(168,85,247,0.6)]"
           )}>
             {bossEmotion === "defeated" ? "😵" :
              bossEmotion === "hurt" ? "😿" :
              bossEmotion === "charging" ? "😈" :
              bossEmotion === "angry" ? "😾" : "😼"}
           </div>
-        </motion.div>
-
-        {/* Boss message */}
-        {bossMessage && (
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="mt-3 px-4 py-2 bg-slate-800/90 rounded-xl border border-purple-500/50"
-          >
-            <p className="text-purple-200 text-sm font-medium">{bossMessage}</p>
-          </motion.div>
-        )}
-
-        {/* Phase indicator */}
-        <div className="mt-2">
-          <span className={cn(
-            "text-xs font-medium px-3 py-1 rounded-full",
-            bossPhase === "phase3" ? "bg-red-500/30 text-red-300" :
-            bossPhase === "phase2" ? "bg-purple-500/30 text-purple-300" :
-            "bg-slate-500/30 text-slate-400"
-          )}>
-            {bossPhase === "phase3" ? "⚠️ FINAL PHASE" : bossPhase === "phase2" ? "PHASE 2" : "PHASE 1"}
-          </span>
         </div>
+
+        {/* Boss message - cleaner speech bubble */}
+        {bossMessage && (
+          <div className="mt-4 max-w-[200px] animate-[fadeIn_0.2s_ease-out]">
+            <div className="relative bg-slate-800/95 backdrop-blur rounded-2xl px-4 py-2 border border-slate-600/50 shadow-xl">
+              <p className="text-white text-sm font-medium text-center">{bossMessage}</p>
+              <div className="absolute -top-2 left-1/2 -translate-x-1/2 w-4 h-4 bg-slate-800/95 border-l border-t border-slate-600/50 rotate-45" />
+            </div>
+          </div>
+        )}
       </div>
 
-      {/* Attack Warning - Center */}
+      {/* Attack Warning - Center Card */}
       {currentAttack && (
-        <motion.div
-          initial={{ scale: 0, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-40"
-        >
-          <motion.div
-            className="text-center"
-            animate={{ scale: [1, 1.1, 1] }}
-            transition={{ duration: 0.3, repeat: Infinity }}
-          >
-            {/* Love Bomb - tap to deflect */}
-            {currentAttack.type === "lovebomb" ? (
-              <>
-                <motion.div
-                  className="text-8xl mb-2"
-                  animate={{ scale: [1, 1 - (1 - currentAttack.timeLeft / currentAttack.duration) * 0.5] }}
-                >
-                  💣💕
-                </motion.div>
-                <div className="text-yellow-400 font-bold text-lg">TAP TO DEFLECT!</div>
-                <div className="text-white text-sm mt-1">
-                  {currentAttack.deflected || 0}/{currentAttack.deflectCount}
-                </div>
-              </>
-            ) : currentAttack.type === "rapidfire" && currentAttack.directions ? (
-              /* Rapidfire - sequence of arrows */
-              <>
-                <div className="flex gap-2 justify-center text-5xl mb-2">
-                  {currentAttack.directions.map((dir, i) => (
-                    <span key={i} className={cn(
-                      "transition-all",
-                      i < (currentAttack.currentIndex || 0) ? "opacity-30 scale-75" :
-                      i === (currentAttack.currentIndex || 0) ? "text-yellow-400 scale-110" : "opacity-60"
-                    )}>
-                      {DIRECTION_ARROWS[dir]}
-                    </span>
-                  ))}
-                </div>
-                <div className="text-cyan-400 font-bold text-lg">RAPID FIRE!</div>
-              </>
-            ) : currentAttack.type === "ragemode" && currentAttack.directions ? (
-              /* Ragemode - two directions at once */
-              <>
-                <div className="flex gap-4 justify-center text-6xl mb-2">
-                  {currentAttack.directions.map((dir, i) => (
-                    <motion.span key={i} animate={{ scale: [1, 1.2, 1] }} transition={{ duration: 0.4, delay: i * 0.1 }}>
-                      {DIRECTION_ARROWS[dir]}
-                    </motion.span>
-                  ))}
-                </div>
-                <div className="text-red-400 font-bold text-lg">SWIPE BOTH!</div>
-              </>
-            ) : currentAttack.type === "fakeout" && currentAttack.isFake ? (
-              /* Fakeout - shows warning */
-              <>
-                <div className="text-8xl mb-2 opacity-80">{currentAttack.emoji}</div>
-                <div className="text-orange-400 font-bold text-lg">WAIT FOR IT...</div>
-                <div className="text-orange-300 text-xs">⚠️ FAKEOUT!</div>
-              </>
-            ) : (
-              /* Normal swipe */
-              <>
-                <div className="text-8xl mb-2">{currentAttack.emoji}</div>
-                <div className="text-white font-bold text-lg">SWIPE {currentAttack.direction.toUpperCase()}!</div>
-              </>
-            )}
-            {/* Timer bar */}
-            <div className="w-32 h-2 bg-slate-700 rounded-full mt-2 mx-auto overflow-hidden">
-              <motion.div
+        <div className="absolute top-[52%] left-1/2 -translate-x-1/2 -translate-y-1/2 z-40 animate-[fadeIn_0.15s_ease-out]">
+          <div className={cn(
+            "relative rounded-3xl p-4 shadow-2xl border-2 backdrop-blur-sm min-w-[180px]",
+            currentAttack.type === "lovebomb" ? "bg-pink-950/90 border-pink-500/60" :
+            currentAttack.type === "rapidfire" ? "bg-cyan-950/90 border-cyan-500/60" :
+            currentAttack.type === "ragemode" ? "bg-red-950/90 border-red-500/60" :
+            currentAttack.type === "fakeout" && currentAttack.isFake ? "bg-orange-950/90 border-orange-500/60" :
+            "bg-slate-900/90 border-white/30"
+          )}>
+            {/* Attack type label */}
+            <div className={cn(
+              "absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider",
+              currentAttack.type === "lovebomb" ? "bg-pink-500 text-white" :
+              currentAttack.type === "rapidfire" ? "bg-cyan-500 text-white" :
+              currentAttack.type === "ragemode" ? "bg-red-500 text-white" :
+              currentAttack.type === "fakeout" && currentAttack.isFake ? "bg-orange-500 text-white" :
+              "bg-white text-slate-900"
+            )}>
+              {currentAttack.type === "lovebomb" ? "DEFLECT!" :
+               currentAttack.type === "rapidfire" ? "RAPID" :
+               currentAttack.type === "ragemode" ? "RAGE" :
+               currentAttack.type === "fakeout" && currentAttack.isFake ? "FAKEOUT" : "DODGE"}
+            </div>
+
+            <div className="text-center pt-1">
+              {/* Love Bomb */}
+              {currentAttack.type === "lovebomb" ? (
+                <>
+                  <div className="text-6xl mb-2" style={{ transform: `scale(${1 - (1 - currentAttack.timeLeft / currentAttack.duration) * 0.4})` }}>
+                    💣💕
+                  </div>
+                  <div className="text-pink-300 font-bold text-base">TAP FAST!</div>
+                  <div className="flex justify-center gap-1 mt-2">
+                    {Array.from({ length: currentAttack.deflectCount || 5 }).map((_, i) => (
+                      <div key={i} className={cn(
+                        "w-3 h-3 rounded-full transition-all",
+                        i < (currentAttack.deflected || 0) ? "bg-green-400 scale-110" : "bg-slate-600"
+                      )} />
+                    ))}
+                  </div>
+                </>
+              ) : currentAttack.type === "rapidfire" && currentAttack.directions ? (
+                <>
+                  <div className="flex gap-1.5 justify-center mb-2">
+                    {currentAttack.directions.map((dir, i) => (
+                      <div key={i} className={cn(
+                        "w-12 h-12 rounded-xl flex items-center justify-center text-3xl transition-all",
+                        i < (currentAttack.currentIndex || 0) ? "bg-green-500/30 opacity-50 scale-90" :
+                        i === (currentAttack.currentIndex || 0) ? "bg-yellow-500/40 ring-2 ring-yellow-400 scale-105" :
+                        "bg-slate-700/50"
+                      )}>
+                        {DIRECTION_ARROWS[dir]}
+                      </div>
+                    ))}
+                  </div>
+                  <div className="text-cyan-300 font-bold text-base">SWIPE SEQUENCE!</div>
+                </>
+              ) : currentAttack.type === "ragemode" && currentAttack.directions ? (
+                <>
+                  <div className="flex gap-2 justify-center mb-2">
+                    {currentAttack.directions.map((dir, i) => (
+                      <div key={i} className="w-14 h-14 rounded-xl bg-red-500/30 flex items-center justify-center text-4xl animate-pulse">
+                        {DIRECTION_ARROWS[dir]}
+                      </div>
+                    ))}
+                  </div>
+                  <div className="text-red-300 font-bold text-base">SWIPE BOTH!</div>
+                </>
+              ) : currentAttack.type === "fakeout" && currentAttack.isFake ? (
+                <>
+                  <div className="text-6xl mb-2 opacity-60 animate-pulse">{currentAttack.emoji}</div>
+                  <div className="text-orange-300 font-bold text-base">WAIT FOR IT...</div>
+                  <div className="text-orange-400/80 text-xs mt-1">Direction will change!</div>
+                </>
+              ) : (
+                <>
+                  <div className="text-7xl mb-1">{currentAttack.emoji}</div>
+                  <div className="text-white font-bold text-lg">SWIPE {currentAttack.direction.toUpperCase()}</div>
+                </>
+              )}
+            </div>
+
+            {/* Timer bar at bottom of card */}
+            <div className="mt-3 h-1.5 bg-slate-800 rounded-full overflow-hidden">
+              <div
                 className={cn(
-                  "h-full",
-                  currentAttack.type === "lovebomb" ? "bg-gradient-to-r from-pink-500 to-yellow-500" :
-                  currentAttack.type === "rapidfire" ? "bg-gradient-to-r from-cyan-500 to-blue-500" :
-                  currentAttack.type === "ragemode" ? "bg-gradient-to-r from-red-600 to-orange-500" :
-                  "bg-gradient-to-r from-red-500 to-yellow-500"
+                  "h-full transition-all duration-75 rounded-full",
+                  currentAttack.type === "lovebomb" ? "bg-gradient-to-r from-pink-400 to-yellow-400" :
+                  currentAttack.type === "rapidfire" ? "bg-gradient-to-r from-cyan-400 to-blue-400" :
+                  currentAttack.type === "ragemode" ? "bg-gradient-to-r from-red-500 to-orange-400" :
+                  currentAttack.timeLeft / currentAttack.duration < 0.3 ? "bg-red-500" : "bg-gradient-to-r from-green-400 to-yellow-400"
                 )}
                 style={{ width: `${(currentAttack.timeLeft / currentAttack.duration) * 100}%` }}
               />
             </div>
-          </motion.div>
-        </motion.div>
+          </div>
+        </div>
       )}
 
       {/* Dodge result feedback */}
@@ -7649,15 +7718,15 @@ const DramaKingBattle = memo(function DramaKingBattle({ onComplete }: { onComple
         </div>
       ))}
 
-      {/* Power-ups */}
+      {/* Power-ups - Floating collectibles */}
       {powerUps.map(powerUp => (
-        <motion.button
+        <button
           key={powerUp.id}
-          initial={{ scale: 0, rotate: -180 }}
-          animate={{ scale: 1, rotate: 0, y: [0, -5, 0] }}
-          transition={{ y: { duration: 1, repeat: Infinity } }}
           onClick={() => collectPowerUp(powerUp)}
-          className="absolute text-4xl z-35 cursor-pointer"
+          className={cn(
+            "absolute z-35 cursor-pointer transition-all duration-200 hover:scale-125",
+            "animate-[bounceFloat_1s_ease-in-out_infinite]"
+          )}
           style={{
             left: `${powerUp.x}%`,
             top: `${powerUp.y}%`,
@@ -7665,159 +7734,268 @@ const DramaKingBattle = memo(function DramaKingBattle({ onComplete }: { onComple
             opacity: powerUp.timeLeft > 1 ? 1 : powerUp.timeLeft,
           }}
         >
-          {powerUp.emoji}
-        </motion.button>
+          <div className={cn(
+            "relative w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg",
+            "border-2 backdrop-blur-sm",
+            powerUp.type === "heart" && "bg-pink-500/30 border-pink-400/60 shadow-pink-500/30",
+            powerUp.type === "star" && "bg-yellow-500/30 border-yellow-400/60 shadow-yellow-500/30",
+            powerUp.type === "shield" && "bg-cyan-500/30 border-cyan-400/60 shadow-cyan-500/30",
+            powerUp.type === "rage" && "bg-red-500/30 border-red-400/60 shadow-red-500/30"
+          )}>
+            <span className="text-2xl">{powerUp.emoji}</span>
+            {/* Timer ring */}
+            <svg className="absolute inset-0 w-full h-full -rotate-90" viewBox="0 0 56 56">
+              <circle
+                cx="28" cy="28" r="26"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeDasharray={`${(powerUp.timeLeft / 5) * 163} 163`}
+                className={cn(
+                  powerUp.type === "heart" && "text-pink-400",
+                  powerUp.type === "star" && "text-yellow-400",
+                  powerUp.type === "shield" && "text-cyan-400",
+                  powerUp.type === "rage" && "text-red-400"
+                )}
+              />
+            </svg>
+          </div>
+        </button>
       ))}
 
-      {/* Counter Window Indicator */}
+      {/* Counter Window Indicator - Dramatic golden overlay */}
       {counterWindowActive && (
-        <motion.div
-          initial={{ scale: 0 }}
-          animate={{ scale: 1 }}
-          className="absolute inset-0 pointer-events-none z-25"
-        >
-          <div className="absolute inset-4 border-4 border-yellow-400 rounded-3xl animate-pulse" />
-          <div className="absolute top-1/3 left-1/2 -translate-x-1/2 text-yellow-400 font-bold text-lg">
-            ⚡ COUNTER! ⚡
-          </div>
-          <div className="absolute top-1/3 left-1/2 -translate-x-1/2 mt-8">
-            <div className="w-24 h-2 bg-slate-700 rounded-full overflow-hidden">
+        <div className="absolute inset-0 pointer-events-none z-25 animate-[fadeIn_0.15s_ease-out]">
+          {/* Golden vignette */}
+          <div className="absolute inset-0 bg-gradient-to-r from-yellow-500/20 via-transparent to-yellow-500/20" />
+          <div className="absolute inset-0 bg-gradient-to-b from-yellow-500/20 via-transparent to-yellow-500/20" />
+
+          {/* Animated border */}
+          <div className="absolute inset-3 rounded-3xl border-4 border-yellow-400/80 animate-pulse shadow-[0_0_30px_rgba(250,204,21,0.4),inset_0_0_30px_rgba(250,204,21,0.1)]" />
+
+          {/* Counter indicator */}
+          <div className="absolute top-[38%] left-1/2 -translate-x-1/2">
+            <div className="bg-yellow-500/90 rounded-2xl px-6 py-3 shadow-2xl border border-yellow-300/50 backdrop-blur-sm">
+              <div className="flex items-center gap-2 text-yellow-950 font-black text-lg">
+                <span className="animate-pulse">⚡</span>
+                <span>COUNTER!</span>
+                <span className="animate-pulse">⚡</span>
+              </div>
+              <div className="text-yellow-800 text-xs text-center font-semibold mt-1">3x DAMAGE</div>
+            </div>
+            {/* Timer bar */}
+            <div className="mt-3 w-40 h-2 bg-slate-900/80 rounded-full overflow-hidden mx-auto border border-yellow-500/30">
               <div
-                className="h-full bg-yellow-400 transition-all"
+                className="h-full bg-gradient-to-r from-yellow-400 to-amber-400 transition-all shadow-[0_0_10px_rgba(250,204,21,0.6)]"
                 style={{ width: `${(counterWindowTimer / 1.5) * 100}%` }}
               />
             </div>
           </div>
-        </motion.div>
+        </div>
       )}
 
-      {/* Charge Indicator */}
+      {/* Charge Indicator - Centered power circle */}
       {isCharging && chargeTime > 0.3 && (
-        <motion.div
-          initial={{ scale: 0 }}
-          animate={{ scale: 1 }}
-          className="absolute bottom-32 left-1/2 -translate-x-1/2 z-40 pointer-events-none"
-        >
-          <div className="relative w-20 h-20">
-            <svg className="w-full h-full -rotate-90">
+        <div className="absolute bottom-36 left-1/2 -translate-x-1/2 z-40 pointer-events-none animate-[scaleIn_0.2s_ease-out]">
+          <div className={cn(
+            "relative w-24 h-24 rounded-full",
+            chargeLevel >= 3 && "animate-pulse"
+          )}>
+            {/* Outer glow */}
+            <div className={cn(
+              "absolute inset-0 rounded-full blur-xl transition-colors duration-300",
+              chargeLevel >= 3 ? "bg-fuchsia-500/50" :
+              chargeLevel >= 2 ? "bg-yellow-500/40" :
+              chargeLevel >= 1 ? "bg-pink-500/30" : "bg-white/20"
+            )} />
+
+            {/* Background circle */}
+            <div className="absolute inset-2 rounded-full bg-slate-900/90 border border-white/10" />
+
+            {/* Progress ring */}
+            <svg className="absolute inset-0 w-full h-full -rotate-90" viewBox="0 0 96 96">
               <circle
-                cx="40" cy="40" r="36"
+                cx="48" cy="48" r="42"
                 fill="none"
-                stroke="rgba(255,255,255,0.2)"
+                stroke="rgba(255,255,255,0.15)"
                 strokeWidth="6"
               />
               <circle
-                cx="40" cy="40" r="36"
+                cx="48" cy="48" r="42"
                 fill="none"
-                stroke={chargeLevel >= 3 ? "#ff00ff" : chargeLevel >= 2 ? "#FFD700" : chargeLevel >= 1 ? "#ff69b4" : "#fff"}
+                stroke={chargeLevel >= 3 ? "#e879f9" : chargeLevel >= 2 ? "#facc15" : chargeLevel >= 1 ? "#f472b6" : "#fff"}
                 strokeWidth="6"
-                strokeDasharray={`${(chargeTime / 3) * 226} 226`}
+                strokeDasharray={`${(chargeTime / 3) * 264} 264`}
                 strokeLinecap="round"
+                style={{ filter: "drop-shadow(0 0 8px currentColor)" }}
               />
             </svg>
+
+            {/* Center icon */}
             <div className="absolute inset-0 flex items-center justify-center">
-              <span className="text-2xl">
+              <span className={cn(
+                "text-3xl transition-transform",
+                chargeLevel >= 3 && "scale-125"
+              )}>
                 {chargeLevel >= 3 ? "💥" : chargeLevel >= 2 ? "⭐" : chargeLevel >= 1 ? "✨" : "💖"}
               </span>
             </div>
           </div>
-          <div className="text-center text-white text-xs mt-1 font-bold">
-            {chargeLevel >= 3 ? "MEGA!" : chargeLevel >= 2 ? "HEAVY!" : chargeLevel >= 1 ? "CHARGED!" : ""}
+
+          {/* Charge level label */}
+          {chargeLevel >= 1 && (
+            <div className={cn(
+              "text-center mt-2 font-black text-sm tracking-wider px-4 py-1 rounded-full",
+              chargeLevel >= 3 ? "bg-fuchsia-500/30 text-fuchsia-300" :
+              chargeLevel >= 2 ? "bg-yellow-500/30 text-yellow-300" :
+              "bg-pink-500/30 text-pink-300"
+            )}>
+              {chargeLevel >= 3 ? "💥 MEGA!" : chargeLevel >= 2 ? "⭐ HEAVY!" : "✨ CHARGED!"}
+            </div>
+          )}
+
+          {/* Damage preview */}
+          <div className="text-center text-white/60 text-xs mt-1">
+            {chargeLevel >= 3 ? "15 DMG" : chargeLevel >= 2 ? "10 DMG" : chargeLevel >= 1 ? "5 DMG" : ""}
           </div>
-        </motion.div>
+        </div>
       )}
 
-      {/* Status Indicators */}
-      <div className="absolute top-24 right-4 z-30 flex flex-col gap-2">
+      {/* Status Indicators - Floating badges */}
+      <div className="absolute top-[140px] right-3 z-30 flex flex-col gap-2">
         {hasShield && (
-          <motion.div
-            initial={{ scale: 0 }}
-            animate={{ scale: 1 }}
-            className="bg-cyan-500/30 px-3 py-1 rounded-full text-cyan-300 text-sm font-bold flex items-center gap-1"
-          >
-            🛡️ SHIELD
-          </motion.div>
+          <div className="animate-[scaleIn_0.2s_ease-out] bg-cyan-500/20 backdrop-blur-sm px-3 py-1.5 rounded-xl border border-cyan-400/40 shadow-lg">
+            <div className="flex items-center gap-2">
+              <span className="text-lg">🛡️</span>
+              <div>
+                <div className="text-cyan-300 text-xs font-bold">SHIELD</div>
+                <div className="text-cyan-400/60 text-[10px]">Block 1 hit</div>
+              </div>
+            </div>
+          </div>
         )}
         {rageMode && (
-          <motion.div
-            initial={{ scale: 0 }}
-            animate={{ scale: [1, 1.1, 1] }}
-            transition={{ duration: 0.3, repeat: Infinity }}
-            className="bg-red-500/30 px-3 py-1 rounded-full text-red-300 text-sm font-bold flex items-center gap-1"
-          >
-            🔥 RAGE {Math.ceil(rageModeTimer)}s
-          </motion.div>
+          <div className="animate-[pulse_0.3s_ease-in-out_infinite] bg-red-500/20 backdrop-blur-sm px-3 py-1.5 rounded-xl border border-red-400/40 shadow-lg shadow-red-500/20">
+            <div className="flex items-center gap-2">
+              <span className="text-lg">🔥</span>
+              <div>
+                <div className="text-red-300 text-xs font-bold">RAGE MODE</div>
+                <div className="text-red-400/80 text-[10px] font-mono tabular-nums">{Math.ceil(rageModeTimer)}s • 2x DMG</div>
+              </div>
+            </div>
+          </div>
         )}
       </div>
 
-      {/* Phase Transition Overlay */}
+      {/* Phase Transition Overlay - Dramatic announcement */}
       {showingPhaseTransition && (
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          className="absolute inset-0 z-50 flex items-center justify-center bg-black/50 pointer-events-none"
-        >
-          <motion.div
-            initial={{ scale: 0, rotate: -10 }}
-            animate={{ scale: [1, 1.2, 1], rotate: [0, 5, -5, 0] }}
-            transition={{ duration: 0.5 }}
-            className={cn(
-              "text-5xl font-black px-8 py-4 rounded-2xl",
-              bossPhase === "phase3" ? "bg-red-600 text-white" : "bg-purple-600 text-white"
-            )}
-          >
-            {phaseTransitionText}
-          </motion.div>
-        </motion.div>
+        <div className="absolute inset-0 z-50 flex items-center justify-center pointer-events-none animate-[fadeIn_0.2s_ease-out]">
+          {/* Dark overlay with radial gradient */}
+          <div className={cn(
+            "absolute inset-0",
+            bossPhase === "phase3"
+              ? "bg-gradient-radial from-red-900/60 via-black/70 to-black/80"
+              : "bg-gradient-radial from-purple-900/60 via-black/70 to-black/80"
+          )} />
+
+          {/* Lightning effect lines */}
+          <div className="absolute inset-0 overflow-hidden">
+            <div className={cn(
+              "absolute top-0 left-1/4 w-1 h-full opacity-30",
+              bossPhase === "phase3" ? "bg-red-500" : "bg-purple-500"
+            )} style={{ transform: "skewX(-15deg)" }} />
+            <div className={cn(
+              "absolute top-0 right-1/4 w-1 h-full opacity-30",
+              bossPhase === "phase3" ? "bg-red-500" : "bg-purple-500"
+            )} style={{ transform: "skewX(15deg)" }} />
+          </div>
+
+          {/* Main announcement */}
+          <div className="relative animate-[bounceIn_0.5s_ease-out]">
+            <div className={cn(
+              "text-5xl sm:text-6xl font-black px-10 py-5 rounded-2xl shadow-2xl",
+              "border-4 backdrop-blur-sm",
+              bossPhase === "phase3"
+                ? "bg-gradient-to-br from-red-600 via-orange-600 to-red-700 border-red-400 text-white shadow-red-500/50"
+                : "bg-gradient-to-br from-purple-600 via-pink-600 to-purple-700 border-purple-400 text-white shadow-purple-500/50"
+            )}>
+              {phaseTransitionText}
+            </div>
+
+            {/* Sub-text */}
+            <div className={cn(
+              "text-center mt-4 text-lg font-bold tracking-wider uppercase",
+              bossPhase === "phase3" ? "text-red-300" : "text-purple-300"
+            )}>
+              {bossPhase === "phase3" ? "⚠️ FINAL PHASE ⚠️" : "💀 PHASE 2 💀"}
+            </div>
+          </div>
+        </div>
       )}
 
-      {/* Bottom Area - Tap hint and Super meter */}
-      <div className="absolute bottom-0 left-0 right-0 p-4 z-30">
-        {/* Super meter */}
-        <div className="mb-3">
-          <div className="flex items-center gap-2">
-            <span className="text-yellow-400 text-sm font-bold">SUPER</span>
-            <div className="flex-1 h-4 bg-slate-800 rounded-full overflow-hidden border border-yellow-500/50">
-              <motion.div
-                className="h-full bg-gradient-to-r from-yellow-500 to-orange-500"
-                style={{ width: `${superMeter}%` }}
-              />
+      {/* Bottom Area - Controls HUD */}
+      <div className="absolute bottom-0 left-0 right-0 z-30 bg-gradient-to-t from-black/50 to-transparent pt-8 pb-4 px-4">
+        {/* Super meter - Redesigned */}
+        <div className="max-w-md mx-auto mb-3">
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1.5 bg-slate-800/80 rounded-lg px-2 py-1 border border-yellow-500/30">
+              <span className="text-yellow-400">⚡</span>
+              <span className="text-yellow-400 text-xs font-bold uppercase tracking-wide">Super</span>
             </div>
+
+            <div className="flex-1 relative">
+              {/* Background track */}
+              <div className="h-5 bg-slate-900/90 rounded-full overflow-hidden border border-slate-700/50 shadow-inner">
+                {/* Progress fill */}
+                <div
+                  className={cn(
+                    "h-full transition-all duration-300 rounded-full relative overflow-hidden",
+                    superMeter >= 100
+                      ? "bg-gradient-to-r from-yellow-400 via-orange-400 to-yellow-400"
+                      : "bg-gradient-to-r from-yellow-600 to-orange-500"
+                  )}
+                  style={{ width: `${superMeter}%` }}
+                >
+                  {/* Shine effect */}
+                  {superMeter >= 100 && (
+                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent animate-[shimmer_1.5s_infinite]" />
+                  )}
+                </div>
+
+                {/* Percentage text */}
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <span className={cn(
+                    "text-[10px] font-bold",
+                    superMeter >= 50 ? "text-white" : "text-slate-400"
+                  )}>
+                    {Math.floor(superMeter)}%
+                  </span>
+                </div>
+              </div>
+            </div>
+
             {superMeter >= 100 && (
-              <motion.button
+              <button
                 onClick={activateSuper}
-                className="px-4 py-2 bg-gradient-to-r from-yellow-400 to-orange-500 rounded-full font-bold text-white text-sm shadow-lg"
-                animate={{ scale: [1, 1.1, 1] }}
-                transition={{ duration: 0.5, repeat: Infinity }}
+                className="animate-pulse px-5 py-2 bg-gradient-to-r from-yellow-400 to-orange-500 rounded-xl font-black text-white text-sm shadow-lg shadow-yellow-500/30 border border-yellow-300/50 hover:scale-105 transition-transform"
               >
                 ⚡ GO!
-              </motion.button>
+              </button>
             )}
           </div>
         </div>
 
-        {/* Tap hint */}
+        {/* Tap hint - Cleaner design */}
         {!currentAttack && !isCharging && (
-          <motion.div
-            className="text-center text-slate-400 text-sm"
-            animate={{ opacity: [0.5, 1, 0.5] }}
-            transition={{ duration: 1.5, repeat: Infinity }}
-          >
-            👆 TAP to attack! HOLD to charge! 👆
-          </motion.div>
-        )}
-
-        {/* Combo multiplier display */}
-        {combo >= 10 && !currentAttack && (
-          <div className="text-center mt-2">
-            <span className={cn(
-              "text-xs font-bold px-2 py-1 rounded-full",
-              combo >= 30 ? "bg-yellow-500/30 text-yellow-300" :
-              combo >= 20 ? "bg-pink-500/30 text-pink-300" :
-              "bg-purple-500/30 text-purple-300"
-            )}>
-              {combo >= 30 ? "2.5x DMG" : combo >= 20 ? "2x DMG" : "1.5x DMG"}
-            </span>
+          <div className="text-center animate-[pulse_2s_ease-in-out_infinite]">
+            <div className="inline-flex items-center gap-3 bg-slate-800/60 rounded-full px-4 py-2 border border-slate-600/40">
+              <span className="text-slate-400 text-sm">👆</span>
+              <span className="text-slate-300 text-xs font-medium">
+                <span className="text-pink-400">TAP</span> to attack •
+                <span className="text-purple-400"> HOLD</span> to charge
+              </span>
+              <span className="text-slate-400 text-sm">👆</span>
+            </div>
           </div>
         )}
       </div>
