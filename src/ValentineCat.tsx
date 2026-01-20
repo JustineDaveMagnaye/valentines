@@ -2008,84 +2008,178 @@ const CatchTheNoGame = memo(function CatchTheNoGame({ onComplete }: { onComplete
     );
   }
 
-  // Main game screen with enhanced visuals
+  // Main game screen with super premium visuals - optimized for performance
   return (
     <motion.div
-      className="fixed inset-0 bg-gradient-to-b from-indigo-600 via-purple-600 to-fuchsia-700 overflow-hidden select-none touch-none"
+      className="fixed inset-0 overflow-hidden select-none touch-none"
       animate={screenShake ? { x: [0, -5, 5, -5, 5, 0] } : {}}
       transition={{ duration: 0.3 }}
       onMouseMove={(e) => handleMove(e.clientX, e.currentTarget.getBoundingClientRect())}
       onTouchMove={(e) => { e.preventDefault(); handleMove(e.touches[0].clientX, e.currentTarget.getBoundingClientRect()); }}
     >
-      {/* Animated background grid */}
-      <div className="absolute inset-0 opacity-10">
+      {/* Super premium animated gradient background */}
+      <div
+        className="absolute inset-0"
+        style={{
+          background: "linear-gradient(135deg, #4338ca 0%, #6d28d9 20%, #a855f7 40%, #ec4899 60%, #db2777 80%, #9333ea 100%)",
+          backgroundSize: "400% 400%",
+          animation: "gradientShift 15s ease infinite",
+        }}
+      />
+
+      {/* Mesh gradient overlay with animated orbs */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div
+          className="absolute w-[600px] h-[600px] rounded-full opacity-30 blur-3xl"
+          style={{
+            background: "radial-gradient(circle, rgba(139,92,246,0.8) 0%, transparent 70%)",
+            top: "-20%",
+            left: "-15%",
+            animation: "float 20s ease-in-out infinite",
+          }}
+        />
+        <div
+          className="absolute w-[500px] h-[500px] rounded-full opacity-25 blur-3xl"
+          style={{
+            background: "radial-gradient(circle, rgba(236,72,153,0.8) 0%, transparent 70%)",
+            bottom: "-20%",
+            right: "-15%",
+            animation: "float 18s ease-in-out infinite reverse",
+          }}
+        />
+      </div>
+
+      {/* Premium grid pattern overlay */}
+      <div className="absolute inset-0 opacity-[0.07]">
         <div className="absolute inset-0" style={{
-          backgroundImage: "linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)",
-          backgroundSize: "40px 40px",
+          backgroundImage: "linear-gradient(rgba(255,255,255,0.3) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.3) 1px, transparent 1px)",
+          backgroundSize: "60px 60px",
         }} />
       </div>
 
-      {/* Header with improved styling */}
-      <div className="absolute top-4 left-0 right-0 flex justify-center gap-3 z-10 px-4">
+      {/* Subtle floating sparkles - CSS only for performance */}
+      <div className="absolute inset-0 pointer-events-none">
+        {[...Array(8)].map((_, i) => (
+          <div
+            key={i}
+            className="absolute w-1 h-1 bg-white rounded-full"
+            style={{
+              left: `${10 + i * 12}%`,
+              top: `${20 + (i % 3) * 25}%`,
+              opacity: 0.4,
+              animation: `starTwinkle ${2 + (i % 3)}s ease-in-out infinite`,
+              animationDelay: `${i * 0.4}s`,
+            }}
+          />
+        ))}
+      </div>
+
+      {/* Premium glassmorphism header */}
+      <div className="absolute top-4 left-0 right-0 flex justify-center gap-2 sm:gap-3 z-10 px-3">
         <motion.div
-          className="bg-white/95 backdrop-blur rounded-2xl px-5 py-3 shadow-xl flex items-center gap-2"
+          className="bg-white/20 backdrop-blur-xl rounded-2xl px-4 sm:px-5 py-2.5 sm:py-3 shadow-[0_8px_32px_rgba(0,0,0,0.2)] border border-white/30 flex items-center gap-2"
           animate={noLetters > 0 ? { scale: [1, 1.05, 1] } : {}}
+          transition={{ duration: 0.2 }}
         >
-          <span className="text-2xl">📝</span>
-          <span className="text-xl font-black text-indigo-600">{noLetters}/5</span>
+          <span className="text-xl sm:text-2xl">📝</span>
+          <span className="text-lg sm:text-xl font-black text-white drop-shadow-lg">{noLetters}/5</span>
         </motion.div>
         <motion.div
           className={cn(
-            "backdrop-blur rounded-2xl px-5 py-3 shadow-xl flex items-center gap-2",
-            timeLeft <= 5 ? "bg-red-100/95" : "bg-white/95"
+            "backdrop-blur-xl rounded-2xl px-4 sm:px-5 py-2.5 sm:py-3 shadow-[0_8px_32px_rgba(0,0,0,0.2)] border flex items-center gap-2 relative overflow-hidden",
+            timeLeft <= 5
+              ? "bg-red-500/30 border-red-400/50"
+              : "bg-white/20 border-white/30"
           )}
-          animate={timeLeft <= 5 ? { scale: [1, 1.05, 1] } : {}}
-          transition={{ duration: 0.5, repeat: timeLeft <= 5 ? Infinity : 0 }}
+          animate={timeLeft <= 5 ? { scale: [1, 1.03, 1] } : {}}
+          transition={{ duration: 0.4, repeat: timeLeft <= 5 ? Infinity : 0 }}
         >
-          <span className="text-2xl">⏱️</span>
-          <span className={cn("text-xl font-black", timeLeft <= 5 ? "text-red-600" : "text-indigo-600")}>
+          {/* Urgent pulse effect */}
+          {timeLeft <= 5 && (
+            <div
+              className="absolute inset-0 bg-red-500/20"
+              style={{ animation: "pulseGlow 0.5s ease-in-out infinite" }}
+            />
+          )}
+          <span className="text-xl sm:text-2xl relative">⏱️</span>
+          <span className={cn(
+            "text-lg sm:text-xl font-black relative drop-shadow-lg",
+            timeLeft <= 5 ? "text-red-100" : "text-white"
+          )}>
             {timeLeft}s
           </span>
         </motion.div>
-        {combo >= 2 && (
-          <motion.div
-            initial={{ scale: 0, rotate: -20 }}
-            animate={{ scale: 1, rotate: 0 }}
-            className="bg-gradient-to-r from-amber-400 to-orange-500 rounded-2xl px-4 py-3 shadow-xl"
-          >
-            <span className="text-xl font-black text-white">x{combo} 🔥</span>
-          </motion.div>
-        )}
+        <AnimatePresence>
+          {combo >= 2 && (
+            <motion.div
+              initial={{ scale: 0, rotate: -20, opacity: 0 }}
+              animate={{ scale: 1, rotate: 0, opacity: 1 }}
+              exit={{ scale: 0, opacity: 0 }}
+              className="bg-gradient-to-r from-amber-500 via-orange-500 to-red-500 rounded-2xl px-3 sm:px-4 py-2.5 sm:py-3 shadow-[0_8px_32px_rgba(251,146,60,0.4)] border border-amber-400/50 relative overflow-hidden"
+              style={{ animation: combo >= 5 ? "comboFire 0.5s ease-in-out infinite" : undefined }}
+            >
+              {/* Shimmer effect */}
+              <div
+                className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent -skew-x-12"
+                style={{ animation: "shimmer 1.5s ease-in-out infinite" }}
+              />
+              <span className="text-lg sm:text-xl font-black text-white relative drop-shadow-lg">x{combo} 🔥</span>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
-      {/* Cat with emotions */}
+      {/* Cat with emotions - premium styling */}
       <motion.div
         className="absolute top-24 left-1/2 -translate-x-1/2 text-center z-20"
         animate={{ y: [0, -5, 0] }}
         transition={{ duration: 2, repeat: Infinity }}
       >
-        <motion.div
-          className="text-6xl mb-2 drop-shadow-lg"
-          animate={catEmotion === "worried" ? { rotate: [0, -5, 5, 0] } : {}}
-          transition={{ duration: 0.5, repeat: catEmotion === "worried" ? Infinity : 0 }}
-        >
-          {catEmotion === "happy" ? "😼" : catEmotion === "angry" ? "😾" : "🙀"}
-        </motion.div>
+        {/* Cat glow effect */}
+        <div className="relative">
+          <div
+            className="absolute inset-0 blur-2xl rounded-full"
+            style={{
+              background: catEmotion === "worried"
+                ? "radial-gradient(circle, rgba(239,68,68,0.4) 0%, transparent 70%)"
+                : catEmotion === "angry"
+                  ? "radial-gradient(circle, rgba(251,146,60,0.4) 0%, transparent 70%)"
+                  : "radial-gradient(circle, rgba(74,222,128,0.4) 0%, transparent 70%)",
+              width: "120px",
+              height: "120px",
+              left: "50%",
+              top: "50%",
+              transform: "translate(-50%, -50%)",
+            }}
+          />
+          <motion.div
+            className="text-6xl sm:text-7xl mb-2 relative"
+            style={{ filter: "drop-shadow(0 4px 20px rgba(0,0,0,0.3))" }}
+            animate={catEmotion === "worried" ? { rotate: [0, -5, 5, 0] } : {}}
+            transition={{ duration: 0.5, repeat: catEmotion === "worried" ? Infinity : 0 }}
+          >
+            {catEmotion === "happy" ? "😼" : catEmotion === "angry" ? "😾" : "🙀"}
+          </motion.div>
+        </div>
         <AnimatePresence>
           {catMessage && (
             <motion.div
-              initial={{ scale: 0, y: 10 }}
-              animate={{ scale: 1, y: 0 }}
-              exit={{ scale: 0, y: -10 }}
-              className="bg-gradient-to-r from-pink-500 to-rose-500 text-white px-5 py-2 rounded-full font-bold shadow-xl text-sm"
+              initial={{ scale: 0, y: 10, opacity: 0 }}
+              animate={{ scale: 1, y: 0, opacity: 1 }}
+              exit={{ scale: 0, y: -10, opacity: 0 }}
+              className="bg-gradient-to-r from-pink-500 via-rose-500 to-red-500 text-white px-5 py-2 rounded-full font-bold shadow-[0_8px_32px_rgba(236,72,153,0.4)] text-sm border border-pink-400/50 relative overflow-hidden"
             >
-              {catMessage}
+              <div
+                className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -skew-x-12"
+                style={{ animation: "shimmer 1s ease-in-out" }}
+              />
+              <span className="relative">{catMessage}</span>
             </motion.div>
           )}
         </AnimatePresence>
       </motion.div>
 
-      {/* Skip button */}
+      {/* Premium skip button */}
       <button
         onClick={() => {
           if (!gameEndedRef.current) {
@@ -2093,12 +2187,12 @@ const CatchTheNoGame = memo(function CatchTheNoGame({ onComplete }: { onComplete
             onComplete(noLetters);
           }
         }}
-        className="absolute top-4 right-4 bg-white/30 backdrop-blur rounded-full px-4 py-2 text-white/80 text-sm z-10 hover:bg-white/40 transition-colors"
+        className="absolute top-4 right-4 bg-white/15 backdrop-blur-xl rounded-full px-4 py-2 text-white/90 text-sm z-10 hover:bg-white/25 transition-all duration-300 border border-white/20 shadow-lg"
       >
         Skip →
       </button>
 
-      {/* Perfect catch indicator */}
+      {/* Premium perfect catch indicator */}
       <AnimatePresence>
         {perfectCatch && (
           <motion.div
@@ -2107,12 +2201,23 @@ const CatchTheNoGame = memo(function CatchTheNoGame({ onComplete }: { onComplete
             exit={{ opacity: 0 }}
             className="absolute left-1/2 -translate-x-1/2 bottom-36 z-40 pointer-events-none"
           >
-            <span className="text-2xl font-black text-yellow-300 drop-shadow-lg">PERFECT!</span>
+            <span
+              className="text-2xl sm:text-3xl font-black"
+              style={{
+                background: "linear-gradient(135deg, #fde047 0%, #fbbf24 50%, #f59e0b 100%)",
+                backgroundClip: "text",
+                WebkitBackgroundClip: "text",
+                color: "transparent",
+                filter: "drop-shadow(0 0 20px rgba(251,191,36,0.8))",
+              }}
+            >
+              PERFECT!
+            </span>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* Catch particles burst */}
+      {/* Premium catch particles burst */}
       <AnimatePresence>
         {catchParticles.map(particle => (
           <motion.div
@@ -2129,12 +2234,14 @@ const CatchTheNoGame = memo(function CatchTheNoGame({ onComplete }: { onComplete
             exit={{ opacity: 0 }}
             transition={{ duration: 0.5, ease: "easeOut" }}
           >
-            <span className="text-2xl">{particle.emoji}</span>
+            <span className="text-2xl" style={{ filter: "drop-shadow(0 0 8px rgba(255,255,255,0.5))" }}>
+              {particle.emoji}
+            </span>
           </motion.div>
         ))}
       </AnimatePresence>
 
-      {/* Catch effect with combo display */}
+      {/* Premium catch effect with combo display */}
       <AnimatePresence>
         {lastCatch && (
           <motion.div
@@ -2145,14 +2252,31 @@ const CatchTheNoGame = memo(function CatchTheNoGame({ onComplete }: { onComplete
             style={{ left: `${lastCatch.x}%`, top: `${lastCatch.y}%` }}
           >
             <div className="text-center">
-              <div className={cn(
-                "text-4xl font-black drop-shadow-lg",
-                lastCatch.type === "star" ? "text-yellow-300" : "text-green-400"
-              )}>
+              <div
+                className="text-4xl sm:text-5xl font-black"
+                style={{
+                  background: lastCatch.type === "star"
+                    ? "linear-gradient(135deg, #fde047 0%, #fbbf24 100%)"
+                    : "linear-gradient(135deg, #4ade80 0%, #22c55e 100%)",
+                  backgroundClip: "text",
+                  WebkitBackgroundClip: "text",
+                  color: "transparent",
+                  filter: `drop-shadow(0 0 15px ${lastCatch.type === "star" ? "rgba(251,191,36,0.8)" : "rgba(74,222,128,0.8)"})`,
+                }}
+              >
                 {lastCatch.type === "star" ? "+2!" : "+1!"}
               </div>
               {lastCatch.combo >= 3 && (
-                <div className="text-xl font-bold text-orange-300 mt-1">
+                <div
+                  className="text-xl font-bold mt-1"
+                  style={{
+                    background: "linear-gradient(135deg, #fb923c 0%, #f97316 100%)",
+                    backgroundClip: "text",
+                    WebkitBackgroundClip: "text",
+                    color: "transparent",
+                    filter: "drop-shadow(0 0 10px rgba(251,146,60,0.6))",
+                  }}
+                >
                   x{lastCatch.combo}!
                 </div>
               )}
@@ -2161,73 +2285,93 @@ const CatchTheNoGame = memo(function CatchTheNoGame({ onComplete }: { onComplete
         )}
       </AnimatePresence>
 
-      {/* Falling items with enhanced visuals */}
+      {/* Premium falling items with enhanced visuals */}
       {items.map(item => (
-        <motion.div
+        <div
           key={item.id}
-          className="absolute pointer-events-none"
+          className="absolute pointer-events-none gpu-accelerate"
           style={{
             left: `${item.x}%`,
             top: `${item.y}%`,
             transform: `translate(-50%, -50%) rotate(${item.rotation}deg) scale(${item.scale})`,
-            willChange: "top, transform",
           }}
-          initial={{ scale: 0 }}
-          animate={{ scale: item.scale }}
-          transition={{ duration: 0.2 }}
         >
           {item.type === "heart" ? (
-            <span className="text-5xl drop-shadow-lg filter">💕</span>
+            <span
+              className="text-5xl sm:text-6xl"
+              style={{ filter: "drop-shadow(0 4px 12px rgba(236,72,153,0.5))" }}
+            >
+              💕
+            </span>
           ) : item.type === "star" ? (
-            <motion.span
-              className="text-5xl drop-shadow-lg"
-              animate={{ rotate: 360, scale: [1, 1.2, 1] }}
-              transition={{ duration: 1, repeat: Infinity }}
+            <span
+              className="text-5xl sm:text-6xl"
+              style={{
+                filter: "drop-shadow(0 0 20px rgba(251,191,36,0.8))",
+                animation: "goldShimmer 1s ease-in-out infinite",
+              }}
             >
               ⭐
-            </motion.span>
+            </span>
           ) : (
-            <span className="text-5xl font-black text-white drop-shadow-[0_0_10px_rgba(239,68,68,0.8)] [text-shadow:_2px_2px_0_rgb(185_28_28)]">
+            <span
+              className="text-5xl sm:text-6xl font-black"
+              style={{
+                background: "linear-gradient(180deg, #ffffff 0%, #fecaca 100%)",
+                backgroundClip: "text",
+                WebkitBackgroundClip: "text",
+                color: "transparent",
+                filter: "drop-shadow(0 0 15px rgba(239,68,68,0.8)) drop-shadow(2px 2px 0 #b91c1c)",
+              }}
+            >
               {item.type}
             </span>
           )}
-        </motion.div>
+        </div>
       ))}
 
-      {/* Basket with dynamic glow effect */}
+      {/* Premium basket with dynamic glow effect */}
       <motion.div
         className="absolute bottom-24"
         style={{
           left: `${basketX}%`,
           transform: "translateX(-50%)",
-          willChange: "left",
         }}
         animate={{ y: [0, -3, 0] }}
         transition={{ duration: 1.5, repeat: Infinity }}
       >
         <div className="relative">
-          {/* Dynamic glow based on basket state */}
-          <motion.div
+          {/* Multi-layer glow effect */}
+          <div
             className={cn(
-              "absolute inset-0 blur-xl rounded-full",
-              basketGlow ? "bg-green-400/60" : "bg-amber-400/30"
+              "absolute blur-2xl rounded-full transition-all duration-300",
+              basketGlow ? "bg-green-400/70" : "bg-amber-400/40"
             )}
-            animate={basketGlow
-              ? { scale: [1.5, 2, 1.5], opacity: [0.6, 1, 0.6] }
-              : { scale: 1.5 }
-            }
-            transition={{ duration: 0.3 }}
-            style={{ width: "100%", height: "100%" }}
+            style={{
+              width: "100px",
+              height: "100px",
+              left: "50%",
+              top: "50%",
+              transform: "translate(-50%, -50%)",
+              animation: basketGlow ? "perfectBurst 0.3s ease-out" : undefined,
+            }}
           />
-          {/* Catch zone indicator ring */}
-          <motion.div
-            className="absolute -inset-3 border-2 border-white/20 rounded-full"
-            animate={{ scale: [1, 1.1, 1], opacity: [0.3, 0.5, 0.3] }}
-            transition={{ duration: 2, repeat: Infinity }}
+          {/* Catch zone indicator ring - CSS animation for performance */}
+          <div
+            className="absolute rounded-full border-2 border-white/30"
+            style={{
+              width: "90px",
+              height: "90px",
+              left: "50%",
+              top: "50%",
+              transform: "translate(-50%, -50%)",
+              animation: "crosshairPulse 2s ease-in-out infinite",
+            }}
           />
           <motion.span
-            className="text-6xl drop-shadow-lg relative"
-            animate={basketGlow ? { scale: [1, 1.2, 1] } : {}}
+            className="text-6xl sm:text-7xl relative"
+            style={{ filter: "drop-shadow(0 8px 24px rgba(0,0,0,0.4))" }}
+            animate={basketGlow ? { scale: [1, 1.15, 1] } : {}}
             transition={{ duration: 0.2 }}
           >
             🧺
@@ -2235,35 +2379,56 @@ const CatchTheNoGame = memo(function CatchTheNoGame({ onComplete }: { onComplete
         </div>
       </motion.div>
 
-      {/* Enhanced progress bar */}
-      <div className="absolute bottom-8 left-4 right-4 z-10">
-        <div className="bg-white/15 backdrop-blur-md rounded-2xl p-2 shadow-lg">
-          <div className="flex gap-1.5 items-center">
+      {/* Super premium progress bar with glassmorphism */}
+      <div className="absolute bottom-6 sm:bottom-8 left-3 right-3 sm:left-4 sm:right-4 z-10">
+        <div className="bg-white/10 backdrop-blur-xl rounded-2xl p-3 shadow-[0_8px_32px_rgba(0,0,0,0.2)] border border-white/20">
+          <div className="flex gap-1.5 sm:gap-2 items-center">
             {["N", "O", " ", "N", "O"].map((letter, i) => (
               <motion.div
                 key={i}
                 className={cn(
-                  "flex-1 h-8 rounded-xl flex items-center justify-center font-black text-lg transition-all duration-300",
+                  "flex-1 h-9 sm:h-10 rounded-xl flex items-center justify-center font-black text-lg sm:text-xl transition-all duration-300 relative overflow-hidden",
                   i < noLetters
-                    ? "bg-gradient-to-r from-green-400 to-emerald-500 text-white shadow-lg shadow-green-500/30"
-                    : "bg-white/20 text-white/40"
+                    ? "text-white"
+                    : "bg-white/10 text-white/30 border border-white/10"
                 )}
-                animate={i < noLetters ? { scale: [1, 1.1, 1] } : {}}
+                style={i < noLetters ? {
+                  background: "linear-gradient(135deg, #4ade80 0%, #22c55e 50%, #16a34a 100%)",
+                  boxShadow: "0 4px 20px rgba(74,222,128,0.4), inset 0 1px 0 rgba(255,255,255,0.3)",
+                } : {}}
+                animate={i < noLetters ? { scale: [1, 1.08, 1] } : {}}
                 transition={{ duration: 0.3 }}
               >
-                {letter !== " " ? (i < noLetters ? letter : "?") : ""}
+                {i < noLetters && (
+                  <div
+                    className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent -skew-x-12"
+                    style={{ animation: "shimmer 2s ease-in-out infinite", animationDelay: `${i * 0.1}s` }}
+                  />
+                )}
+                <span className="relative">{letter !== " " ? (i < noLetters ? letter : "?") : ""}</span>
               </motion.div>
             ))}
           </div>
           <motion.p
-            className="text-white/70 text-sm mt-2 text-center font-medium"
+            className="text-white/80 text-sm mt-2 text-center font-medium"
             animate={noLetters >= 5 ? { scale: [1, 1.05, 1] } : {}}
             transition={{ duration: 0.5, repeat: noLetters >= 5 ? Infinity : 0 }}
           >
             {noLetters < 5 ? (
               <>Collect <span className="text-green-300 font-bold">{5 - noLetters}</span> more letters!</>
             ) : (
-              <span className="text-green-300">You spelled NO! 🎉</span>
+              <span
+                style={{
+                  background: "linear-gradient(90deg, #4ade80, #22c55e, #4ade80)",
+                  backgroundSize: "200% auto",
+                  backgroundClip: "text",
+                  WebkitBackgroundClip: "text",
+                  color: "transparent",
+                  animation: "shimmer 2s linear infinite",
+                }}
+              >
+                You spelled NO! 🎉
+              </span>
             )}
           </motion.p>
         </div>
@@ -2945,74 +3110,144 @@ const SmashTheHeartsGame = memo(function SmashTheHeartsGame({ onComplete }: { on
     );
   }
 
-  // Main game screen
+  // Super premium main game screen
   return (
     <motion.div
-      className="fixed inset-0 bg-gradient-to-b from-rose-600 via-red-600 to-pink-700 overflow-hidden select-none"
+      className="fixed inset-0 overflow-hidden select-none"
       animate={screenShake ? { x: [0, -8, 8, -8, 8, 0] } : {}}
       transition={{ duration: 0.3 }}
     >
-      {/* Background pattern */}
-      <div className="absolute inset-0 opacity-10">
+      {/* Super premium animated gradient background */}
+      <div
+        className="absolute inset-0"
+        style={{
+          background: "linear-gradient(135deg, #e11d48 0%, #db2777 20%, #c026d3 40%, #9333ea 60%, #dc2626 80%, #f43f5e 100%)",
+          backgroundSize: "400% 400%",
+          animation: "gradientShift 12s ease infinite",
+        }}
+      />
+
+      {/* Animated mesh gradient orbs */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div
+          className="absolute w-[500px] h-[500px] rounded-full opacity-30 blur-3xl"
+          style={{
+            background: "radial-gradient(circle, rgba(251,113,133,0.8) 0%, transparent 70%)",
+            top: "-15%",
+            left: "-10%",
+            animation: "float 15s ease-in-out infinite",
+          }}
+        />
+        <div
+          className="absolute w-[400px] h-[400px] rounded-full opacity-25 blur-3xl"
+          style={{
+            background: "radial-gradient(circle, rgba(249,115,22,0.8) 0%, transparent 70%)",
+            bottom: "-15%",
+            right: "-10%",
+            animation: "float 12s ease-in-out infinite reverse",
+          }}
+        />
+      </div>
+
+      {/* Premium pattern overlay */}
+      <div className="absolute inset-0 opacity-[0.08]">
         <div className="absolute inset-0" style={{
-          backgroundImage: "radial-gradient(circle, white 1px, transparent 1px)",
-          backgroundSize: "30px 30px",
+          backgroundImage: "radial-gradient(circle, white 2px, transparent 2px)",
+          backgroundSize: "40px 40px",
         }} />
       </div>
 
-      {/* Header */}
-      <div className="absolute top-4 left-0 right-0 flex justify-center gap-3 z-20 px-4">
+      {/* Premium glassmorphism header */}
+      <div className="absolute top-4 left-0 right-0 flex justify-center gap-2 sm:gap-3 z-20 px-3">
         <motion.div
-          className="bg-white/95 backdrop-blur rounded-2xl px-5 py-3 shadow-xl flex items-center gap-2"
+          className="bg-white/20 backdrop-blur-xl rounded-2xl px-4 sm:px-5 py-2.5 sm:py-3 shadow-[0_8px_32px_rgba(0,0,0,0.2)] border border-white/30 flex items-center gap-2"
           animate={score > 0 ? { scale: [1, 1.05, 1] } : {}}
+          transition={{ duration: 0.2 }}
         >
-          <span className="text-2xl">💯</span>
-          <span className="text-xl font-black text-red-600">{score}</span>
+          <span className="text-xl sm:text-2xl">💯</span>
+          <span className="text-lg sm:text-xl font-black text-white drop-shadow-lg">{score}</span>
         </motion.div>
         <motion.div
           className={cn(
-            "backdrop-blur rounded-2xl px-5 py-3 shadow-xl flex items-center gap-2",
-            timeLeft <= 5 ? "bg-red-100/95" : "bg-white/95"
+            "backdrop-blur-xl rounded-2xl px-4 sm:px-5 py-2.5 sm:py-3 shadow-[0_8px_32px_rgba(0,0,0,0.2)] border flex items-center gap-2 relative overflow-hidden",
+            timeLeft <= 5
+              ? "bg-red-500/40 border-red-400/50"
+              : "bg-white/20 border-white/30"
           )}
-          animate={timeLeft <= 5 ? { scale: [1, 1.05, 1] } : {}}
-          transition={{ duration: 0.5, repeat: timeLeft <= 5 ? Infinity : 0 }}
+          animate={timeLeft <= 5 ? { scale: [1, 1.03, 1] } : {}}
+          transition={{ duration: 0.4, repeat: timeLeft <= 5 ? Infinity : 0 }}
         >
-          <span className="text-2xl">⏱️</span>
-          <span className={cn("text-xl font-black", timeLeft <= 5 ? "text-red-600" : "text-pink-600")}>
+          {timeLeft <= 5 && (
+            <div
+              className="absolute inset-0 bg-red-500/30"
+              style={{ animation: "pulseGlow 0.5s ease-in-out infinite" }}
+            />
+          )}
+          <span className="text-xl sm:text-2xl relative">⏱️</span>
+          <span className={cn(
+            "text-lg sm:text-xl font-black relative drop-shadow-lg",
+            timeLeft <= 5 ? "text-red-100" : "text-white"
+          )}>
             {timeLeft}s
           </span>
         </motion.div>
-        {combo >= 3 && (
-          <motion.div
-            initial={{ scale: 0, rotate: -20 }}
-            animate={{ scale: 1, rotate: 0 }}
-            className="bg-gradient-to-r from-orange-400 to-red-500 rounded-2xl px-4 py-3 shadow-xl"
-          >
-            <span className="text-xl font-black text-white">x{combo} 🔥</span>
-          </motion.div>
-        )}
+        <AnimatePresence>
+          {combo >= 3 && (
+            <motion.div
+              initial={{ scale: 0, rotate: -20, opacity: 0 }}
+              animate={{ scale: 1, rotate: 0, opacity: 1 }}
+              exit={{ scale: 0, opacity: 0 }}
+              className="bg-gradient-to-r from-orange-500 via-red-500 to-rose-500 rounded-2xl px-3 sm:px-4 py-2.5 sm:py-3 shadow-[0_8px_32px_rgba(249,115,22,0.4)] border border-orange-400/50 relative overflow-hidden"
+              style={{ animation: combo >= 5 ? "comboFire 0.5s ease-in-out infinite" : undefined }}
+            >
+              <div
+                className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent -skew-x-12"
+                style={{ animation: "shimmer 1.5s ease-in-out infinite" }}
+              />
+              <span className="text-lg sm:text-xl font-black text-white relative drop-shadow-lg">x{combo} 🔥</span>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
-      {/* Cat with reactions */}
+      {/* Premium cat with reactions */}
       <motion.div
         className="absolute top-20 left-1/2 -translate-x-1/2 text-center z-20"
         animate={{ y: [0, -3, 0] }}
         transition={{ duration: 1.5, repeat: Infinity }}
       >
-        <motion.div
-          className="text-5xl mb-1"
-          animate={catEmotion === "shocked" ? { scale: [1, 1.3, 1], rotate: [0, -10, 10, 0] } : {}}
-          transition={{ duration: 0.3, repeat: catEmotion === "shocked" ? Infinity : 0 }}
-        >
-          {catEmotion === "happy" ? "😼" : catEmotion === "angry" ? "😾" : catEmotion === "sad" ? "😿" : "🙀"}
-        </motion.div>
+        <div className="relative">
+          <div
+            className="absolute blur-2xl rounded-full"
+            style={{
+              background: catEmotion === "shocked"
+                ? "radial-gradient(circle, rgba(239,68,68,0.5) 0%, transparent 70%)"
+                : catEmotion === "sad"
+                  ? "radial-gradient(circle, rgba(59,130,246,0.4) 0%, transparent 70%)"
+                  : "radial-gradient(circle, rgba(251,146,60,0.4) 0%, transparent 70%)",
+              width: "100px",
+              height: "100px",
+              left: "50%",
+              top: "50%",
+              transform: "translate(-50%, -50%)",
+            }}
+          />
+          <motion.div
+            className="text-5xl sm:text-6xl mb-1 relative"
+            style={{ filter: "drop-shadow(0 4px 20px rgba(0,0,0,0.3))" }}
+            animate={catEmotion === "shocked" ? { scale: [1, 1.3, 1], rotate: [0, -10, 10, 0] } : {}}
+            transition={{ duration: 0.3, repeat: catEmotion === "shocked" ? Infinity : 0 }}
+          >
+            {catEmotion === "happy" ? "😼" : catEmotion === "angry" ? "😾" : catEmotion === "sad" ? "😿" : "🙀"}
+          </motion.div>
+        </div>
         <AnimatePresence>
           {catReaction && (
             <motion.div
-              initial={{ scale: 0, y: 10 }}
-              animate={{ scale: 1, y: 0 }}
-              exit={{ scale: 0, y: -10 }}
-              className="bg-white/95 text-red-600 px-4 py-2 rounded-full font-bold shadow-xl text-sm whitespace-nowrap"
+              initial={{ scale: 0, y: 10, opacity: 0 }}
+              animate={{ scale: 1, y: 0, opacity: 1 }}
+              exit={{ scale: 0, y: -10, opacity: 0 }}
+              className="bg-white/95 backdrop-blur-xl text-red-600 px-4 py-2 rounded-full font-bold shadow-[0_8px_32px_rgba(0,0,0,0.2)] text-sm whitespace-nowrap border border-white/50"
             >
               {catReaction}
             </motion.div>
@@ -3020,7 +3255,7 @@ const SmashTheHeartsGame = memo(function SmashTheHeartsGame({ onComplete }: { on
         </AnimatePresence>
       </motion.div>
 
-      {/* Skip button */}
+      {/* Premium skip button */}
       <button
         onClick={() => {
           if (!gameEndedRef.current) {
@@ -3028,12 +3263,12 @@ const SmashTheHeartsGame = memo(function SmashTheHeartsGame({ onComplete }: { on
             onComplete(score);
           }
         }}
-        className="absolute top-4 right-4 bg-white/30 backdrop-blur rounded-full px-4 py-2 text-white/80 text-sm z-20"
+        className="absolute top-4 right-4 bg-white/15 backdrop-blur-xl rounded-full px-4 py-2 text-white/90 text-sm z-20 hover:bg-white/25 transition-all duration-300 border border-white/20 shadow-lg"
       >
         Skip →
       </button>
 
-      {/* Smash particles */}
+      {/* Premium smash particles */}
       <AnimatePresence>
         {particles.map(p => (
           <motion.div
@@ -3043,84 +3278,104 @@ const SmashTheHeartsGame = memo(function SmashTheHeartsGame({ onComplete }: { on
             exit={{ opacity: 0 }}
             transition={{ duration: 0.6 }}
             className={cn("absolute text-2xl pointer-events-none z-30", p.color)}
-            style={{ left: p.x, top: p.y }}
+            style={{
+              left: p.x,
+              top: p.y,
+              filter: "drop-shadow(0 0 10px currentColor)",
+            }}
           >
             {p.emoji}
           </motion.div>
         ))}
       </AnimatePresence>
 
-      {/* Hearts grid */}
+      {/* Premium hearts grid with glassmorphism */}
       <div className="absolute inset-0 flex items-center justify-center pt-32 pb-20">
-        <div className="grid grid-cols-5 gap-3 p-4">
-          {hearts.map(heart => (
-            <motion.button
-              key={heart.id}
-              onClick={(e) => smashHeart(heart, e)}
-              disabled={heart.smashed}
-              className={cn(
-                "w-14 h-14 sm:w-16 sm:h-16 rounded-2xl flex items-center justify-center text-4xl sm:text-5xl transition-all",
-                heart.smashed ? "opacity-0 scale-0" : "shadow-lg active:scale-90",
-                heart.type === "pink" && !heart.smashed && "bg-pink-100/80 hover:bg-pink-200/80",
-                heart.type === "red" && !heart.smashed && "bg-red-100/80 hover:bg-red-200/80",
-                heart.type === "gold" && !heart.smashed && "bg-yellow-100/80 hover:bg-yellow-200/80",
-                heart.type === "cat" && !heart.smashed && "bg-slate-100/80 hover:bg-slate-200/80",
-                heart.type === "bomb" && !heart.smashed && "bg-orange-100/80 hover:bg-orange-200/80",
-              )}
-              initial={{ scale: 0, rotate: -180 }}
-              animate={{
-                scale: heart.smashed ? 0 : 1,
-                rotate: heart.shaking ? [0, -15, 15, -15, 15, 0] : 0,
-                y: heart.smashed ? -20 : 0,
-              }}
-              transition={{
-                type: "spring",
-                stiffness: 300,
-                damping: 20,
-                rotate: { duration: 0.4 },
-              }}
-              whileHover={{ scale: heart.smashed ? 0 : 1.1 }}
-              whileTap={{ scale: heart.smashed ? 0 : 0.8 }}
-            >
-              {heart.type === "pink" && "💕"}
-              {heart.type === "red" && "❤️"}
-              {heart.type === "gold" && (
-                <motion.span
-                  animate={{ rotate: [0, 10, -10, 0] }}
-                  transition={{ duration: 1, repeat: Infinity }}
-                >
-                  💛
-                </motion.span>
-              )}
-              {heart.type === "cat" && "😺"}
-              {heart.type === "bomb" && (
-                <motion.span
-                  animate={{ scale: [1, 1.15, 1] }}
-                  transition={{ duration: 0.5, repeat: Infinity }}
-                >
-                  💣
-                </motion.span>
-              )}
-            </motion.button>
-          ))}
+        <div className="bg-white/10 backdrop-blur-md rounded-3xl p-4 sm:p-5 shadow-[0_8px_32px_rgba(0,0,0,0.2)] border border-white/20">
+          <div className="grid grid-cols-5 gap-2 sm:gap-3">
+            {hearts.map(heart => (
+              <motion.button
+                key={heart.id}
+                onClick={(e) => smashHeart(heart, e)}
+                disabled={heart.smashed}
+                className={cn(
+                  "w-14 h-14 sm:w-16 sm:h-16 rounded-2xl flex items-center justify-center text-3xl sm:text-4xl transition-all relative overflow-hidden",
+                  heart.smashed ? "opacity-0 scale-0" : "active:scale-90",
+                )}
+                style={!heart.smashed ? {
+                  background: heart.type === "pink" ? "linear-gradient(135deg, rgba(251,207,232,0.9) 0%, rgba(244,114,182,0.6) 100%)"
+                    : heart.type === "red" ? "linear-gradient(135deg, rgba(254,202,202,0.9) 0%, rgba(248,113,113,0.6) 100%)"
+                    : heart.type === "gold" ? "linear-gradient(135deg, rgba(254,249,195,0.9) 0%, rgba(250,204,21,0.6) 100%)"
+                    : heart.type === "cat" ? "linear-gradient(135deg, rgba(226,232,240,0.9) 0%, rgba(148,163,184,0.6) 100%)"
+                    : "linear-gradient(135deg, rgba(254,215,170,0.9) 0%, rgba(251,146,60,0.6) 100%)",
+                  boxShadow: heart.type === "gold"
+                    ? "0 4px 20px rgba(250,204,21,0.4), inset 0 1px 0 rgba(255,255,255,0.5)"
+                    : "0 4px 20px rgba(0,0,0,0.15), inset 0 1px 0 rgba(255,255,255,0.5)",
+                  border: "1px solid rgba(255,255,255,0.3)",
+                } : {}}
+                initial={{ scale: 0, rotate: -180 }}
+                animate={{
+                  scale: heart.smashed ? 0 : 1,
+                  rotate: heart.shaking ? [0, -15, 15, -15, 15, 0] : 0,
+                  y: heart.smashed ? -20 : 0,
+                }}
+                transition={{
+                  type: "spring",
+                  stiffness: 300,
+                  damping: 20,
+                  rotate: { duration: 0.4 },
+                }}
+                whileHover={{ scale: heart.smashed ? 0 : 1.1, y: -2 }}
+                whileTap={{ scale: heart.smashed ? 0 : 0.85 }}
+              >
+                {/* Shimmer effect on gold */}
+                {heart.type === "gold" && !heart.smashed && (
+                  <div
+                    className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent -skew-x-12"
+                    style={{ animation: "shimmer 2s ease-in-out infinite" }}
+                  />
+                )}
+                <span className="relative" style={{ filter: heart.type === "gold" ? "drop-shadow(0 0 8px rgba(250,204,21,0.8))" : undefined }}>
+                  {heart.type === "pink" && "💕"}
+                  {heart.type === "red" && "❤️"}
+                  {heart.type === "gold" && "💛"}
+                  {heart.type === "cat" && "😺"}
+                  {heart.type === "bomb" && (
+                    <span style={{ animation: "pulseGlow 0.5s ease-in-out infinite" }}>💣</span>
+                  )}
+                </span>
+              </motion.button>
+            ))}
+          </div>
         </div>
       </div>
 
-      {/* Progress / Instructions */}
-      <div className="absolute bottom-6 left-4 right-4 z-10">
-        <div className="bg-white/20 backdrop-blur rounded-2xl p-3 text-center">
-          <p className="text-white font-medium">
+      {/* Super premium progress / instructions bar */}
+      <div className="absolute bottom-6 left-3 right-3 sm:left-4 sm:right-4 z-10">
+        <div className="bg-white/10 backdrop-blur-xl rounded-2xl p-3 sm:p-4 text-center shadow-[0_8px_32px_rgba(0,0,0,0.2)] border border-white/20">
+          <p className="text-white/90 font-medium text-sm sm:text-base">
             👆 Tap hearts to smash! Avoid the cat! 😺
           </p>
-          {combo >= 2 && (
-            <motion.p
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="text-yellow-200 text-sm mt-1"
-            >
-              🔥 {combo} combo! +{Math.floor(combo / 3) * 5} bonus per hit!
-            </motion.p>
-          )}
+          <AnimatePresence>
+            {combo >= 2 && (
+              <motion.p
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                exit={{ opacity: 0, height: 0 }}
+                className="text-sm mt-1 font-bold"
+                style={{
+                  background: "linear-gradient(90deg, #fde047, #fb923c, #fde047)",
+                  backgroundSize: "200% auto",
+                  backgroundClip: "text",
+                  WebkitBackgroundClip: "text",
+                  color: "transparent",
+                  animation: "shimmer 2s linear infinite",
+                }}
+              >
+                🔥 {combo} combo! +{Math.floor(combo / 3) * 5} bonus per hit!
+              </motion.p>
+            )}
+          </AnimatePresence>
         </div>
       </div>
     </motion.div>
@@ -4144,15 +4399,10 @@ const DodgeTheLoveGame = memo(function DodgeTheLoveGame({ onComplete }: { onComp
     );
   }
 
-  // Main game
+  // Super premium main game
   return (
     <motion.div
-      className={cn(
-        "fixed inset-0 overflow-hidden select-none touch-none",
-        slowMo
-          ? "bg-gradient-to-b from-blue-950 via-indigo-950 to-purple-950"
-          : "bg-gradient-to-b from-slate-900 via-purple-900 to-violet-900"
-      )}
+      className="fixed inset-0 overflow-hidden select-none touch-none"
       animate={hitFlash
         ? { backgroundColor: ["#dc2626", "transparent"] }
         : screenShake > 0
@@ -4166,10 +4416,44 @@ const DodgeTheLoveGame = memo(function DodgeTheLoveGame({ onComplete }: { onComp
         handleMove(e.touches[0].clientX, e.touches[0].clientY, e.currentTarget.getBoundingClientRect());
       }}
     >
-      {/* Animated star field background */}
+      {/* Super premium animated gradient background */}
+      <div
+        className="absolute inset-0"
+        style={{
+          background: slowMo
+            ? "linear-gradient(135deg, #1e3a5f 0%, #1e1b4b 25%, #312e81 50%, #4c1d95 75%, #2e1065 100%)"
+            : "linear-gradient(135deg, #0f172a 0%, #1e1b4b 20%, #4c1d95 45%, #7e22ce 70%, #581c87 100%)",
+          backgroundSize: "300% 300%",
+          animation: "gradientShift 20s ease infinite",
+        }}
+      />
+
+      {/* Animated nebula orbs */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div
+          className="absolute w-[600px] h-[600px] rounded-full opacity-30 blur-3xl"
+          style={{
+            background: "radial-gradient(circle, rgba(168,85,247,0.6) 0%, transparent 70%)",
+            top: "-20%",
+            left: "-15%",
+            animation: "float 25s ease-in-out infinite",
+          }}
+        />
+        <div
+          className="absolute w-[500px] h-[500px] rounded-full opacity-20 blur-3xl"
+          style={{
+            background: "radial-gradient(circle, rgba(236,72,153,0.6) 0%, transparent 70%)",
+            bottom: "-15%",
+            right: "-15%",
+            animation: "float 20s ease-in-out infinite reverse",
+          }}
+        />
+      </div>
+
+      {/* Optimized star field - CSS animations */}
       <div className="absolute inset-0 pointer-events-none overflow-hidden">
-        {Array.from({ length: 50 }).map((_, i) => (
-          <motion.div
+        {[...Array(30)].map((_, i) => (
+          <div
             key={i}
             className="absolute rounded-full bg-white"
             style={{
@@ -4177,34 +4461,25 @@ const DodgeTheLoveGame = memo(function DodgeTheLoveGame({ onComplete }: { onComp
               top: `${(i * 23 + 7) % 100}%`,
               width: i % 3 === 0 ? "3px" : i % 2 === 0 ? "2px" : "1px",
               height: i % 3 === 0 ? "3px" : i % 2 === 0 ? "2px" : "1px",
-            }}
-            animate={{
-              opacity: [0.2, 0.8, 0.2],
-              scale: i % 5 === 0 ? [1, 1.5, 1] : [1, 1.2, 1],
-            }}
-            transition={{
-              duration: 2 + (i % 3),
-              repeat: Infinity,
-              delay: (i * 0.1) % 2,
-              ease: "easeInOut"
+              animation: `starTwinkle ${2 + (i % 3)}s ease-in-out infinite`,
+              animationDelay: `${(i * 0.1) % 2}s`,
             }}
           />
         ))}
       </div>
 
-      {/* Ambient floating particles */}
+      {/* Subtle ambient particles - reduced for performance */}
       <div className="absolute inset-0 pointer-events-none overflow-hidden">
-        {Array.from({ length: 8 }).map((_, i) => (
-          <motion.div
+        {[...Array(5)].map((_, i) => (
+          <div
             key={`ambient-${i}`}
             className="absolute w-2 h-2 rounded-full bg-pink-400/20 blur-sm"
-            style={{ left: `${10 + i * 12}%`, top: `${20 + (i % 3) * 25}%` }}
-            animate={{
-              y: [0, -30, 0],
-              x: [0, 10 * (i % 2 === 0 ? 1 : -1), 0],
-              opacity: [0.3, 0.6, 0.3],
+            style={{
+              left: `${15 + i * 18}%`,
+              top: `${25 + (i % 3) * 20}%`,
+              animation: `float ${5 + i}s ease-in-out infinite`,
+              animationDelay: `${i * 0.5}s`,
             }}
-            transition={{ duration: 4 + i, repeat: Infinity, delay: i * 0.5 }}
           />
         ))}
       </div>
@@ -4230,29 +4505,36 @@ const DodgeTheLoveGame = memo(function DodgeTheLoveGame({ onComplete }: { onComp
         </motion.div>
       )}
 
-      {/* Header */}
+      {/* Premium glassmorphism header */}
       <div className="absolute top-3 left-0 right-0 flex justify-center gap-2 z-30 px-3">
         <motion.div
-          className="bg-black/40 backdrop-blur-md rounded-xl px-3 py-1.5 shadow-lg border border-white/10 flex items-center gap-1.5"
-          animate={score > 0 ? { scale: [1, 1.02, 1] } : {}}
+          className="bg-white/10 backdrop-blur-xl rounded-2xl px-4 py-2 shadow-[0_8px_32px_rgba(0,0,0,0.3)] border border-white/20 flex items-center gap-1.5"
+          animate={score > 0 ? { scale: [1, 1.03, 1] } : {}}
+          transition={{ duration: 0.2 }}
         >
           <span className="text-lg">⭐</span>
-          <span className="text-base font-bold text-white">{score}</span>
+          <span className="text-base font-bold text-white drop-shadow-lg">{score}</span>
         </motion.div>
         <motion.div
           className={cn(
-            "backdrop-blur-md rounded-xl px-3 py-1.5 shadow-lg border flex items-center gap-1.5",
-            timeLeft <= 5 ? "bg-red-500/30 border-red-400/30" : "bg-black/40 border-white/10"
+            "backdrop-blur-xl rounded-2xl px-4 py-2 shadow-[0_8px_32px_rgba(0,0,0,0.3)] border flex items-center gap-1.5 relative overflow-hidden",
+            timeLeft <= 5 ? "bg-red-500/30 border-red-400/40" : "bg-white/10 border-white/20"
           )}
-          animate={timeLeft <= 5 ? { scale: [1, 1.05, 1] } : {}}
-          transition={{ duration: 0.5, repeat: timeLeft <= 5 ? Infinity : 0 }}
+          animate={timeLeft <= 5 ? { scale: [1, 1.03, 1] } : {}}
+          transition={{ duration: 0.4, repeat: timeLeft <= 5 ? Infinity : 0 }}
         >
-          <span className="text-lg">⏱️</span>
-          <span className={cn("text-base font-bold", timeLeft <= 5 ? "text-red-300" : "text-white")}>
+          {timeLeft <= 5 && (
+            <div
+              className="absolute inset-0 bg-red-500/20"
+              style={{ animation: "pulseGlow 0.5s ease-in-out infinite" }}
+            />
+          )}
+          <span className="text-lg relative">⏱️</span>
+          <span className={cn("text-base font-bold relative drop-shadow-lg", timeLeft <= 5 ? "text-red-200" : "text-white")}>
             {timeLeft}s
           </span>
         </motion.div>
-        <div className="bg-black/40 backdrop-blur-md rounded-xl px-2 py-1.5 shadow-lg border border-white/10 flex items-center gap-0.5">
+        <div className="bg-white/10 backdrop-blur-xl rounded-2xl px-3 py-2 shadow-[0_8px_32px_rgba(0,0,0,0.3)] border border-white/20 flex items-center gap-0.5">
           {[...Array(5)].map((_, i) => (
             <motion.div
               key={i}
@@ -4265,15 +4547,23 @@ const DodgeTheLoveGame = memo(function DodgeTheLoveGame({ onComplete }: { onComp
             </motion.div>
           ))}
         </div>
-        {combo >= 5 && (
-          <motion.div
-            initial={{ scale: 0, x: 20 }}
-            animate={{ scale: 1, x: 0 }}
-            className="bg-gradient-to-r from-orange-500/50 to-yellow-500/50 backdrop-blur-md rounded-xl px-3 py-1.5 shadow-lg border border-yellow-400/30"
-          >
-            <span className="text-base font-bold text-yellow-200">x{combo} 🔥</span>
-          </motion.div>
-        )}
+        <AnimatePresence>
+          {combo >= 5 && (
+            <motion.div
+              initial={{ scale: 0, x: 20, opacity: 0 }}
+              animate={{ scale: 1, x: 0, opacity: 1 }}
+              exit={{ scale: 0, opacity: 0 }}
+              className="bg-gradient-to-r from-orange-500/60 via-yellow-500/60 to-amber-500/60 backdrop-blur-xl rounded-2xl px-4 py-2 shadow-[0_8px_32px_rgba(251,191,36,0.3)] border border-yellow-400/40 relative overflow-hidden"
+              style={{ animation: combo >= 10 ? "comboFire 0.5s ease-in-out infinite" : undefined }}
+            >
+              <div
+                className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent -skew-x-12"
+                style={{ animation: "shimmer 1.5s ease-in-out infinite" }}
+              />
+              <span className="text-base font-bold text-yellow-100 relative drop-shadow-lg">x{combo} 🔥</span>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
       {/* Pattern announcement */}
@@ -6520,56 +6810,110 @@ const RejectLettersGame = memo(function RejectLettersGame({ onComplete }: { onCo
     );
   }
 
-  // Main game - letter queue view
+  // Super premium main game - letter queue view
   return (
     <motion.div
-      className="fixed inset-0 bg-gradient-to-b from-amber-100 via-rose-100 to-pink-200 overflow-hidden"
+      className="fixed inset-0 overflow-hidden"
       animate={screenShake > 0 ? { x: [0, -screenShake, screenShake, 0] } : {}}
     >
-      {/* Background pattern */}
-      <div className="absolute inset-0 opacity-10 pointer-events-none">
+      {/* Super premium animated gradient background */}
+      <div
+        className="absolute inset-0"
+        style={{
+          background: "linear-gradient(135deg, #fef3c7 0%, #fecaca 20%, #fbcfe8 40%, #fce7f3 60%, #ffe4e6 80%, #fef9c3 100%)",
+          backgroundSize: "400% 400%",
+          animation: "gradientShift 15s ease infinite",
+        }}
+      />
+
+      {/* Animated mesh gradient orbs */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div
+          className="absolute w-[500px] h-[500px] rounded-full opacity-30 blur-3xl"
+          style={{
+            background: "radial-gradient(circle, rgba(251,113,133,0.6) 0%, transparent 70%)",
+            top: "-15%",
+            left: "-10%",
+            animation: "float 20s ease-in-out infinite",
+          }}
+        />
+        <div
+          className="absolute w-[400px] h-[400px] rounded-full opacity-25 blur-3xl"
+          style={{
+            background: "radial-gradient(circle, rgba(251,191,36,0.6) 0%, transparent 70%)",
+            bottom: "-10%",
+            right: "-10%",
+            animation: "float 15s ease-in-out infinite reverse",
+          }}
+        />
+      </div>
+
+      {/* Premium diagonal pattern overlay */}
+      <div className="absolute inset-0 opacity-[0.05] pointer-events-none">
         <div className="absolute inset-0" style={{
-          backgroundImage: `repeating-linear-gradient(45deg, transparent, transparent 20px, rgba(244,63,94,0.1) 20px, rgba(244,63,94,0.1) 40px)`,
+          backgroundImage: `repeating-linear-gradient(45deg, transparent, transparent 20px, rgba(244,63,94,0.3) 20px, rgba(244,63,94,0.3) 40px)`,
         }} />
       </div>
 
-      {/* Header */}
+      {/* Premium glassmorphism header */}
       <div className="absolute top-3 left-3 right-3 flex justify-between items-center z-30">
         <motion.div
-          className="bg-white/90 backdrop-blur-md rounded-xl px-4 py-2 shadow-lg border border-rose-200 flex items-center gap-2"
-          animate={score > 0 ? { scale: [1, 1.02, 1] } : {}}
+          className="bg-white/30 backdrop-blur-xl rounded-2xl px-4 py-2.5 shadow-[0_8px_32px_rgba(0,0,0,0.1)] border border-white/50 flex items-center gap-2"
+          animate={score > 0 ? { scale: [1, 1.03, 1] } : {}}
+          transition={{ duration: 0.2 }}
         >
           <span className="text-xl">💔</span>
-          <span className="text-lg font-bold text-rose-600">{score}</span>
+          <span className="text-lg font-bold text-rose-600 drop-shadow">{score}</span>
         </motion.div>
 
         <motion.div
           className={cn(
-            "backdrop-blur-md rounded-xl px-4 py-2 shadow-lg border flex items-center gap-2",
-            timeLeft <= 10 ? "bg-red-100/90 border-red-300" : "bg-white/90 border-rose-200"
+            "backdrop-blur-xl rounded-2xl px-4 py-2.5 shadow-[0_8px_32px_rgba(0,0,0,0.1)] border flex items-center gap-2 relative overflow-hidden",
+            timeLeft <= 10 ? "bg-red-500/20 border-red-400/50" : "bg-white/30 border-white/50"
           )}
-          animate={timeLeft <= 10 ? { scale: [1, 1.05, 1] } : {}}
-          transition={{ duration: 0.5, repeat: timeLeft <= 10 ? Infinity : 0 }}
+          animate={timeLeft <= 10 ? { scale: [1, 1.03, 1] } : {}}
+          transition={{ duration: 0.4, repeat: timeLeft <= 10 ? Infinity : 0 }}
         >
-          <span className="text-xl">⏱️</span>
-          <span className={cn("text-lg font-bold", timeLeft <= 10 ? "text-red-600" : "text-rose-600")}>
+          {timeLeft <= 10 && (
+            <div
+              className="absolute inset-0 bg-red-500/20"
+              style={{ animation: "pulseGlow 0.5s ease-in-out infinite" }}
+            />
+          )}
+          <span className="text-xl relative">⏱️</span>
+          <span className={cn("text-lg font-bold relative", timeLeft <= 10 ? "text-red-600" : "text-rose-600")}>
             {timeLeft}s
           </span>
         </motion.div>
       </div>
 
-      {/* Cat with mailbag */}
+      {/* Premium cat with mailbag */}
       <div className="absolute top-16 left-1/2 -translate-x-1/2 text-center z-20">
-        <motion.div
-          animate={{ y: [0, -8, 0], rotate: [-2, 2, -2] }}
-          transition={{ duration: 2, repeat: Infinity }}
-        >
-          <span className="text-6xl">
-            {catEmotion === "devastated" ? "😭" : catEmotion === "crying" ? "😿" : catEmotion === "nervous" ? "🙀" : "😸"}
-          </span>
-        </motion.div>
+        <div className="relative">
+          <div
+            className="absolute blur-2xl rounded-full"
+            style={{
+              background: catEmotion === "devastated" || catEmotion === "crying"
+                ? "radial-gradient(circle, rgba(239,68,68,0.3) 0%, transparent 70%)"
+                : "radial-gradient(circle, rgba(251,146,60,0.3) 0%, transparent 70%)",
+              width: "100px",
+              height: "100px",
+              left: "50%",
+              top: "50%",
+              transform: "translate(-50%, -50%)",
+            }}
+          />
+          <motion.div
+            animate={{ y: [0, -8, 0], rotate: [-2, 2, -2] }}
+            transition={{ duration: 2, repeat: Infinity }}
+          >
+            <span className="text-6xl relative" style={{ filter: "drop-shadow(0 4px 16px rgba(0,0,0,0.2))" }}>
+              {catEmotion === "devastated" ? "😭" : catEmotion === "crying" ? "😿" : catEmotion === "nervous" ? "🙀" : "😸"}
+            </span>
+          </motion.div>
+        </div>
         <motion.p
-          className="text-rose-600 font-medium text-sm mt-1"
+          className="text-rose-600/90 font-medium text-sm mt-1"
           animate={{ opacity: [0.7, 1, 0.7] }}
           transition={{ duration: 2, repeat: Infinity }}
         >
@@ -6578,10 +6922,10 @@ const RejectLettersGame = memo(function RejectLettersGame({ onComplete }: { onCo
         <AnimatePresence>
           {catMessage && (
             <motion.div
-              initial={{ scale: 0, y: 5 }}
-              animate={{ scale: 1, y: 0 }}
+              initial={{ scale: 0, y: 5, opacity: 0 }}
+              animate={{ scale: 1, y: 0, opacity: 1 }}
               exit={{ scale: 0, opacity: 0 }}
-              className="absolute top-full left-1/2 -translate-x-1/2 mt-2 bg-white text-rose-600 px-4 py-2 rounded-full font-bold shadow-xl text-sm whitespace-nowrap"
+              className="absolute top-full left-1/2 -translate-x-1/2 mt-2 bg-white/95 backdrop-blur-xl text-rose-600 px-4 py-2 rounded-full font-bold shadow-[0_8px_32px_rgba(0,0,0,0.15)] text-sm whitespace-nowrap border border-rose-200/50"
             >
               {catMessage}
             </motion.div>
@@ -6589,19 +6933,19 @@ const RejectLettersGame = memo(function RejectLettersGame({ onComplete }: { onCo
         </AnimatePresence>
       </div>
 
-      {/* Stats bar */}
-      <div className="absolute top-32 left-1/2 -translate-x-1/2 flex gap-3 z-20">
-        <div className="bg-white/80 backdrop-blur rounded-lg px-3 py-1 text-center shadow">
+      {/* Premium stats bar with glassmorphism */}
+      <div className="absolute top-32 left-1/2 -translate-x-1/2 flex gap-2 z-20">
+        <div className="bg-white/40 backdrop-blur-xl rounded-xl px-3 py-1.5 text-center shadow-[0_4px_20px_rgba(0,0,0,0.08)] border border-white/50">
           <div className="text-lg font-bold text-rose-600">{lettersDestroyed}</div>
-          <div className="text-[9px] text-rose-400">destroyed</div>
+          <div className="text-[9px] text-rose-400 font-medium">destroyed</div>
         </div>
-        <div className="bg-orange-100/80 backdrop-blur rounded-lg px-3 py-1 text-center shadow">
+        <div className="bg-orange-100/50 backdrop-blur-xl rounded-xl px-3 py-1.5 text-center shadow-[0_4px_20px_rgba(251,146,60,0.15)] border border-orange-200/50">
           <div className="text-lg font-bold text-orange-600">{burnCount} 🔥</div>
-          <div className="text-[9px] text-orange-400">burned</div>
+          <div className="text-[9px] text-orange-400 font-medium">burned</div>
         </div>
-        <div className="bg-slate-100/80 backdrop-blur rounded-lg px-3 py-1 text-center shadow">
+        <div className="bg-slate-100/50 backdrop-blur-xl rounded-xl px-3 py-1.5 text-center shadow-[0_4px_20px_rgba(0,0,0,0.05)] border border-slate-200/50">
           <div className="text-lg font-bold text-slate-600">{ripCount} ✂️</div>
-          <div className="text-[9px] text-slate-400">ripped</div>
+          <div className="text-[9px] text-slate-400 font-medium">ripped</div>
         </div>
       </div>
 
@@ -10459,25 +10803,55 @@ const LoveLetterPuzzleGame = memo(function LoveLetterPuzzleGame({
     );
   }
 
-  // Playing
+  // Super premium playing screen
   return (
-    <div className="fixed inset-0 bg-gradient-to-b from-rose-700 via-pink-700 to-fuchsia-800 flex flex-col items-center justify-center p-4 overflow-hidden">
-      {/* Ambient floating particles */}
+    <div className="fixed inset-0 flex flex-col items-center justify-center p-4 overflow-hidden">
+      {/* Super premium animated gradient background */}
+      <div
+        className="absolute inset-0"
+        style={{
+          background: "linear-gradient(135deg, #be123c 0%, #db2777 20%, #c026d3 40%, #9333ea 60%, #ec4899 80%, #f43f5e 100%)",
+          backgroundSize: "400% 400%",
+          animation: "gradientShift 15s ease infinite",
+        }}
+      />
+
+      {/* Animated mesh gradient orbs */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div
+          className="absolute w-[500px] h-[500px] rounded-full opacity-30 blur-3xl"
+          style={{
+            background: "radial-gradient(circle, rgba(251,113,133,0.6) 0%, transparent 70%)",
+            top: "-15%",
+            left: "-10%",
+            animation: "float 20s ease-in-out infinite",
+          }}
+        />
+        <div
+          className="absolute w-[400px] h-[400px] rounded-full opacity-25 blur-3xl"
+          style={{
+            background: "radial-gradient(circle, rgba(168,85,247,0.6) 0%, transparent 70%)",
+            bottom: "-15%",
+            right: "-10%",
+            animation: "float 15s ease-in-out infinite reverse",
+          }}
+        />
+      </div>
+
+      {/* Ambient floating particles - optimized CSS */}
       <div className="absolute inset-0 pointer-events-none overflow-hidden">
         {[...Array(6)].map((_, i) => (
-          <motion.div
+          <div
             key={i}
             className="absolute text-xl opacity-20"
-            initial={{ y: "100%", x: `${i * 20}%` }}
-            animate={{ y: "-100%" }}
-            transition={{
-              duration: 10 + i * 2,
-              repeat: Infinity,
-              ease: "linear"
+            style={{
+              left: `${i * 18}%`,
+              animation: `floatUp ${12 + i * 2}s linear infinite`,
+              animationDelay: `${i * 1.5}s`,
             }}
           >
             {["💕", "💗", "💖"][i % 3]}
-          </motion.div>
+          </div>
         ))}
       </div>
 
@@ -10513,28 +10887,29 @@ const LoveLetterPuzzleGame = memo(function LoveLetterPuzzleGame({
         </motion.div>
       )}
 
-      {/* Premium HUD */}
-      <div className="absolute top-0 left-0 right-0 z-30 p-3 bg-gradient-to-b from-black/60 to-transparent">
+      {/* Super premium glassmorphism HUD */}
+      <div className="absolute top-0 left-0 right-0 z-30 p-3 bg-gradient-to-b from-black/40 to-transparent">
         <div className="flex justify-between items-center max-w-md mx-auto">
           {/* Moves counter */}
           <motion.div
-            className="bg-black/50 backdrop-blur-sm rounded-xl px-3 py-1.5 border border-white/10"
+            className="bg-white/10 backdrop-blur-xl rounded-2xl px-4 py-2 border border-white/20 shadow-[0_8px_32px_rgba(0,0,0,0.2)]"
             animate={lastMovedTile ? { scale: [1, 1.05, 1] } : {}}
+            transition={{ duration: 0.2 }}
           >
-            <div className="text-white text-[10px] opacity-60">Moves</div>
-            <div className="text-white text-lg font-black tabular-nums">{moves}</div>
+            <div className="text-white/70 text-[10px] font-medium">Moves</div>
+            <div className="text-white text-lg font-black tabular-nums drop-shadow">{moves}</div>
           </motion.div>
 
           {/* Progress + Streak */}
-          <div className="bg-black/50 backdrop-blur-sm rounded-xl px-3 py-1.5 border border-white/10 flex gap-3">
+          <div className="bg-white/10 backdrop-blur-xl rounded-2xl px-4 py-2 border border-white/20 shadow-[0_8px_32px_rgba(0,0,0,0.2)] flex gap-4">
             <div className="text-center">
-              <div className="text-white text-[10px] opacity-60">Correct</div>
-              <div className="text-green-400 text-lg font-black">{correctTiles.size}/8</div>
+              <div className="text-white/70 text-[10px] font-medium">Correct</div>
+              <div className="text-green-400 text-lg font-black drop-shadow">{correctTiles.size}/8</div>
             </div>
             {streak > 0 && (
               <div className="text-center">
-                <div className="text-orange-300 text-[10px] opacity-80">Streak</div>
-                <div className="text-orange-400 text-lg font-black">🔥{streak}</div>
+                <div className="text-orange-200/80 text-[10px] font-medium">Streak</div>
+                <div className="text-orange-400 text-lg font-black drop-shadow">🔥{streak}</div>
               </div>
             )}
           </div>
@@ -10542,19 +10917,25 @@ const LoveLetterPuzzleGame = memo(function LoveLetterPuzzleGame({
           {/* Timer */}
           <motion.div
             className={cn(
-              "bg-black/50 backdrop-blur-sm rounded-xl px-3 py-1.5 border",
-              timeLeft <= 10 ? "border-red-500/50" : "border-white/10"
+              "backdrop-blur-xl rounded-2xl px-4 py-2 border shadow-[0_8px_32px_rgba(0,0,0,0.2)] relative overflow-hidden",
+              timeLeft <= 10 ? "bg-red-500/30 border-red-400/50" : "bg-white/10 border-white/20"
             )}
-            animate={timeLeft <= 10 ? { scale: [1, 1.05, 1] } : {}}
-            transition={{ duration: 0.5, repeat: timeLeft <= 10 ? Infinity : 0 }}
+            animate={timeLeft <= 10 ? { scale: [1, 1.03, 1] } : {}}
+            transition={{ duration: 0.4, repeat: timeLeft <= 10 ? Infinity : 0 }}
           >
+            {timeLeft <= 10 && (
+              <div
+                className="absolute inset-0 bg-red-500/20"
+                style={{ animation: "pulseGlow 0.5s ease-in-out infinite" }}
+              />
+            )}
             <div className={cn(
-              "text-[10px] opacity-60",
-              timeLeft <= 10 ? "text-red-400" : "text-white"
+              "text-[10px] font-medium relative",
+              timeLeft <= 10 ? "text-red-200" : "text-white/70"
             )}>Time</div>
             <div className={cn(
-              "text-lg font-black tabular-nums",
-              timeLeft <= 10 ? "text-red-400" : "text-white"
+              "text-lg font-black tabular-nums relative drop-shadow",
+              timeLeft <= 10 ? "text-red-200" : "text-white"
             )}>{timeLeft}s</div>
           </motion.div>
         </div>
@@ -11500,14 +11881,52 @@ const CupidsArrowGame = memo(function CupidsArrowGame({
     );
   }
 
-  // Playing
+  // Super premium playing screen
   return (
     <div
       ref={containerRef}
-      className="fixed inset-0 bg-gradient-to-b from-indigo-950 via-purple-950 to-slate-950 overflow-hidden cursor-none select-none"
+      className="fixed inset-0 overflow-hidden cursor-none select-none"
       onPointerMove={handlePointerMove}
       onClick={handleShoot}
     >
+      {/* Super premium animated gradient background */}
+      <div
+        className="absolute inset-0"
+        style={{
+          background: frenzyMode
+            ? "linear-gradient(135deg, #7c2d12 0%, #dc2626 20%, #f97316 40%, #fbbf24 60%, #ef4444 80%, #9a3412 100%)"
+            : "linear-gradient(135deg, #1e1b4b 0%, #312e81 20%, #4c1d95 40%, #6d28d9 60%, #5b21b6 80%, #1e1b4b 100%)",
+          backgroundSize: "400% 400%",
+          animation: "gradientShift 20s ease infinite",
+        }}
+      />
+
+      {/* Animated nebula orbs */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div
+          className="absolute w-[500px] h-[500px] rounded-full opacity-20 blur-3xl"
+          style={{
+            background: frenzyMode
+              ? "radial-gradient(circle, rgba(251,146,60,0.6) 0%, transparent 70%)"
+              : "radial-gradient(circle, rgba(139,92,246,0.6) 0%, transparent 70%)",
+            top: "-15%",
+            left: "-10%",
+            animation: "float 25s ease-in-out infinite",
+          }}
+        />
+        <div
+          className="absolute w-[400px] h-[400px] rounded-full opacity-15 blur-3xl"
+          style={{
+            background: frenzyMode
+              ? "radial-gradient(circle, rgba(239,68,68,0.6) 0%, transparent 70%)"
+              : "radial-gradient(circle, rgba(168,85,247,0.6) 0%, transparent 70%)",
+            bottom: "-15%",
+            right: "-10%",
+            animation: "float 20s ease-in-out infinite reverse",
+          }}
+        />
+      </div>
+
       {/* Screen flash effect */}
       {screenFlash && (
         <div
@@ -11520,17 +11939,19 @@ const CupidsArrowGame = memo(function CupidsArrowGame({
         />
       )}
 
-      {/* Starfield background */}
+      {/* Premium starfield - optimized CSS animations */}
       <div className="absolute inset-0 pointer-events-none">
-        {[...Array(20)].map((_, i) => (
+        {[...Array(25)].map((_, i) => (
           <div
             key={i}
-            className="absolute w-0.5 h-0.5 bg-white rounded-full animate-[starTwinkle_3s_ease-in-out_infinite]"
+            className="absolute rounded-full bg-white"
             style={{
-              left: `${Math.random() * 100}%`,
-              top: `${Math.random() * 100}%`,
-              animationDelay: `${Math.random() * 3}s`,
-              opacity: 0.2 + Math.random() * 0.3
+              left: `${(i * 17 + 5) % 100}%`,
+              top: `${(i * 23 + 7) % 100}%`,
+              width: i % 3 === 0 ? "3px" : i % 2 === 0 ? "2px" : "1px",
+              height: i % 3 === 0 ? "3px" : i % 2 === 0 ? "2px" : "1px",
+              animation: `starTwinkle ${2 + (i % 3)}s ease-in-out infinite`,
+              animationDelay: `${(i * 0.15) % 3}s`,
             }}
           />
         ))}
@@ -11569,16 +11990,17 @@ const CupidsArrowGame = memo(function CupidsArrowGame({
         </div>
       </div>
 
-      {/* Premium HUD */}
-      <div className="absolute top-0 left-0 right-0 z-30 p-4 bg-gradient-to-b from-black/70 to-transparent pointer-events-none">
-        <div className="flex justify-between items-center max-w-lg mx-auto">
+      {/* Super premium glassmorphism HUD */}
+      <div className="absolute top-0 left-0 right-0 z-30 p-3 sm:p-4 bg-gradient-to-b from-black/50 to-transparent pointer-events-none">
+        <div className="flex justify-between items-center max-w-lg mx-auto gap-2">
           {/* Score */}
           <motion.div
-            className="bg-black/60 backdrop-blur-sm rounded-xl px-4 py-2 border border-purple-500/30"
+            className="bg-white/10 backdrop-blur-xl rounded-2xl px-3 sm:px-4 py-2 border border-white/20 shadow-[0_8px_32px_rgba(0,0,0,0.3)]"
             animate={score !== displayedScore ? { scale: [1, 1.05, 1] } : {}}
+            transition={{ duration: 0.2 }}
           >
-            <div className="text-purple-300 text-[10px] font-bold uppercase tracking-wider">Score</div>
-            <div className="text-white text-xl font-black tabular-nums">
+            <div className="text-purple-200/80 text-[9px] sm:text-[10px] font-bold uppercase tracking-wider">Score</div>
+            <div className="text-white text-lg sm:text-xl font-black tabular-nums drop-shadow-lg">
               {displayedScore.toLocaleString()}
             </div>
           </motion.div>
@@ -11586,32 +12008,49 @@ const CupidsArrowGame = memo(function CupidsArrowGame({
           {/* Combo */}
           <motion.div
             className={cn(
-              "rounded-xl px-4 py-2 font-black text-lg transition-all backdrop-blur-sm border",
-              combo >= 8 ? "bg-gradient-to-r from-orange-500/80 to-red-500/80 text-white border-orange-400/50 animate-[comboFire_0.5s_ease-in-out_infinite]" :
-              combo >= 5 ? "bg-gradient-to-r from-yellow-500/80 to-orange-500/80 text-white border-yellow-400/50" :
-              combo >= 3 ? "bg-gradient-to-r from-pink-500/80 to-rose-500/80 text-white border-pink-400/50" :
-              "bg-black/60 text-white/80 border-purple-500/30"
+              "rounded-2xl px-3 sm:px-4 py-2 font-black text-base sm:text-lg transition-all backdrop-blur-xl border shadow-[0_8px_32px_rgba(0,0,0,0.3)] relative overflow-hidden",
+              combo >= 8 ? "bg-gradient-to-r from-orange-500/70 to-red-500/70 text-white border-orange-400/50" :
+              combo >= 5 ? "bg-gradient-to-r from-yellow-500/70 to-orange-500/70 text-white border-yellow-400/50" :
+              combo >= 3 ? "bg-gradient-to-r from-pink-500/70 to-rose-500/70 text-white border-pink-400/50" :
+              "bg-white/10 text-white/80 border-white/20"
             )}
             animate={combo > 0 ? { scale: [1, 1.1, 1] } : {}}
             transition={{ duration: 0.15 }}
+            style={{ animation: combo >= 8 ? "comboFire 0.5s ease-in-out infinite" : undefined }}
           >
-            {combo}x {combo >= 5 && "🔥"}
+            {combo >= 5 && (
+              <div
+                className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent -skew-x-12"
+                style={{ animation: "shimmer 1.5s ease-in-out infinite" }}
+              />
+            )}
+            <span className="relative drop-shadow-lg">{combo}x {combo >= 5 && "🔥"}</span>
           </motion.div>
 
           {/* Timer */}
-          <div className={cn(
-            "bg-black/60 backdrop-blur-sm rounded-xl px-4 py-2 border",
-            timeLeft <= 10 ? "border-red-500/50" : "border-purple-500/30"
-          )}>
+          <motion.div
+            className={cn(
+              "backdrop-blur-xl rounded-2xl px-3 sm:px-4 py-2 border shadow-[0_8px_32px_rgba(0,0,0,0.3)] relative overflow-hidden",
+              timeLeft <= 10 ? "bg-red-500/30 border-red-400/50" : "bg-white/10 border-white/20"
+            )}
+            animate={timeLeft <= 10 ? { scale: [1, 1.03, 1] } : {}}
+            transition={{ duration: 0.4, repeat: timeLeft <= 10 ? Infinity : 0 }}
+          >
+            {timeLeft <= 10 && (
+              <div
+                className="absolute inset-0 bg-red-500/20"
+                style={{ animation: "pulseGlow 0.5s ease-in-out infinite" }}
+              />
+            )}
             <div className={cn(
-              "text-[10px] font-bold uppercase tracking-wider",
-              timeLeft <= 10 ? "text-red-400" : "text-purple-300"
+              "text-[9px] sm:text-[10px] font-bold uppercase tracking-wider relative",
+              timeLeft <= 10 ? "text-red-200" : "text-purple-200/80"
             )}>Time</div>
             <div className={cn(
-              "text-xl font-black tabular-nums",
-              timeLeft <= 10 ? "text-red-400 animate-pulse" : "text-white"
+              "text-lg sm:text-xl font-black tabular-nums relative drop-shadow-lg",
+              timeLeft <= 10 ? "text-red-200" : "text-white"
             )}>{timeLeft}s</div>
-          </div>
+          </motion.div>
         </div>
       </div>
 
